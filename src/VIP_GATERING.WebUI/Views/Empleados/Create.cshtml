@@ -1,0 +1,64 @@
+@model VIP_GATERING.Domain.Entities.Empleado
+@{
+    ViewData["Title"] = "Nuevo empleado";
+    var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
+    var sucursales = (IEnumerable<VIP_GATERING.Domain.Entities.Sucursal>)ViewBag.Sucursales;
+}
+<h1 class="text-2xl font-semibold mb-4">Nuevo empleado</h1>
+
+<form asp-action="Create" method="post" class="space-y-4 card max-w-lg">
+    @Html.AntiForgeryToken()
+    <div>
+        <label class="block text-sm">Cliente</label>
+        <select class="w-full border rounded p-2" id="selEmpresa">
+            @foreach (var e in empresas)
+            {
+                <option value="@e.Id">@e.Nombre</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm">Sucursal</label>
+        <select asp-for="SucursalId" class="w-full border rounded p-2" id="selSucursal">
+            @foreach (var s in sucursales)
+            {
+                <option value="@s.Id" data-empresa="@s.EmpresaId">@s.Nombre</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm">Estado</label>
+        <select asp-for="Estado" class="w-full border rounded p-2">
+            <option value="0">Habilitado</option>
+            <option value="1">Suspendido</option>
+            <option value="2">Desactivado</option>
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm">Código</label>
+        <input asp-for="Codigo" class="w-full border rounded p-2" />
+    </div>
+    <div>
+        <label class="block text-sm">Nombre</label>
+        <input asp-for="Nombre" class="w-full border rounded p-2" />
+    </div>
+    <div class="flex gap-2">
+        <button class="btn-primary">Guardar</button>
+        <a asp-action="Index" class="btn-outline">Cancelar</a>
+    </div>
+</form>
+<script>
+    (function(){
+        const emp = document.getElementById('selEmpresa');
+        const suc = document.getElementById('selSucursal');
+        function filter(){
+            const v = emp.value;
+            for(const opt of suc.options){
+                if(!opt.value) continue;
+                const show = !opt.dataset.empresa || opt.dataset.empresa === v;
+                opt.style.display = show ? '' : 'none';
+            }
+        }
+        emp.addEventListener('change', filter); filter();
+    })();
+</script>

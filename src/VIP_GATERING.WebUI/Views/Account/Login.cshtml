@@ -1,0 +1,28 @@
+﻿@model VIP_GATERING.WebUI.Models.Account.LoginVM
+@{
+    ViewData["Title"] = "Login";
+}
+<div class="max-w-md mx-auto card">
+    <h1 class="text-xl font-semibold mb-4">Iniciar sesión</h1>
+    <form asp-action="Login" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="ReturnUrl" />
+        <div class="mb-3">
+            <label asp-for="Email" class="block text-sm font-medium"></label>
+            <input asp-for="Email" class="border rounded w-full p-2" autocomplete="username" />
+            <span asp-validation-for="Email" class="text-red-600 text-sm"></span>
+        </div>
+        <div class="mb-4">
+            <label asp-for="Password" class="block text-sm font-medium"></label>
+            <input asp-for="Password" class="border rounded w-full p-2" autocomplete="current-password" />
+            <span asp-validation-for="Password" class="text-red-600 text-sm"></span>
+        </div>
+        <button class="btn-primary">Entrar</button>
+        <div class="text-sm text-slate-500 mt-4">Usuarios de demo: admin@demo.local, empresa@demo.local, empleado@demo.local (contraseña: dev123)</div>
+    </form>
+    
+</div>
+
+@section Scripts{
+    <partial name="_ValidationScriptsPartial" />
+}

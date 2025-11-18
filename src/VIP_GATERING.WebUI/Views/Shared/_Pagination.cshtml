@@ -1,0 +1,31 @@
+@using Microsoft.AspNetCore.Http
+@model VIP_GATERING.WebUI.Models.PagedResult<object>
+@{
+    var req = ViewContext.HttpContext.Request;
+    var q = req.Query.Where(kv => kv.Key != "page" && kv.Key != "pageSize").ToDictionary(kv => kv.Key, kv => kv.Value.ToString());
+    string baseQs = string.Join("&", q.Select(kv => $"{kv.Key}={kv.Value}"));
+    string sep = string.IsNullOrEmpty(baseQs) ? "?" : "?" + baseQs + "&";
+}
+<div class="flex items-center justify-between text-sm mt-3">
+    <div>Mostrando @(Model.Items.Count) de @Model.TotalItems</div>
+    <div class="flex gap-2">
+        @if (Model.Page > 1)
+        {
+            <a class="btn-outline" href="@($"{sep}page={Model.Page-1}&pageSize={Model.PageSize}")">Anterior</a>
+        }
+        else
+        {
+            <span class="btn-outline" style="opacity:.5;pointer-events:none">Anterior</span>
+        }
+        <span class="px-2 py-2">Página @Model.Page de @Model.TotalPages</span>
+        @if (Model.Page < Model.TotalPages)
+        {
+            <a class="btn-outline" href="@($"{sep}page={Model.Page+1}&pageSize={Model.PageSize}")">Siguiente</a>
+        }
+        else
+        {
+            <span class="btn-outline" style="opacity:.5;pointer-events:none">Siguiente</span>
+        }
+    </div>
+</div>
+

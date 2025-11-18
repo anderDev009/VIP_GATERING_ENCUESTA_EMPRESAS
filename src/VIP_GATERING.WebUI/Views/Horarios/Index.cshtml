@@ -1,0 +1,39 @@
+@model IEnumerable<VIP_GATERING.Domain.Entities.Horario>
+@{
+    ViewData["Title"] = "Horarios";
+}
+<div class="flex justify-between items-center mb-4">
+    <h1 class="text-2xl font-semibold">Horarios</h1>
+    <a asp-action="Create" class="btn-primary">Nuevo horario</a>
+ </div>
+
+<div class="overflow-x-auto">
+    <table class="min-w-full bg-white border rounded">
+        <thead class="bg-slate-100">
+            <tr>
+                <th class="text-left p-2">Nombre</th>
+                <th class="text-left p-2">Orden</th>
+                <th class="text-left p-2">Activo</th>
+                <th class="p-2">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var h in Model)
+        {
+            <tr class="border-t">
+                <td class="p-2">@h.Nombre</td>
+                <td class="p-2">@h.Orden</td>
+                <td class="p-2">@(h.Activo?"Sí":"No")</td>
+                <td class="p-2 text-right space-x-2">
+                    <a asp-action="Edit" asp-route-id="@h.Id" class="btn-outline">Editar</a>
+                    <form asp-action="Delete" method="post" class="inline">
+                        <input type="hidden" name="id" value="@h.Id" />
+                        <button class="btn-outline text-red-600">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+

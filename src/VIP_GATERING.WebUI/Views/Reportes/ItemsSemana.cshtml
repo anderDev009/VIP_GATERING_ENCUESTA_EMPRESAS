@@ -1,0 +1,96 @@
+@model VIP_GATERING.WebUI.Models.Reportes.ItemsSemanaVM
+@{
+    ViewData["Title"] = "Items de la semana";
+}
+
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-3xl font-semibold">Items de la semana</h1>
+        <p class="text-sm text-slate-500">(@Model.Inicio:yyyy-MM-dd a @Model.Fin:yyyy-MM-dd)</p>
+    </div>
+    <a class="btn-outline" asp-action="ItemsSemanaPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId">Exportar PDF</a>
+</div>
+
+<form method="get" class="mb-8 grid md:grid-cols-4 gap-4 items-end">
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Empresa</label>
+        <select name="empresaId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="">Todas</option>
+            @foreach (var e in Model.Empresas)
+            {
+                <option value="@e.Id" selected="@(Model.EmpresaId == e.Id ? "selected" : null)">@e.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Sucursal</label>
+        <select name="sucursalId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="">Todas</option>
+            @foreach (var s in Model.Sucursales)
+            {
+                <option value="@s.Id" selected="@(Model.SucursalId == s.Id ? "selected" : null)">@s.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="flex gap-3 md:col-span-4">
+        <button type="submit" class="btn-primary">Filtrar</button>
+        <a class="btn-outline" asp-action="ItemsSemana">Limpiar</a>
+        <input type="hidden" name="_" value="@DateTime.UtcNow.Ticks" />
+    </div>
+</form>
+
+<div class="grid md:grid-cols-3 gap-4 mb-6">
+    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="text-xs uppercase text-slate-400">Costo empresa</p>
+        <p class="text-2xl font-semibold">@Model.TotalCosto.ToString("C")</p>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="text-xs uppercase text-slate-400">Consumo empleados</p>
+        <p class="text-2xl font-semibold">@Model.TotalPrecio.ToString("C")</p>
+    </div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <p class="text-xs uppercase text-slate-400">Beneficio</p>
+        <p class="text-2xl font-semibold">@Model.TotalBeneficio.ToString("C")</p>
+    </div>
+</div>
+
+<div class="overflow-x-auto">
+    <table class="min-w-full bg-white border rounded">
+        <thead class="bg-slate-100">
+        <tr>
+            <th class="text-left p-2">Item</th>
+            <th class="text-right p-2">Costo unitario</th>
+            <th class="text-right p-2">Precio unitario</th>
+            <th class="text-right p-2">Beneficio unitario</th>
+            <th class="text-right p-2">Cantidad</th>
+            <th class="text-right p-2">Total costo</th>
+            <th class="text-right p-2">Total precio</th>
+            <th class="text-right p-2">Beneficio total</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model.Items)
+        {
+            <tr class="border-t">
+                <td class="p-2">@row.Nombre</td>
+                <td class="p-2 text-right">@row.CostoUnitario.ToString("C")</td>
+                <td class="p-2 text-right">@row.PrecioUnitario.ToString("C")</td>
+                <td class="p-2 text-right">@row.BeneficioUnitario.ToString("C")</td>
+                <td class="p-2 text-right">@row.Cantidad</td>
+                <td class="p-2 text-right">@row.TotalCosto.ToString("C")</td>
+                <td class="p-2 text-right">@row.TotalPrecio.ToString("C")</td>
+                <td class="p-2 text-right">@row.TotalBeneficio.ToString("C")</td>
+            </tr>
+        }
+        </tbody>
+        <tfoot>
+        <tr class="bg-slate-50 font-semibold">
+            <th colspan="4" class="text-right p-2">Total</th>
+            <th class="text-right p-2">@Model.Items.Sum(x => x.Cantidad)</th>
+            <th class="text-right p-2">@Model.TotalCosto.ToString("C")</th>
+            <th class="text-right p-2">@Model.TotalPrecio.ToString("C")</th>
+            <th class="text-right p-2">@Model.TotalBeneficio.ToString("C")</th>
+        </tr>
+        </tfoot>
+    </table>
+</div>

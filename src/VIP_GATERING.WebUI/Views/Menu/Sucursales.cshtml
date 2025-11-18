@@ -1,0 +1,31 @@
+@model VIP_GATERING.WebUI.Controllers.MenuSucursalesVM
+@{
+    ViewData["Title"] = "Sucursales por cliente";
+}
+<h1 class="text-2xl font-semibold mb-4">Sucursales por cliente</h1>
+
+<form method="get" class="mb-4 flex flex-wrap items-end gap-2">
+    <input type="text" name="q" value="@Model.Q" placeholder="Buscar por cliente o sucursal" class="border rounded p-2 grow min-w-[260px]" />
+    @if (Model.EmpresaId != null)
+    {
+        <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
+    }
+    <button class="btn-outline">Buscar</button>
+    <a asp-action="Sucursales" class="btn-outline">Limpiar</a>
+</form>
+
+@foreach (var g in Model.Grupos)
+{
+    <div class="mb-6">
+        <div class="font-medium mb-2">@g.Empresa</div>
+        <div class="grid md:grid-cols-2 gap-2">
+            @foreach (var s in g.Sucursales)
+            {
+                <div class="card flex justify-between items-center">
+                    <div>@s.Nombre</div>
+                    <a href="@Url.Action("Administrar","Menu", new { sucursalId = s.Id })" class="btn-outline">Administrar</a>
+                </div>
+            }
+        </div>
+    </div>
+}

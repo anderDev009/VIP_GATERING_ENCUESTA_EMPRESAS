@@ -1,0 +1,203 @@
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model VIP_GATERING.WebUI.Models.MenuEdicionVM
+@{
+    ViewData["Title"] = "Administrar menú";
+}
+<h1 class="text-2xl font-semibold mb-1">Administrar menú semanal</h1>
+
+<form method="get" class="mb-6 flex items-end gap-3">
+    <input type='hidden' name='empresaId' value='@Model.EmpresaId' />
+    <input type='hidden' name='sucursalId' value='@Model.SucursalId' />
+    <div>
+        <label class="block text-sm text-slate-600">Semana (elige cualquier día)</label>
+        <input type="date" name="fecha" value="@Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")" class="border rounded p-2" />
+    </div>
+    <button class="btn-outline">Ir</button>
+</form>
+
+<div class="mb-4 text-sm text-slate-600">
+    Alcance: <span class="inline-block px-2 py-0.5 rounded border bg-white">@Model.OrigenScope</span>
+    — Cliente: <strong>@Model.EmpresaNombre</strong>
+    @if (Model.SucursalId != null)
+    {
+        <text> — Sucursal: <strong>@Model.SucursalNombre</strong></text>
+    }
+    <div class="text-xs text-slate-500">Semana @Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd") a @Model.FechaTermino.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")</div>
+</div>
+
+<form method="get" class="mb-6 p-4 bg-white border rounded grid md:grid-cols-4 gap-3 items-end">
+    <input type='hidden' name='fecha' value='@Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")' />
+    <div>
+        <label class="block text-sm text-slate-600">Cliente</label>
+        <select name="empresaId" class="border rounded p-2 w-full">
+            @foreach (var e in Model.Empresas)
+            {
+                if (Model.EmpresaId == e.id) {<option selected value="@e.id">@e.nombre</option>} else {<option value="@e.id">@e.nombre</option>}
+            }
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm text-slate-600">Sucursal (opcional)</label>
+        <select name="sucursalId" class="border rounded p-2 w-full">
+            <option value="">-- Global por cliente --</option>
+            @foreach (var s in Model.Sucursales)
+            {
+                if (Model.SucursalId == s.id) {<option selected value="@s.id">@s.nombre</option>} else {<option value="@s.id">@s.nombre</option>}
+            }
+        </select>
+    </div>
+    <div>
+        <button class="btn-outline">Cambiar alcance</button>
+    </div>
+</form>
+
+<div class="mb-4 p-4 bg-white border rounded space-y-2">
+    <div class="flex flex-wrap gap-3 justify-between items-center">
+        <div>
+            <div class="text-sm text-slate-500">Estado de encuesta</div>
+            <div class="text-lg font-semibold @(Model.EncuestaCerrada ? "text-red-600" : "text-emerald-600")">
+                @(Model.EncuestaCerrada ? "Cerrada" : "Abierta")
+            </div>
+        </div>
+        <div class="text-sm text-slate-600">
+            Cierre autom&aacute;tico: @Model.FechaCierreAutomatica.ToString("dd/MM/yyyy")
+            @if (Model.FechaCierreManual != null)
+            {
+                <div>Cierre manual: @Model.FechaCierreManual.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+            }
+        </div>
+        <div class="text-sm text-slate-600">
+            Empleados con encuesta completa: <strong>@Model.EmpleadosCompletos</strong>
+        </div>
+        @if (User.IsInRole("Admin"))
+        {
+            <div class="flex gap-2">
+                @if (!Model.EncuestaCerrada)
+                {
+                    <form asp-action="CerrarEncuesta" method="post" class="inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="inicio" value="@Model.FechaInicio.ToString("yyyy-MM-dd")" />
+                        <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
+                        <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
+                        <button class="btn-outline" onclick="return confirm('¿Cerrar encuesta para esta semana?');">Cerrar encuesta</button>
+                    </form>
+                }
+                else
+                {
+                    <form asp-action="ReabrirEncuesta" method="post" class="inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="inicio" value="@Model.FechaInicio.ToString("yyyy-MM-dd")" />
+                        <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
+                        <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
+                        <button class="btn-outline">Reabrir encuesta</button>
+                    </form>
+                }
+            </div>
+        }
+    </div>
+    @if (Model.EncuestaCerrada)
+    {
+        <div class="text-sm text-amber-700">Mientras la encuesta esté cerrada no se pueden modificar las opciones.</div>
+    }
+</div>
+
+<form asp-action="Guardar" method="post" class="space-y-4">
+    @Html.AntiForgeryToken()
+    <div class="text-red-700 mb-2">@Html.ValidationSummary()</div>
+    <input type="hidden" asp-for="FechaInicio" />
+    <input type="hidden" asp-for="FechaTermino" />
+    <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
+    <input type="hidden" name="SucursalId" value="@Model.SucursalId" />
+
+    @for (var i = 0; i < Model.Dias.Count; i++)
+    {
+        <div class="bg-white border rounded p-4">
+            <input type="hidden" name="Dias[@i].OpcionMenuId" value="@Model.Dias[i].OpcionMenuId" />
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <div class="font-medium">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(Model.Dias[i].DiaSemana)</div>
+                <span class="text-xs uppercase tracking-wide bg-slate-100 text-slate-600 px-2 py-0.5 rounded">@Model.Dias[i].HorarioNombre</span>
+            </div>
+            <div class="grid md:grid-cols-4 gap-3">
+                <div>
+                    <label class="text-sm text-slate-600">Opción A</label>
+                    <select name="Dias[@i].A" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
+                        <option value="">-- Sin opción --</option>
+                        @foreach (var o in Model.Opciones)
+                        {
+                            if (Model.Dias[i].A.HasValue && Model.Dias[i].A.Value == o.Id)
+                            {
+                                <option selected value="@o.Id">@o.Nombre</option>
+                            }
+                            else
+                            {
+                                <option value="@o.Id">@o.Nombre</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm text-slate-600">Opción B</label>
+                    <select name="Dias[@i].B" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
+                        <option value="">-- Sin opción --</option>
+                        @foreach (var o in Model.Opciones)
+                        {
+                            if (Model.Dias[i].B.HasValue && Model.Dias[i].B.Value == o.Id)
+                            {
+                                <option selected value="@o.Id">@o.Nombre</option>
+                            }
+                            else
+                            {
+                                <option value="@o.Id">@o.Nombre</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm text-slate-600">Opción C</label>
+                    <select name="Dias[@i].C" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
+                        <option value="">-- Sin opción --</option>
+                        @foreach (var o in Model.Opciones)
+                        {
+                            if (Model.Dias[i].C.HasValue && Model.Dias[i].C.Value == o.Id)
+                            {
+                                <option selected value="@o.Id">@o.Nombre</option>
+                            }
+                            else
+                            {
+                                <option value="@o.Id">@o.Nombre</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="flex items-center gap-3">
+        <a class="btn-outline" href="@Url.Action("Administrar", new { fecha = Model.FechaInicio.ToDateTime(TimeOnly.MinValue).AddDays(-7).ToString("yyyy-MM-dd"), empresaId = Model.EmpresaId, sucursalId = Model.SucursalId })">Semana anterior</a>
+        <button class="btn-primary" @(Model.EncuestaCerrada ? "disabled" : "")>Guardar todo</button>
+        <a class="btn-outline" href="@Url.Action("Administrar", new { fecha = Model.FechaInicio.ToDateTime(TimeOnly.MinValue).AddDays(7).ToString("yyyy-MM-dd"), empresaId = Model.EmpresaId, sucursalId = Model.SucursalId })">Siguiente semana</a>
+    </div>
+</form>
+
+<script>
+    (function(){
+        // Inserta buscadores para cada select de opciones
+        const selects = document.querySelectorAll('select[name^="Dias["][name$='].A'] , select[name^="Dias["][name$='].B'], select[name^="Dias["][name$='].C']');
+        selects.forEach(sel => {
+            if (sel.previousElementSibling && sel.previousElementSibling.classList && sel.previousElementSibling.classList.contains('option-search')) return;
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.placeholder = 'Buscar...';
+            inp.className = 'option-search border rounded p-2 mb-1 w-full';
+            sel.parentElement.insertBefore(inp, sel);
+            inp.addEventListener('input', () => {
+                const q = inp.value.toLowerCase();
+                Array.from(sel.options).forEach(opt => {
+                    if(!opt.value){ opt.style.display=''; return; }
+                    opt.style.display = opt.text.toLowerCase().includes(q) ? '' : 'none';
+                });
+            });
+        });
+    })();
+</script>

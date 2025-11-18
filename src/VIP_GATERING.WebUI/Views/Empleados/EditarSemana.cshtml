@@ -1,0 +1,78 @@
+@model VIP_GATERING.WebUI.Models.SemanaEmpleadoVM
+@{
+    ViewData["Title"] = "Editar selecciones (jefe)";
+}
+
+<h1 class="text-2xl font-semibold mb-2">Editar selecciones de @Model.EmpleadoNombre</h1>
+<div class="mb-4 text-sm text-slate-600">
+    Alcance: <span class="inline-block px-2 py-0.5 rounded border bg-white">@Model.OrigenMenu</span>
+    &mdash; Cliente: <strong>@Model.EmpresaNombre</strong>
+    @if (!string.IsNullOrWhiteSpace(Model.SucursalNombre))
+    {
+        <text> &mdash; Sucursal: <strong>@Model.SucursalNombre</strong></text>
+    }
+    <div class="text-xs text-slate-500">Semana @Model.FechaInicio.ToString("yyyy-MM-dd") a @Model.FechaTermino.ToString("yyyy-MM-dd")</div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.MensajeBloqueo))
+{
+    <div class="p-3 rounded bg-amber-50 border border-amber-200 text-amber-800 mb-4">
+        @Model.MensajeBloqueo
+    </div>
+}
+
+<form asp-action="GuardarSemanaJefe" method="post" class="space-y-4">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="empleadoId" value="@Model.EmpleadoId" />
+    <input type="hidden" name="MenuId" value="@Model.MenuId" />
+    @for (var i = 0; i < Model.Dias.Count; i++)
+    {
+        var d = Model.Dias[i];
+        <div class="bg-white border rounded">
+            <div class="px-4 py-3 border-b font-medium">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana) - @d.HorarioNombre</div>
+            <div class="p-4">
+                @if (d.A == null && d.B == null && d.C == null)
+                {
+                    <div class="text-slate-500">Aún no hay opciones definidas para este día.</div>
+                }
+                else
+                {
+                    <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
+                    var opcionesDia = new[]
+                    {
+                        new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA },
+                        new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB },
+                        new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC }
+                    };
+                    <div class="grid md:grid-cols-3 gap-3">
+                        @foreach (var opc in opcionesDia)
+                        {
+                            var seleccionada = d.Seleccion == opc.Clave[0];
+                            <label class="border rounded-lg p-3 flex gap-3 items-center hover:border-emerald-500 transition @((seleccionada) ? "border-emerald-500 bg-emerald-50 shadow-sm" : "border-slate-200")">
+                                <input type="radio"
+                                       name="Dias[@i].Seleccion"
+                                       value="@opc.Clave"
+                                       class="mt-1"
+                                       @(seleccionada ? "checked" : "") />
+                                <div class="flex items-center gap-3 w-full">
+                                    @if (!string.IsNullOrWhiteSpace(opc.Imagen))
+                                    {
+                                        <img src="@opc.Imagen" alt="Opción @opc.Clave de @d.HorarioNombre" class="w-20 h-20 object-cover rounded-md border" />
+                                    }
+                                    <div>
+                                        <div class="text-xs uppercase text-slate-500">Opción @opc.Clave</div>
+                                        <div class="font-medium">@(!string.IsNullOrWhiteSpace(opc.Nombre) ? opc.Nombre : "Sin definir")</div>
+                                    </div>
+                                </div>
+                            </label>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    <div class="flex gap-3">
+        <button class="btn-primary">Guardar cambios</button>
+        <a asp-action="Semana" asp-route-id="@Model.EmpleadoId" class="btn-outline">Cancelar</a>
+    </div>
+</form>

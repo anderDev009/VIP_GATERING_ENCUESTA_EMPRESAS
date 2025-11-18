@@ -1,0 +1,121 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using VIP_GATERING.Domain.Entities;
+using VIP_GATERING.Infrastructure.Identity;
+
+namespace VIP_GATERING.Infrastructure.Data;
+
+public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>
+{
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+    public DbSet<Empresa> Empresas => Set<Empresa>();
+    public DbSet<Sucursal> Sucursales => Set<Sucursal>();
+    public DbSet<Empleado> Empleados => Set<Empleado>();
+    public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<Rol> Roles => Set<Rol>();
+    public DbSet<RolUsuario> RolesUsuario => Set<RolUsuario>();
+    public DbSet<Opcion> Opciones => Set<Opcion>();
+    public DbSet<Menu> Menus => Set<Menu>();
+    public DbSet<OpcionMenu> OpcionesMenu => Set<OpcionMenu>();
+    public DbSet<Horario> Horarios => Set<Horario>();
+    public DbSet<SucursalHorario> SucursalesHorarios => Set<SucursalHorario>();
+    public DbSet<RespuestaFormulario> RespuestasFormulario => Set<RespuestaFormulario>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Sucursal>()
+            .HasOne(s => s.Empresa)
+            .WithMany(e => e.Sucursales)
+            .HasForeignKey(s => s.EmpresaId);
+
+        modelBuilder.Entity<Empleado>()
+            .HasOne(e => e.Sucursal)
+            .WithMany(s => s.Empleados)
+            .HasForeignKey(e => e.SucursalId);
+
+        // Legacy Usuario entity mapping (kept for backward compatibility in the domain layer)
+        modelBuilder.Entity<Usuario>()
+            .HasOne(u => u.Empleado)
+            .WithOne(e => e.Usuario)
+            .HasForeignKey<Usuario>(u => u.EmpleadoId);
+
+        // Identity user links to domain entities for scoping
+        modelBuilder.Entity<ApplicationUser>()
+            .HasIndex(u => u.EmpleadoId);
+        modelBuilder.Entity<ApplicationUser>()
+            .HasIndex(u => u.EmpresaId);
+
+        modelBuilder.Entity<RolUsuario>()
+            .HasOne(ru => ru.Rol)
+            .WithMany(r => r.RolesUsuario)
+            .HasForeignKey(ru => ru.RolId);
+
+        modelBuilder.Entity<RolUsuario>()
+            .HasOne(ru => ru.Usuario)
+            .WithMany(u => u.RolesUsuario)
+            .HasForeignKey(ru => ru.UsuarioId);
+
+        modelBuilder.Entity<OpcionMenu>()
+            .HasOne(om => om.Menu)
+            .WithMany(m => m.OpcionesPorDia)
+            .HasForeignKey(om => om.MenuId);
+
+        modelBuilder.Entity<Menu>()
+            .HasOne(m => m.Empresa)
+            .WithMany()
+            .HasForeignKey(m => m.EmpresaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Menu>()
+            .HasOne(m => m.Sucursal)
+            .WithMany()
+            .HasForeignKey(m => m.SucursalId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<OpcionMenu>()
+            .HasOne(om => om.OpcionA)
+            .WithMany()
+            .HasForeignKey(om => om.OpcionIdA)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<OpcionMenu>()
+            .HasOne(om => om.OpcionB)
+            .WithMany()
+            .HasForeignKey(om => om.OpcionIdB)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<OpcionMenu>()
+            .HasOne(om => om.OpcionC)
+            .WithMany()
+            .HasForeignKey(om => om.OpcionIdC)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<OpcionMenu>()
+            .HasOne(om => om.Horario)
+            .WithMany()
+            .HasForeignKey(om => om.HorarioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<RespuestaFormulario>()
+            .HasOne(r => r.OpcionMenu)
+            .WithMany(om => om.Respuestas)
+            .HasForeignKey(r => r.OpcionMenuId);
+
+        modelBuilder.Entity<SucursalHorario>()
+            .HasIndex(sh => new { sh.SucursalId, sh.HorarioId })
+            .IsUnique();
+        modelBuilder.Entity<SucursalHorario>()
+            .HasOne(sh => sh.Sucursal)
+            .WithMany()
+            .HasForeignKey(sh => sh.SucursalId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<SucursalHorario>()
+            .HasOne(sh => sh.Horario)
+            .WithMany()
+            .HasForeignKey(sh => sh.HorarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

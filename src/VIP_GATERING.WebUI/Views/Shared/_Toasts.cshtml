@@ -1,0 +1,38 @@
+@{
+    var success = TempData["Success"] as string;
+    var info = TempData["Info"] as string;
+    var error = TempData["Error"] as string;
+}
+<div id="toast-root" class="fixed top-4 right-4 z-50 space-y-2" style="position:fixed;top:1rem;right:1rem;z-index:9999;">
+    @if (!string.IsNullOrWhiteSpace(success))
+    {
+        <div class="px-4 py-3 rounded shadow bg-emerald-600 text-white" data-toast style="background:#059669;color:#fff;border-radius:.375rem;box-shadow:0 1px 2px rgba(0,0,0,.1);">
+            @success
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(info))
+    {
+        <div class="px-4 py-3 rounded shadow bg-sky-600 text-white" data-toast style="background:#0284c7;color:#fff;border-radius:.375rem;box-shadow:0 1px 2px rgba(0,0,0,.1);">
+            @info
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="px-4 py-3 rounded shadow bg-red-600 text-white" data-toast style="background:#dc2626;color:#fff;border-radius:.375rem;box-shadow:0 1px 2px rgba(0,0,0,.1);">
+            @error
+        </div>
+    }
+</div>
+<script>
+    (function () {
+        const nodes = document.querySelectorAll('#toast-root [data-toast]');
+        nodes.forEach(n => {
+            setTimeout(() => {
+                n.style.transition = 'opacity .4s ease, transform .4s ease';
+                n.style.opacity = '0';
+                n.style.transform = 'translateY(-6px)';
+                setTimeout(() => n.remove(), 400);
+            }, 3000);
+        });
+    })();
+    </script>

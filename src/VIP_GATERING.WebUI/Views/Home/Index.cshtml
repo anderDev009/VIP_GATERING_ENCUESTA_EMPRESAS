@@ -1,0 +1,62 @@
+@{
+    ViewData["Title"] = "Panel principal";
+    var nombre = User.Identity?.IsAuthenticated == true ? User.Identity.Name : "Invitado";
+    var esAdmin = User.IsInRole("Admin");
+    var esEmpresa = User.IsInRole("Empresa");
+}
+
+<section class="dashboard-hero">
+    <div>
+        <p class="text-sm text-slate-500">Bienvenido de nuevo</p>
+        <h1>@nombre</h1>
+        <p class="text-slate-500 max-w-xl">Consulta el estado general de encuestas y accede rápidamente a los módulos clave para continuar con la operación diaria.</p>
+    </div>
+    <div class="dashboard-metrics">
+        <div class="dashboard-metric">
+            <p class="label">Semana actual</p>
+            <p class="value">@DateTime.Now.ToString("dd MMM")</p>
+        </div>
+        <div class="dashboard-metric">
+            <p class="label">Reportes activos</p>
+            <p class="value">@((esAdmin || esEmpresa) ? "3" : "1")</p>
+        </div>
+        <div class="dashboard-metric">
+            <p class="label">Atajos</p>
+            <p class="value">@(User.Identity?.IsAuthenticated == true ? "Listo" : "Iniciar")</p>
+        </div>
+    </div>
+</section>
+
+<section class="dashboard-grid">
+    <div class="dashboard-card">
+        <span class="text-xs uppercase text-slate-400">Operación</span>
+        <a asp-controller="Empleado" asp-action="MiSemana">Mi semana</a>
+        <p>Confirma selecciones y visualiza el menú asignado para cada empleado.</p>
+    </div>
+    @if (esAdmin || esEmpresa)
+    {
+        <div class="dashboard-card">
+            <span class="text-xs uppercase text-slate-400">Recursos</span>
+            <a asp-controller="Empleados" asp-action="Index">Empleados</a>
+            <p>Gestiona usuarios, acceso a encuestas y creación de cuentas.</p>
+        </div>
+        <div class="dashboard-card">
+            <span class="text-xs uppercase text-slate-400">Logística</span>
+            <a asp-controller="Sucursales" asp-action="Index">Sucursales</a>
+            <p>Actualiza la información de sedes y relación con clientes.</p>
+        </div>
+        <div class="dashboard-card">
+            <span class="text-xs uppercase text-slate-400">Análisis</span>
+            <a asp-controller="Reportes" asp-action="Selecciones">Reportes</a>
+            <p>Consulta selecciones, totales por empleado e ítems de la semana.</p>
+        </div>
+    }
+    else
+    {
+        <div class="dashboard-card">
+            <span class="text-xs uppercase text-slate-400">Soporte</span>
+            <a asp-controller="Account" asp-action="ChangePassword">Actualizar contraseña</a>
+            <p>Refuerza la seguridad de tu cuenta en segundos.</p>
+        </div>
+    }
+</section>

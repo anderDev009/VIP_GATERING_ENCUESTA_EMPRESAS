@@ -1,0 +1,74 @@
+@model VIP_GATERING.WebUI.Models.PagedResult<VIP_GATERING.Domain.Entities.Sucursal>
+@{
+    ViewData["Title"] = "Sucursales";
+    var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
+    Guid? empresaSel = ViewBag.EmpresaId as Guid?;
+}
+@section Breadcrumb{<div class="text-sm text-slate-500 mb-4">Inicio / Administración / Sucursales</div>}
+<div class="flex justify-between items-center mb-4">
+    <div>
+        <h1 class="text-2xl font-semibold">Sucursales</h1>
+        <p class="text-sm text-slate-500">Gestiona las sedes de cada cliente desde un solo lugar.</p>
+    </div>
+    <a asp-action="Create" class="btn-primary">Nueva sucursal</a>
+</div>
+
+<form method="get" class="mb-6 grid md:grid-cols-4 gap-4 max-w-4xl items-end">
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Cliente</label>
+        <select name="empresaId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="">-- Todos --</option>
+            @foreach (var e in empresas)
+            {
+                if (empresaSel == e.Id)
+                {
+                    <option selected value="@e.Id">@e.Nombre</option>
+                }
+                else
+                {
+                    <option value="@e.Id">@e.Nombre</option>
+                }
+            }
+        </select>
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Buscar</label>
+        <input type="text" name="q" value="@ViewBag.Q" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-100" />
+    </div>
+    <div class="flex gap-3 md:col-span-4">
+        <button class="btn-primary" type="submit">Aplicar filtros</button>
+        <a asp-action="Index" class="btn-outline">Limpiar</a>
+    </div>
+</form>
+
+<div class="overflow-x-auto">
+    <table class="min-w-full bg-white border rounded">
+        <thead class="bg-slate-100">
+            <tr>
+                <th class="text-left p-2">Nombre</th>
+                <th class="text-left p-2">Cliente</th>
+                <th class="p-2">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var s in Model.Items)
+        {
+            <tr class="border-t">
+                <td class="p-2">@s.Nombre</td>
+                <td class="p-2">@s.Empresa?.Nombre</td>
+                <td class="p-2 text-right">
+                    <div class="flex justify-end gap-2">
+                        <a asp-action="Edit" asp-route-id="@s.Id" class="btn-outline">Editar</a>
+                        <form asp-action="Delete" method="post" class="inline">
+                            <input type="hidden" name="id" value="@s.Id" />
+                            <button class="btn-outline text-rose-500 border-rose-100 hover:border-rose-300">Eliminar</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@await Html.PartialAsync("_Pagination", new VIP_GATERING.WebUI.Models.PagedResult<object>{ Items = Model.Items.Cast<object>().ToList(), Page=Model.Page, PageSize=Model.PageSize, TotalItems=Model.TotalItems })

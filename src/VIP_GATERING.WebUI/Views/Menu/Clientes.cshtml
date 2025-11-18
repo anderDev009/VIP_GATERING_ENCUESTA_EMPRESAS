@@ -1,0 +1,40 @@
+@model VIP_GATERING.WebUI.Controllers.MenuClientesVM
+@{
+    ViewData["Title"] = "Clientes";
+}
+<h1 class="text-2xl font-semibold mb-4">Clientes</h1>
+
+<form method="get" class="mb-4 flex flex-wrap items-end gap-2">
+    <input type="text" name="q" value="@Model.Q" placeholder="Buscar por nombre o RNC" class="border rounded p-2 grow min-w-[260px]" />
+    <button class="btn-outline">Buscar</button>
+    <a asp-action="Clientes" class="btn-outline">Limpiar</a>
+    <a asp-controller="Menu" asp-action="Sucursales" class="btn-outline">Ver sucursales (agrupadas)</a>
+</form>
+
+<div class="overflow-x-auto">
+    <table class="min-w-full bg-white border rounded">
+        <thead class="bg-slate-100">
+            <tr>
+                <th class="text-left p-2">Nombre</th>
+                <th class="text-left p-2">RNC</th>
+                <th class="text-left p-2">Sucursales</th>
+                <th class="p-2">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var c in Model.Clientes)
+        {
+            <tr class="border-t">
+                <td class="p-2">@c.Nombre</td>
+                <td class="p-2">@c.Rnc</td>
+                <td class="p-2">@c.Sucursales</td>
+                <td class="p-2 space-x-2 text-right">
+                    <a href="@Url.Action("Administrar","Menu", new { empresaId = c.Id, alcance = "empresa" })" class="px-2 py-1 border rounded">Menú del cliente</a>
+                    <a href="@Url.Action("Sucursales","Menu", new { empresaId = c.Id })" class="px-2 py-1 border rounded">Sucursales</a>
+                    <a href="@Url.Action("Copiar","Menu", new { empresaId = c.Id })" class="px-2 py-1 border rounded">Copiar a sucursales</a>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "VIP_GATERING.Domain/1.0.0": {
+        "runtime": {
+          "VIP_GATERING.Domain.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "VIP_GATERING.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

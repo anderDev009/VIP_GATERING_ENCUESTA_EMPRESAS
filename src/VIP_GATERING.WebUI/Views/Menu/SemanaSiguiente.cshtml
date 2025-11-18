@@ -1,0 +1,54 @@
+@model VIP_GATERING.WebUI.Models.MenuSemanaVM
+@{
+    ViewData["Title"] = "Armar menú semana siguiente";
+}
+<h1 class="text-2xl font-semibold mb-6">Armar menú (próxima semana)</h1>
+
+<div class="space-y-4">
+@foreach (var d in Model.Dias)
+{
+    <div class="bg-white border rounded p-4">
+        <div class="font-medium mb-2">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana)</div>
+        <form asp-action="Asignar" method="post" class="grid md:grid-cols-4 gap-3 items-end">
+            <input type="hidden" name="id" value="@d.Id" />
+
+            <div>
+                <label class="text-sm text-slate-600">Opción A</label>
+                <select name="a" class="w-full border rounded p-2">
+                    <option value="">-- Sin opción --</option>
+                    @foreach (var o in Model.Opciones)
+                    {
+                        <option value="@o.Id">@o.Nombre</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="text-sm text-slate-600">Opción B</label>
+                <select name="b" class="w-full border rounded p-2">
+                    <option value="">-- Sin opción --</option>
+                    @foreach (var o in Model.Opciones)
+                    {
+                        <option value="@o.Id">@o.Nombre</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="text-sm text-slate-600">Opción C</label>
+                <select name="c" class="w-full border rounded p-2">
+                    <option value="">-- Sin opción --</option>
+                    @foreach (var o in Model.Opciones)
+                    {
+                        <option value="@o.Id">@o.Nombre</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <button class="px-3 py-2 bg-indigo-600 text-white rounded">Guardar</button>
+            </div>
+        </form>
+    </div>
+}
+</div>

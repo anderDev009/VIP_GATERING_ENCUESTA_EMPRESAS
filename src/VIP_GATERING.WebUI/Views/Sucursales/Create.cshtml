@@ -1,0 +1,43 @@
+@model VIP_GATERING.Domain.Entities.Sucursal
+@{
+    ViewData["Title"] = "Nueva sucursal";
+    var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
+}
+<h1 class="text-2xl font-semibold mb-4">Nueva sucursal</h1>
+
+<form asp-action="Create" method="post" class="space-y-4 card max-w-lg">
+    @Html.AntiForgeryToken()
+    <div>
+        <label class="block text-sm">Nombre</label>
+        <input asp-for="Nombre" class="w-full border rounded p-2" />
+    </div>
+    <div>
+        <label class="block text-sm">Dirección</label>
+        <input asp-for="Direccion" class="w-full border rounded p-2" />
+    </div>
+    <div>
+        <label class="block text-sm">Cliente</label>
+        <select asp-for="EmpresaId" class="w-full border rounded p-2">
+            @foreach (var e in empresas)
+            {
+                <option value="@e.Id">@e.Nombre</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label class="block text-sm">Horarios asignados</label>
+        <div class="grid grid-cols-2 gap-2">
+        @foreach (var h in (IEnumerable<VIP_GATERING.Domain.Entities.Horario>)ViewBag.Horarios)
+        {
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="horarios" value="@h.Id" checked />
+                <span>@h.Nombre</span>
+            </label>
+        }
+        </div>
+    </div>
+    <div class="flex gap-2">
+        <button class="btn-primary">Guardar</button>
+        <a asp-action="Index" class="btn-outline">Cancelar</a>
+    </div>
+</form>
