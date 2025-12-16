@@ -10,6 +10,9 @@ public static class DependencyInjection
         services.AddScoped<IMenuService, MenuService>();
         services.AddScoped<IMenuCloneService, MenuCloneService>();
         services.AddSingleton<IFechaServicio, FechaServicio>();
+        services.AddSingleton<ISubsidioService, SubsidioService>();
+        services.AddScoped<IMenuConfiguracionService, MenuConfiguracionService>();
+        services.AddScoped<IMenuEdicionService, MenuEdicionService>();
         return services;
     }
 }

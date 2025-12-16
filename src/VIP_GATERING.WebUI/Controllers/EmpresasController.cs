@@ -55,6 +55,9 @@ public class EmpresasController : Controller
         if (ent == null) return NotFound();
         ent.Nombre = model.Nombre;
         ent.Rnc = model.Rnc;
+        ent.SubsidiaEmpleados = model.SubsidiaEmpleados;
+        ent.SubsidioTipo = model.SubsidioTipo;
+        ent.SubsidioValor = model.SubsidioValor;
         await _db.SaveChangesAsync();
         TempData["Success"] = "Cliente actualizado.";
         return RedirectToAction(nameof(Index));

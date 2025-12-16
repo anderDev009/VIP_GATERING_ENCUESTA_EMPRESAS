@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using VIP_GATERING.Infrastructure.Data;
 using VIP_GATERING.Infrastructure.Identity;
 
@@ -15,6 +16,9 @@ public static class IdentitySeeder
         {
             await db.Database.MigrateAsync();
         }
+
+        var seedPassword = IdentityDefaults.GetDefaultPassword();
+
         // Roles: Admin, Empresa, Empleado
         async Task EnsureRole(string name)
         {
@@ -48,6 +52,21 @@ public static class IdentitySeeder
         await db.SaveChangesAsync();
 
         // Users
+        async Task EnsurePasswordAsync(ApplicationUser user)
+        {
+            // Reasegurar contraseña demo y limpiar lockout para usuarios conocidos en Dev/Testing
+            var hasPwd = await users.HasPasswordAsync(user);
+            var validPwd = hasPwd && await users.CheckPasswordAsync(user, seedPassword);
+            if (!validPwd)
+            {
+                if (hasPwd)
+                    await users.RemovePasswordAsync(user);
+                await users.AddPasswordAsync(user, seedPassword);
+            }
+            await users.ResetAccessFailedCountAsync(user);
+            await users.SetLockoutEndDateAsync(user, null);
+        }
+
         async Task<ApplicationUser> EnsureUser(string email, string role, Guid? empresaId = null, Guid? empleadoId = null)
         {
             var user = await users.FindByEmailAsync(email);
@@ -61,7 +80,13 @@ public static class IdentitySeeder
                     EmpresaId = empresaId,
                     EmpleadoId = empleadoId
                 };
-                await users.CreateAsync(user, "dev123");
+                await users.CreateAsync(user, seedPassword);
+            }
+            else
+            {
+                // Si ya existía, asegurar contraseña y desbloqueo en entornos no productivos
+                if (!env.IsProduction())
+                    await EnsurePasswordAsync(user);
             }
             if (!await users.IsInRoleAsync(user, role))
             {
@@ -80,6 +105,3 @@ public static class IdentitySeeder
             await users.AddClaimAsync(empleadoUser, new System.Security.Claims.Claim("must_change_password", "1"));
     }
 }
-
-
-

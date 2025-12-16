@@ -6,12 +6,18 @@
 <div class="grid md:grid-cols-2 gap-4">
     <a asp-controller="Menu" asp-action="Clientes" class="block p-4 border rounded bg-white hover:shadow">
         <div class="font-medium">Cambiar menú</div>
-        <div class="text-sm text-slate-500">Buscar cliente y administrar menús (cliente o sucursal).</div>
+        <div class="text-sm text-slate-500">Buscar cliente y administrar menús (cliente o dependiente).</div>
     </a>
 
     <a asp-controller="Menu" asp-action="CrearProxima" class="block p-4 border rounded bg-white hover:shadow">
         <div class="font-medium">Crear/asegurar menú de la próxima semana</div>
         <div class="text-sm text-slate-500">Genera la semana si aún no existe.</div>
+    </a>
+
+
+    <a asp-controller="Configuracion" asp-action="Menu" class="block p-4 border rounded bg-white hover:shadow">
+        <div class="font-medium">Ventana de semana actual</div>
+        <div class="text-sm text-slate-500">Configura hora limite y dias de anticipacion.</div>
     </a>
 
     <a asp-controller="Opciones" asp-action="Index" class="block p-4 border rounded bg-white hover:shadow">
@@ -26,8 +32,8 @@
         <div class="text-sm text-slate-500">Crear y administrar clientes.</div>
     </a>
     <a asp-controller="Sucursales" asp-action="Index" class="block p-4 border rounded bg-white hover:shadow">
-        <div class="font-medium">Sucursales</div>
-        <div class="text-sm text-slate-500">Crear y administrar sucursales.</div>
+        <div class="font-medium">Dependientes</div>
+        <div class="text-sm text-slate-500">Crear y administrar dependientes.</div>
     </a>
     <a asp-controller="Empleados" asp-action="Index" class="block p-4 border rounded bg-white hover:shadow">
         <div class="font-medium">Empleados</div>
@@ -36,5 +42,5 @@
 </div>
 
 <div class="mt-6">
-    <a asp-controller="Menu" asp-action="Sucursales" class="underline">Administrar por sucursal (agrupado por cliente)</a>
+    <a asp-controller="Menu" asp-action="Sucursales" class="underline">Administrar por dependiente (agrupado por cliente)</a>
 </div>

@@ -2,14 +2,16 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using VIP_GATERING.Application.Services;
 using VIP_GATERING.Domain.Entities;
 using VIP_GATERING.Infrastructure.Data;
-using VIP_GATERING.WebUI.Services;
+using VIP_GATERING.Infrastructure.Identity;
 using VIP_GATERING.Infrastructure.Services;
 using VIP_GATERING.WebUI.Models;
-using VIP_GATERING.Infrastructure.Identity;
-using VIP_GATERING.Application.Services;
-using System.ComponentModel.DataAnnotations;
+using VIP_GATERING.WebUI.Services;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
@@ -22,8 +24,9 @@ public class EmpleadosController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IMenuService _menuService;
     private readonly IEncuestaCierreService _cierre;
-    public EmpleadosController(AppDbContext db, ICurrentUserService currentUser, IEmpleadoUsuarioService empUserService, UserManager<ApplicationUser> userManager, IMenuService menuService, IEncuestaCierreService cierre)
-    { _db = db; _currentUser = currentUser; _empUserService = empUserService; _userManager = userManager; _menuService = menuService; _cierre = cierre; }
+    private readonly ISubsidioService _subsidios;
+    public EmpleadosController(AppDbContext db, ICurrentUserService currentUser, IEmpleadoUsuarioService empUserService, UserManager<ApplicationUser> userManager, IMenuService menuService, IEncuestaCierreService cierre, ISubsidioService subsidios)
+    { _db = db; _currentUser = currentUser; _empUserService = empUserService; _userManager = userManager; _menuService = menuService; _cierre = cierre; _subsidios = subsidios; }
 
     public async Task<IActionResult> Index(Guid? empresaId, Guid? sucursalId, string? q, int page = 1, int pageSize = 10)
     {
@@ -158,6 +161,7 @@ public class EmpleadosController : Controller
         ent.Nombre = model.Nombre;
         ent.SucursalId = model.SucursalId;
         ent.Estado = model.Estado;
+        ent.EsSubsidiado = model.EsSubsidiado;
         await _db.SaveChangesAsync();
         TempData["Success"] = "Empleado actualizado.";
         return RedirectToAction(nameof(Index), new { sucursalId = model.SucursalId });
@@ -247,9 +251,28 @@ public class EmpleadosController : Controller
             return RedirectToAction(nameof(Semana), new { id = empleadoId });
         }
 
+        var opcionIds = model.Dias.Select(d => d.OpcionMenuId).ToList();
+        var respuestasActuales = await _db.RespuestasFormulario
+            .Where(r => r.EmpleadoId == empleadoId && opcionIds.Contains(r.OpcionMenuId))
+            .ToListAsync();
+        bool removals = false;
         foreach (var d in model.Dias)
         {
-            if (d.Seleccion is 'A' or 'B' or 'C')
+            if (d.Seleccion is not ('A' or 'B' or 'C' or 'D' or 'E'))
+            {
+                var existente = respuestasActuales.FirstOrDefault(r => r.OpcionMenuId == d.OpcionMenuId);
+                if (existente != null)
+                {
+                    _db.RespuestasFormulario.Remove(existente);
+                    removals = true;
+                }
+            }
+        }
+        if (removals) await _db.SaveChangesAsync();
+
+        foreach (var d in model.Dias)
+        {
+            if (d.Seleccion is 'A' or 'B' or 'C' or 'D' or 'E')
             {
                 await _menuService.RegistrarSeleccionAsync(empleadoId, d.OpcionMenuId, d.Seleccion.Value);
             }
@@ -261,6 +284,7 @@ public class EmpleadosController : Controller
 
     // Crear usuario de Identity para un empleado (solo Admin o Empresa dentro de su empresa)
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> CrearUsuario(Guid id, string email)
     {
         var empleado = await _db.Empleados.Include(e => e.Sucursal).FirstOrDefaultAsync(e => e.Id == id);
@@ -290,6 +314,7 @@ public class EmpleadosController : Controller
         var exists = await _db.Set<ApplicationUser>().AnyAsync(u => u.EmpleadoId == id);
         if (!exists)
         {
+            var tempPassword = IdentityDefaults.GetDefaultPassword();
             var user = new ApplicationUser
             {
                 UserName = email,
@@ -298,11 +323,12 @@ public class EmpleadosController : Controller
                 EmpleadoId = empleado.Id,
                 EmpresaId = empleado.Sucursal!.EmpresaId
             };
-            var res = await _userManager.CreateAsync(user, "dev123");
+            var res = await _userManager.CreateAsync(user, tempPassword);
             if (res.Succeeded)
             {
                 await _userManager.AddToRoleAsync(user, "Empleado");
-                TempData["Success"] = "Usuario creado.";
+                await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("must_change_password", "1"));
+                TempData["Success"] = "Usuario creado con contraseña temporal segura. Se pedirá cambio al iniciar sesión.";
             }
             else
             {
@@ -328,9 +354,9 @@ public class EmpleadosController : Controller
             var empresaId = _currentUser.EmpresaId;
             if (empresaId == null || empleado.Sucursal!.EmpresaId != empresaId) return Forbid();
         }
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 3)
+        if (string.IsNullOrWhiteSpace(newPassword))
         {
-            TempData["Error"] = "La nueva contraseña es requerida (mínimo 3 caracteres).";
+            TempData["Error"] = "La nueva contraseña es requerida.";
             return RedirectToAction(nameof(Edit), new { id });
         }
         if (newPassword != confirmPassword)
@@ -342,6 +368,12 @@ public class EmpleadosController : Controller
         if (user == null)
         {
             TempData["Error"] = "El empleado no tiene usuario.";
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+        var validationError = await ValidatePasswordAsync(user, newPassword);
+        if (validationError != null)
+        {
+            TempData["Error"] = validationError;
             return RedirectToAction(nameof(Edit), new { id });
         }
         var hasPwd = await _userManager.HasPasswordAsync(user);
@@ -381,6 +413,18 @@ public class EmpleadosController : Controller
         if (exists != null) return Json("Ya existe un usuario con ese correo.");
         return Json(true);
     }
+
+    private async Task<string?> ValidatePasswordAsync(ApplicationUser user, string newPassword)
+    {
+        var allErrors = new List<IdentityError>();
+        foreach (var validator in _userManager.PasswordValidators)
+        {
+            var res = await validator.ValidateAsync(_userManager, user, newPassword);
+            if (!res.Succeeded) allErrors.AddRange(res.Errors);
+        }
+        return allErrors.Count > 0 ? string.Join("; ", allErrors.Select(e => e.Description)) : null;
+    }
+
     private async Task<SemanaEmpleadoVM?> ConstruirSemanaEmpleadoAsync(Guid empleadoId, bool paraAdministrador)
     {
         var info = await _db.Empleados
@@ -394,7 +438,14 @@ public class EmpleadosController : Controller
                 e.SucursalId,
                 SucursalNombre = e.Sucursal!.Nombre,
                 EmpresaId = e.Sucursal!.EmpresaId,
-                EmpresaNombre = e.Sucursal!.Empresa!.Nombre
+                EmpresaNombre = e.Sucursal!.Empresa!.Nombre,
+                e.EsSubsidiado,
+                SucursalSubsidia = e.Sucursal!.SubsidiaEmpleados,
+                SucursalTipo = e.Sucursal!.SubsidioTipo,
+                SucursalValor = e.Sucursal!.SubsidioValor,
+                EmpresaSubsidia = e.Sucursal!.Empresa!.SubsidiaEmpleados,
+                EmpresaTipo = e.Sucursal!.Empresa!.SubsidioTipo,
+                EmpresaValor = e.Sucursal!.Empresa!.SubsidioValor
             })
             .FirstOrDefaultAsync();
         if (info == null) return null;
@@ -405,7 +456,9 @@ public class EmpleadosController : Controller
         var fechaCierreAuto = _cierre.GetFechaCierreAutomatica(menu);
         var encuestaCerrada = _cierre.EstaCerrada(menu);
         var opciones = await _db.OpcionesMenu
-            .Include(o => o.OpcionA).Include(o => o.OpcionB).Include(o => o.OpcionC).Include(o => o.Horario)
+            .Include(o => o.OpcionA).Include(o => o.OpcionB).Include(o => o.OpcionC)
+            .Include(o => o.OpcionD).Include(o => o.OpcionE)
+            .Include(o => o.Horario)
             .Where(o => o.MenuId == menu.Id)
             .OrderBy(o => o.DiaSemana)
             .ToListAsync();
@@ -415,13 +468,27 @@ public class EmpleadosController : Controller
             foreach (var d in dias)
                 await _db.OpcionesMenu.AddAsync(new OpcionMenu { MenuId = menu.Id, DiaSemana = d });
             await _db.SaveChangesAsync();
-            opciones = await _db.OpcionesMenu.Include(o => o.OpcionA).Include(o => o.OpcionB).Include(o => o.OpcionC)
+            opciones = await _db.OpcionesMenu
+                .Include(o => o.OpcionA).Include(o => o.OpcionB).Include(o => o.OpcionC)
+                .Include(o => o.OpcionD).Include(o => o.OpcionE)
                 .Where(o => o.MenuId == menu.Id).OrderBy(o => o.DiaSemana).ToListAsync();
         }
         var opcionIds = opciones.Select(o => o.Id).ToList();
         var respuestas = await _db.RespuestasFormulario
             .Where(r => r.EmpleadoId == empleadoId && opcionIds.Contains(r.OpcionMenuId))
             .ToListAsync();
+        var totalEmpleado = 0m;
+        var totalEmpresa = 0m;
+        foreach (var r in respuestas)
+        {
+            var om = opciones.FirstOrDefault(o => o.Id == r.OpcionMenuId);
+            var opcion = GetOpcionSeleccionada(om, r.Seleccion);
+            if (opcion == null) continue;
+            var ctx = new SubsidioContext(opcion.EsSubsidiado, info.EsSubsidiado, info.EmpresaSubsidia, info.EmpresaTipo, info.EmpresaValor, info.SucursalSubsidia, info.SucursalTipo, info.SucursalValor);
+            var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
+            totalEmpleado += precio;
+            totalEmpresa += opcion.Costo;
+        }
 
         return new SemanaEmpleadoVM
         {
@@ -434,11 +501,13 @@ public class EmpleadosController : Controller
             MensajeBloqueo = encuestaCerrada ? $"La encuesta está cerrada desde {fechaCierreAuto:dd/MM/yyyy}." : null,
             RespuestasCount = respuestas.Count,
             TotalDias = opciones.Count,
-            OrigenMenu = menu.SucursalId != null ? "Sucursal" : "Cliente",
+            OrigenMenu = menu.SucursalId != null ? "Dependiente" : "Cliente",
             EmpresaNombre = info.EmpresaNombre,
             SucursalNombre = info.SucursalNombre,
             EsJefe = info.EsJefe,
             EsVistaAdministrador = paraAdministrador,
+            TotalEmpleado = totalEmpleado,
+            TotalEmpresa = paraAdministrador ? totalEmpresa : null,
             Dias = opciones.Select(o => new DiaEmpleadoVM
             {
                 OpcionMenuId = o.Id,
@@ -450,8 +519,27 @@ public class EmpleadosController : Controller
                 ImagenA = o.OpcionA?.ImagenUrl,
                 ImagenB = o.OpcionB?.ImagenUrl,
                 ImagenC = o.OpcionC?.ImagenUrl,
+                D = o.OpcionD?.Nombre,
+                E = o.OpcionE?.Nombre,
+                ImagenD = o.OpcionD?.ImagenUrl,
+                ImagenE = o.OpcionE?.ImagenUrl,
+                OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas,
                 Seleccion = respuestas.FirstOrDefault(r => r.OpcionMenuId == o.Id)?.Seleccion
             }).ToList()
+        };
+    }
+
+    private static Opcion? GetOpcionSeleccionada(OpcionMenu opcionMenu, char seleccion)
+    {
+        var max = opcionMenu.OpcionesMaximas == 0 ? 3 : Math.Clamp(opcionMenu.OpcionesMaximas, 1, 5);
+        return seleccion switch
+        {
+            'A' when max >= 1 => opcionMenu.OpcionA,
+            'B' when max >= 2 => opcionMenu.OpcionB,
+            'C' when max >= 3 => opcionMenu.OpcionC,
+            'D' when max >= 4 => opcionMenu.OpcionD,
+            'E' when max >= 5 => opcionMenu.OpcionE,
+            _ => null
         };
     }
 }

@@ -8,25 +8,64 @@ public static class SeedData
     public static async Task EnsureSeedAsync(AppDbContext db)
     {
         // Horarios por defecto
-        if (!await db.Horarios.AnyAsync())
+        var horariosPermitidos = new (string nombre, int orden)[]
         {
-            await db.Horarios.AddRangeAsync(
-                new Horario { Nombre = "Desayuno", Orden = 1, Activo = true },
-                new Horario { Nombre = "Almuerzo", Orden = 2, Activo = true }
-            );
+            ("Desayuno", 1),
+            ("Almuerzo", 2),
+            ("Cena", 3)
+        };
+        var nombresPermitidos = horariosPermitidos.Select(h => h.nombre).ToArray();
+
+        foreach (var h in horariosPermitidos)
+        {
+            var existente = await db.Horarios.FirstOrDefaultAsync(x => x.Nombre == h.nombre);
+            if (existente == null)
+                await db.Horarios.AddAsync(new Horario { Nombre = h.nombre, Orden = h.orden, Activo = true });
+            else
+            {
+                existente.Orden = h.orden;
+                existente.Activo = true;
+            }
+        }
+
+        // Desactivar otros horarios no permitidos
+        var otros = await db.Horarios.Where(x => !nombresPermitidos.Contains(x.Nombre)).ToListAsync();
+        foreach (var h in otros) h.Activo = false;
+
+        await db.SaveChangesAsync();
+
+        // Configuración global de menú (única)
+        if (!await db.ConfiguracionesMenu.AnyAsync())
+        {
+            await db.ConfiguracionesMenu.AddAsync(new MenuConfiguracion());
             await db.SaveChangesAsync();
         }
+
         // Empresas
         var empresaDemo = await db.Empresas.FirstOrDefaultAsync(e => e.Nombre == "Empresa Demo");
         if (empresaDemo == null)
         {
-            empresaDemo = new Empresa { Nombre = "Empresa Demo", Rnc = "RNC-000" };
+            empresaDemo = new Empresa
+            {
+                Nombre = "Empresa Demo",
+                Rnc = "RNC-000",
+                SubsidiaEmpleados = true,
+                SubsidioTipo = SubsidioTipo.Porcentaje,
+                SubsidioValor = 75m
+            };
             db.Empresas.Add(empresaDemo);
         }
         var empresaBeta = await db.Empresas.FirstOrDefaultAsync(e => e.Nombre == "Empresa Beta");
         if (empresaBeta == null)
         {
-            empresaBeta = new Empresa { Nombre = "Empresa Beta", Rnc = "RNC-111" };
+            empresaBeta = new Empresa
+            {
+                Nombre = "Empresa Beta",
+                Rnc = "RNC-111",
+                SubsidiaEmpleados = true,
+                SubsidioTipo = SubsidioTipo.Porcentaje,
+                SubsidioValor = 75m
+            };
             db.Empresas.Add(empresaBeta);
         }
         await db.SaveChangesAsync();

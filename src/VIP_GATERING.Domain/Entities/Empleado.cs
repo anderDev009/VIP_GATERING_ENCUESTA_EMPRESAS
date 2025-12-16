@@ -12,6 +12,7 @@ public class Empleado
 
     public Usuario? Usuario { get; set; }
 
+    public bool EsSubsidiado { get; set; } = true;
     public EmpleadoEstado Estado { get; set; } = EmpleadoEstado.Habilitado;
     public bool EsJefe { get; set; } = false;
 }

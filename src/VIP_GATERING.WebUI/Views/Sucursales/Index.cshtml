@@ -1,16 +1,16 @@
 @model VIP_GATERING.WebUI.Models.PagedResult<VIP_GATERING.Domain.Entities.Sucursal>
 @{
-    ViewData["Title"] = "Sucursales";
+    ViewData["Title"] = "Dependientes";
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
     Guid? empresaSel = ViewBag.EmpresaId as Guid?;
 }
-@section Breadcrumb{<div class="text-sm text-slate-500 mb-4">Inicio / Administración / Sucursales</div>}
+@section Breadcrumb{<div class="text-sm text-slate-500 mb-4">Inicio / Administración / Dependientes</div>}
 <div class="flex justify-between items-center mb-4">
     <div>
-        <h1 class="text-2xl font-semibold">Sucursales</h1>
-        <p class="text-sm text-slate-500">Gestiona las sedes de cada cliente desde un solo lugar.</p>
+        <h1 class="text-2xl font-semibold">Dependientes</h1>
+        <p class="text-sm text-slate-500">Gestiona los dependientes de cada cliente y sus reglas de subsidio.</p>
     </div>
-    <a asp-action="Create" class="btn-primary">Nueva sucursal</a>
+    <a asp-action="Create" class="btn-primary">Nuevo dependiente</a>
 </div>
 
 <form method="get" class="mb-6 grid md:grid-cols-4 gap-4 max-w-4xl items-end">
@@ -45,7 +45,7 @@
     <table class="min-w-full bg-white border rounded">
         <thead class="bg-slate-100">
             <tr>
-                <th class="text-left p-2">Nombre</th>
+                <th class="text-left p-2">Dependiente</th>
                 <th class="text-left p-2">Cliente</th>
                 <th class="p-2">Acciones</th>
             </tr>

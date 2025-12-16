@@ -11,6 +11,7 @@ public interface IMenuService
     Task<Menu> GetOrCreateMenuAsync(DateOnly inicio, DateOnly fin, Guid? empresaId, Guid? sucursalId, CancellationToken ct = default);
     Task<Menu?> FindMenuAsync(DateOnly inicio, DateOnly fin, Guid? empresaId, Guid? sucursalId, CancellationToken ct = default);
     Task<Menu> GetEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, Guid empresaId, Guid? sucursalId, CancellationToken ct = default);
+    Task<Menu?> FindEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, Guid empresaId, Guid? sucursalId, bool requireOpcionesConfiguradas = false, CancellationToken ct = default);
     Task<IReadOnlyList<OpcionMenu>> ObtenerOpcionesEmpleadoAsync(Guid empleadoId, CancellationToken ct = default);
     Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, CancellationToken ct = default);
 }
@@ -85,7 +86,7 @@ public class MenuService : IMenuService
         var dias = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday };
         foreach (var dia in dias)
             foreach (var h in horarios)
-                await _opcionesMenu.AddAsync(new OpcionMenu { Menu = menu, MenuId = menu.Id, DiaSemana = dia, HorarioId = h.Id }, ct);
+                await _opcionesMenu.AddAsync(new OpcionMenu { Menu = menu, MenuId = menu.Id, DiaSemana = dia, HorarioId = h.Id, OpcionesMaximas = 3 }, ct);
 
         await _uow.SaveChangesAsync(ct);
         return menu;
@@ -126,7 +127,7 @@ public class MenuService : IMenuService
         var dias = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday };
         foreach (var dia in dias)
             foreach (var h in horarios)
-                await _opcionesMenu.AddAsync(new OpcionMenu { Menu = menu, MenuId = menu.Id, DiaSemana = dia, HorarioId = h.Id }, ct);
+                await _opcionesMenu.AddAsync(new OpcionMenu { Menu = menu, MenuId = menu.Id, DiaSemana = dia, HorarioId = h.Id, OpcionesMaximas = 3 }, ct);
         await _uow.SaveChangesAsync(ct);
         return menu;
     }
@@ -157,7 +158,8 @@ public class MenuService : IMenuService
             if (menuSuc != null)
             {
                 var diasSuc = await _opcionesMenu.ListAsync(d => d.MenuId == menuSuc.Id, ct);
-                var tieneOpciones = diasSuc.Any(d => d.OpcionIdA != null || d.OpcionIdB != null || d.OpcionIdC != null);
+                var tieneOpciones = diasSuc.Any(d =>
+                    d.OpcionIdA != null || d.OpcionIdB != null || d.OpcionIdC != null || d.OpcionIdD != null || d.OpcionIdE != null);
                 if (tieneOpciones)
                     return menuSuc;
             }
@@ -172,6 +174,22 @@ public class MenuService : IMenuService
         return await GetOrCreateMenuAsync(inicio, fin, empresaId, null, ct);
     }
 
+    public async Task<Menu?> FindEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, Guid empresaId, Guid? sucursalId, bool requireOpcionesConfiguradas = false, CancellationToken ct = default)
+    {
+        if (sucursalId != null)
+        {
+            var menuSuc = await FindMenuAsync(inicio, fin, empresaId, sucursalId, ct);
+            if (menuSuc != null && (!requireOpcionesConfiguradas || await TieneOpcionesConfiguradasAsync(menuSuc.Id, ct)))
+                return menuSuc;
+        }
+
+        var menuEmp = await FindMenuAsync(inicio, fin, empresaId, null, ct);
+        if (menuEmp != null && (!requireOpcionesConfiguradas || await TieneOpcionesConfiguradasAsync(menuEmp.Id, ct)))
+            return menuEmp;
+
+        return null;
+    }
+
     public async Task<IReadOnlyList<OpcionMenu>> ObtenerOpcionesEmpleadoAsync(Guid empleadoId, CancellationToken ct = default)
     {
         var menu = await GetOrCreateMenuSemanaSiguienteAsync(ct);
@@ -181,8 +199,33 @@ public class MenuService : IMenuService
 
     public async Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, CancellationToken ct = default)
     {
-        if (seleccion is not ('A' or 'B' or 'C'))
+        var opcionMenu = await _opcionesMenu.GetByIdAsync(opcionMenuId, ct);
+        if (opcionMenu == null) throw new ArgumentException("OpcionMenu no existe", nameof(opcionMenuId));
+
+        var max = opcionMenu.OpcionesMaximas <= 0 ? 3 : Math.Clamp(opcionMenu.OpcionesMaximas, 1, 5);
+        var slot = seleccion switch
+        {
+            'A' => 1,
+            'B' => 2,
+            'C' => 3,
+            'D' => 4,
+            'E' => 5,
+            _ => 0
+        };
+        if (slot == 0 || slot > max)
             throw new ArgumentException("Seleccion invalida", nameof(seleccion));
+
+        bool slotTieneOpcion = slot switch
+        {
+            1 => opcionMenu.OpcionIdA != null,
+            2 => opcionMenu.OpcionIdB != null,
+            3 => opcionMenu.OpcionIdC != null,
+            4 => opcionMenu.OpcionIdD != null,
+            5 => opcionMenu.OpcionIdE != null,
+            _ => false
+        };
+        if (!slotTieneOpcion)
+            throw new ArgumentException("Seleccion no disponible para este dia/horario", nameof(seleccion));
 
         var existentes = await _respuestas.ListAsync(r => r.EmpleadoId == empleadoId && r.OpcionMenuId == opcionMenuId, ct);
         var actual = existentes.FirstOrDefault();
@@ -200,5 +243,12 @@ public class MenuService : IMenuService
             actual.Seleccion = seleccion;
         }
         await _uow.SaveChangesAsync(ct);
+    }
+
+    private async Task<bool> TieneOpcionesConfiguradasAsync(Guid menuId, CancellationToken ct)
+    {
+        var dias = await _opcionesMenu.ListAsync(d => d.MenuId == menuId, ct);
+        if (dias.Count == 0) return false;
+        return dias.Any(d => d.OpcionIdA != null || d.OpcionIdB != null || d.OpcionIdC != null || d.OpcionIdD != null || d.OpcionIdE != null);
     }
 }

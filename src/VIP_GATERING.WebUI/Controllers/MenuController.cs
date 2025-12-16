@@ -162,6 +162,8 @@ public class MenuController : Controller
             .Include(o => o.OpcionA)
             .Include(o => o.OpcionB)
             .Include(o => o.OpcionC)
+            .Include(o => o.OpcionD)
+            .Include(o => o.OpcionE)
             .Include(o => o.Horario)
             .Where(o => o.MenuId == menu.Id)
             .OrderBy(o => o.DiaSemana)
@@ -177,6 +179,7 @@ public class MenuController : Controller
             .GroupBy(r => r.EmpleadoId)
             .Where(g => g.Count() >= diasVm.Count)
             .CountAsync();
+        var sinRespuestas = !await _db.RespuestasFormulario.AnyAsync(r => opcionIds.Contains(r.OpcionMenuId));
 
         var vm = new MenuEdicionVM
         {
@@ -194,7 +197,8 @@ public class MenuController : Controller
             Sucursales = sucursales.Select(s => (s.Id, s.Nombre)),
             EmpresaNombre = empresas.FirstOrDefault(e => e.Id == empresaSel)?.Nombre,
             SucursalNombre = sucursales.FirstOrDefault(s => s.Id == sucursalSel)?.Nombre,
-            Dias = diasVm
+            Dias = diasVm,
+            PuedeEliminarEncuesta = sinRespuestas
         };
         return View(vm);
     }
@@ -237,10 +241,16 @@ public class MenuController : Controller
                 var mA = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.A$");
                 var mB = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.B$");
                 var mC = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.C$");
+                var mD = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.D$");
+                var mE = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.E$");
+                var mMax = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.OpcionesMaximas$");
                 if (mId.Success && int.TryParse(mId.Groups[1].Value, out var i1)) idxs.Add(i1);
                 if (mA.Success && int.TryParse(mA.Groups[1].Value, out var i2)) idxs.Add(i2);
                 if (mB.Success && int.TryParse(mB.Groups[1].Value, out var i3)) idxs.Add(i3);
                 if (mC.Success && int.TryParse(mC.Groups[1].Value, out var i4)) idxs.Add(i4);
+                if (mD.Success && int.TryParse(mD.Groups[1].Value, out var i5)) idxs.Add(i5);
+                if (mE.Success && int.TryParse(mE.Groups[1].Value, out var i6)) idxs.Add(i6);
+                if (mMax.Success && int.TryParse(mMax.Groups[1].Value, out var i7)) idxs.Add(i7);
             }
             var dias = new List<DiaEdicion>();
             foreach (var i in idxs.OrderBy(x => x))
@@ -249,8 +259,13 @@ public class MenuController : Controller
                 Guid? ga = Guid.TryParse(form[$"Dias[{i}].A"], out var a) ? a : null;
                 Guid? gb = Guid.TryParse(form[$"Dias[{i}].B"], out var b) ? b : null;
                 Guid? gc = Guid.TryParse(form[$"Dias[{i}].C"], out var c) ? c : null;
-                dias.Add(new DiaEdicion { OpcionMenuId = omId, A = ga, B = gb, C = gc });
-                _logger.LogInformation("[POST Guardar] idx={Idx} omId={Om} A={A} B={B} C={C}", i, omId, ga, gb, gc);
+                Guid? gd = Guid.TryParse(form[$"Dias[{i}].D"], out var d) ? d : null;
+                Guid? ge = Guid.TryParse(form[$"Dias[{i}].E"], out var eVal) ? eVal : null;
+                int max = 3;
+                if (int.TryParse(form[$"Dias[{i}].OpcionesMaximas"], out var maxForm))
+                    max = Math.Clamp(maxForm, 1, 5);
+                dias.Add(new DiaEdicion { OpcionMenuId = omId, A = ga, B = gb, C = gc, D = gd, E = ge, OpcionesMaximas = max });
+                _logger.LogInformation("[POST Guardar] idx={Idx} omId={Om} A={A} B={B} C={C} D={D} E={E} Max={Max}", i, omId, ga, gb, gc, gd, ge, max);
             }
             model.Dias = dias;
             _logger.LogInformation("[POST Guardar] Días reconstruidos: {Dias}", model.Dias.Count);
@@ -291,26 +306,19 @@ public class MenuController : Controller
         var overrides = model.Dias;
         model.Dias = MapDias(diasDb, overrides);
 
-        // Validación: ningún día puede quedar sin al menos una opción
-        var diasInvalidos = model.Dias.Where(d => d.A == null && d.B == null && d.C == null).ToList();
-        if (diasInvalidos.Any())
-        {
-            ModelState.AddModelError(string.Empty, "Todos los días deben tener al menos una opción (A, B o C).");
-            model.Opciones = await _db.Opciones.OrderBy(o => o.Nombre).ToListAsync();
-            model.Dias = MapDias(diasDb, overrides);
-            TempData["Error"] = "Debe seleccionar al menos una opción por día.";
-            _logger.LogWarning("[POST Guardar] {Count} días sin opciones.", diasInvalidos.Count);
-            return View("Administrar", model);
-        }
         try
         {
             var diasDict = diasDb.ToDictionary(x => x.Id);
             foreach (var d in model.Dias)
             {
                 if (!diasDict.TryGetValue(d.OpcionMenuId, out var dia)) continue;
-                dia.OpcionIdA = d.A;
-                dia.OpcionIdB = d.B;
-                dia.OpcionIdC = d.C;
+                var max = d.OpcionesMaximas <= 0 ? 3 : Math.Clamp(d.OpcionesMaximas, 1, 5);
+                dia.OpcionesMaximas = max;
+                dia.OpcionIdA = max >= 1 ? d.A : null;
+                dia.OpcionIdB = max >= 2 ? d.B : null;
+                dia.OpcionIdC = max >= 3 ? d.C : null;
+                dia.OpcionIdD = max >= 4 ? d.D : null;
+                dia.OpcionIdE = max >= 5 ? d.E : null;
             }
             await _db.SaveChangesAsync();
             TempData["Success"] = "Menú actualizado correctamente.";
@@ -356,6 +364,43 @@ public class MenuController : Controller
         return RedirectToAction(nameof(Administrar), new { fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId, sucursalId });
     }
 
+    [Authorize(Roles = "Admin,Empresa")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EliminarEncuesta(DateOnly inicio, Guid? empresaId, Guid? sucursalId)
+    {
+        var fin = inicio.AddDays(4);
+        // Seguridad: empresa solo en su alcance
+        if (User.IsInRole("Empresa"))
+        {
+            var currentEmpresaId = _current.EmpresaId;
+            if (currentEmpresaId == null || (empresaId != null && currentEmpresaId != empresaId)) return Forbid();
+            empresaId ??= currentEmpresaId;
+        }
+
+        var menu = await _menuService.FindMenuAsync(inicio, fin, empresaId, sucursalId);
+        if (menu == null)
+        {
+            TempData["Info"] = "No existe encuesta para ese rango.";
+            return RedirectToAction(nameof(Administrar), new { fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId, sucursalId });
+        }
+
+        var opcionIds = await _db.OpcionesMenu.Where(o => o.MenuId == menu.Id).Select(o => o.Id).ToListAsync();
+        var tieneRespuestas = await _db.RespuestasFormulario.AnyAsync(r => opcionIds.Contains(r.OpcionMenuId));
+        if (tieneRespuestas)
+        {
+            TempData["Error"] = "No se puede eliminar: ya existen respuestas registradas.";
+            return RedirectToAction(nameof(Administrar), new { fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId, sucursalId });
+        }
+
+        var opciones = await _db.OpcionesMenu.Where(o => o.MenuId == menu.Id).ToListAsync();
+        _db.OpcionesMenu.RemoveRange(opciones);
+        _db.Menus.Remove(menu);
+        await _db.SaveChangesAsync();
+        TempData["Success"] = "Encuesta eliminada (sin respuestas).";
+        return RedirectToAction(nameof(Administrar), new { fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId, sucursalId });
+    }
+
     private static List<DiaEdicion> MapDias(IEnumerable<OpcionMenu> diasDb, IEnumerable<DiaEdicion>? overrides)
     {
         var overrideDict = overrides?
@@ -380,7 +425,10 @@ public class MenuController : Controller
                 HorarioOrden = dia.Horario?.Orden ?? int.MaxValue,
                 A = custom?.A ?? dia.OpcionIdA,
                 B = custom?.B ?? dia.OpcionIdB,
-                C = custom?.C ?? dia.OpcionIdC
+                C = custom?.C ?? dia.OpcionIdC,
+                D = custom?.D ?? dia.OpcionIdD,
+                E = custom?.E ?? dia.OpcionIdE,
+                OpcionesMaximas = Math.Clamp(custom?.OpcionesMaximas ?? (dia.OpcionesMaximas == 0 ? 3 : dia.OpcionesMaximas), 1, 5)
             });
         }
         return list;

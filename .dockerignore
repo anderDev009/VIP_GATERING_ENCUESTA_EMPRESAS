@@ -1,0 +1,14 @@
+bin/
+obj/
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.db
+tmp/
+tmp_*/
+node_modules/
+*.db
+**/*.db

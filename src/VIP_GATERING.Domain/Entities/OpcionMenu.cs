@@ -13,6 +13,14 @@ public class OpcionMenu
     public Guid? OpcionIdC { get; set; }
     public Opcion? OpcionC { get; set; }
 
+    public Guid? OpcionIdD { get; set; }
+    public Opcion? OpcionD { get; set; }
+
+    public Guid? OpcionIdE { get; set; }
+    public Opcion? OpcionE { get; set; }
+
+    public int OpcionesMaximas { get; set; } = 3;
+
     public Guid MenuId { get; set; }
     public Menu? Menu { get; set; }
 

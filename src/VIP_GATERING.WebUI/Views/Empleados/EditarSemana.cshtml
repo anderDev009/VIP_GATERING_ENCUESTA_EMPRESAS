@@ -9,7 +9,7 @@
     &mdash; Cliente: <strong>@Model.EmpresaNombre</strong>
     @if (!string.IsNullOrWhiteSpace(Model.SucursalNombre))
     {
-        <text> &mdash; Sucursal: <strong>@Model.SucursalNombre</strong></text>
+        <text> &mdash; Dependiente: <strong>@Model.SucursalNombre</strong></text>
     }
     <div class="text-xs text-slate-500">Semana @Model.FechaInicio.ToString("yyyy-MM-dd") a @Model.FechaTermino.ToString("yyyy-MM-dd")</div>
 </div>
@@ -25,54 +25,105 @@
     @Html.AntiForgeryToken()
     <input type="hidden" name="empleadoId" value="@Model.EmpleadoId" />
     <input type="hidden" name="MenuId" value="@Model.MenuId" />
-    @for (var i = 0; i < Model.Dias.Count; i++)
-    {
-        var d = Model.Dias[i];
-        <div class="bg-white border rounded">
-            <div class="px-4 py-3 border-b font-medium">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana) - @d.HorarioNombre</div>
-            <div class="p-4">
-                @if (d.A == null && d.B == null && d.C == null)
-                {
-                    <div class="text-slate-500">Aún no hay opciones definidas para este día.</div>
-                }
-                else
-                {
-                    <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
-                    var opcionesDia = new[]
+    <div class="p-3 bg-slate-50 border rounded text-sm text-slate-700">
+        Total empleado: <strong>@Model.TotalEmpleado.ToString("C")</strong>
+        @if (Model.EsVistaAdministrador && Model.TotalEmpresa != null)
+        {
+            <span class="ml-3">Costo empresa: <strong>@Model.TotalEmpresa.Value.ToString("C")</strong></span>
+        }
+    </div>
+@{
+    var diasConIndice = Model.Dias.Select((d, idx) => new { Dia = d, Index = idx }).ToList();
+    var grupos = diasConIndice.GroupBy(x => string.IsNullOrWhiteSpace(x.Dia.HorarioNombre) ? "General" : x.Dia.HorarioNombre!).ToList();
+}
+<div class="mb-4 overflow-x-auto">
+    <div class="flex gap-2" id="tabs-horario">
+        @for (var gi = 0; gi < grupos.Count; gi++)
+        {
+            var g = grupos[gi];
+            var tabId = $"tab-{gi}";
+            <button type="button" class="px-3 py-1.5 border rounded-full text-sm bg-white hover:bg-slate-100" data-tab-target="@tabId">@g.Key</button>
+        }
+    </div>
+</div>
+
+@for (var gi = 0; gi < grupos.Count; gi++)
+{
+    var g = grupos[gi];
+    var tabId = $"tab-{gi}";
+    <div id="@tabId" style="display:@(gi == 0 ? "block" : "none")" class="space-y-3" data-tab-panel>
+        @foreach (var item in g)
+        {
+            var d = item.Dia;
+            var i = item.Index;
+            var opcionesDia = new[]
+            {
+                new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA },
+                new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB },
+                new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC },
+                new { Clave = "D", Nombre = d.D, Imagen = d.ImagenD },
+                new { Clave = "E", Nombre = d.E, Imagen = d.ImagenE }
+            }.Take(d.OpcionesMaximas <= 0 ? 3 : d.OpcionesMaximas).ToList();
+
+            <div class="bg-white border rounded">
+                <div class="px-4 py-3 border-b font-medium">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana) - @d.HorarioNombre</div>
+                <div class="p-4">
+                    @if (!opcionesDia.Any(o => !string.IsNullOrWhiteSpace(o.Nombre)))
                     {
-                        new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA },
-                        new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB },
-                        new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC }
-                    };
-                    <div class="grid md:grid-cols-3 gap-3">
-                        @foreach (var opc in opcionesDia)
-                        {
-                            var seleccionada = d.Seleccion == opc.Clave[0];
-                            <label class="border rounded-lg p-3 flex gap-3 items-center hover:border-emerald-500 transition @((seleccionada) ? "border-emerald-500 bg-emerald-50 shadow-sm" : "border-slate-200")">
-                                <input type="radio"
-                                       name="Dias[@i].Seleccion"
-                                       value="@opc.Clave"
-                                       class="mt-1"
-                                       @(seleccionada ? "checked" : "") />
-                                <div class="flex items-center gap-3 w-full">
-                                    @if (!string.IsNullOrWhiteSpace(opc.Imagen))
-                                    {
-                                        <img src="@opc.Imagen" alt="Opción @opc.Clave de @d.HorarioNombre" class="w-20 h-20 object-cover rounded-md border" />
-                                    }
-                                    <div>
-                                        <div class="text-xs uppercase text-slate-500">Opción @opc.Clave</div>
-                                        <div class="font-medium">@(!string.IsNullOrWhiteSpace(opc.Nombre) ? opc.Nombre : "Sin definir")</div>
+                        <div class="text-slate-500">Aún no hay opciones definidas para este día.</div>
+                    }
+                    else
+                    {
+                        <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
+                        <div class="grid lg:grid-cols-5 md:grid-cols-3 sm:grid-cols-2 gap-3">
+                            @foreach (var opc in opcionesDia)
+                            {
+                                var seleccionada = d.Seleccion == opc.Clave[0];
+                                <label class="border rounded-lg p-3 flex gap-3 items-center hover:border-emerald-500 transition @((seleccionada) ? "border-emerald-500 bg-emerald-50 shadow-sm" : "border-slate-200")">
+                                    <input type="radio"
+                                           name="Dias[@i].Seleccion"
+                                           value="@opc.Clave"
+                                           class="mt-1"
+                                           @(seleccionada ? "checked" : "") />
+                                    <div class="flex items-center gap-3 w-full">
+                                        @if (!string.IsNullOrWhiteSpace(opc.Imagen))
+                                        {
+                                            <img src="@opc.Imagen" alt="Opción @opc.Clave de @d.HorarioNombre" class="w-20 h-20 object-cover rounded-md border" />
+                                        }
+                                        <div>
+                                            <div class="text-xs uppercase text-slate-500">Opción @opc.Clave</div>
+                                            <div class="font-medium">@(!string.IsNullOrWhiteSpace(opc.Nombre) ? opc.Nombre : "Sin definir")</div>
+                                        </div>
                                     </div>
-                                </div>
-                            </label>
-                        }
-                    </div>
-                }
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
             </div>
-        </div>
-    }
+        }
+    </div>
+}
     <div class="flex gap-3">
         <button class="btn-primary">Guardar cambios</button>
         <a asp-action="Semana" asp-route-id="@Model.EmpleadoId" class="btn-outline">Cancelar</a>
     </div>
 </form>
+
+<script>
+    (() => {
+        const tabButtons = document.querySelectorAll('[data-tab-target]');
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-tab-target');
+                if (!targetId) return;
+                document.querySelectorAll('[data-tab-panel]').forEach(p => p.style.display = 'none');
+                const target = document.getElementById(targetId);
+                if (target) target.style.display = 'block';
+                tabButtons.forEach(b => b.classList.remove('bg-slate-200'));
+                btn.classList.add('bg-slate-200');
+            });
+        });
+        if (tabButtons.length > 0) tabButtons[0].classList.add('bg-slate-200');
+    })();
+</script>

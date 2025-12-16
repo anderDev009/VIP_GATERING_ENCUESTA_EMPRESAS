@@ -1,19 +1,26 @@
 @model VIP_GATERING.Domain.Entities.Sucursal
 @{
-    ViewData["Title"] = "Nueva sucursal";
+    ViewData["Title"] = "Nuevo dependiente";
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
+    var usaPersonalizado = Model.SubsidioTipo != null || Model.SubsidiaEmpleados != null || Model.SubsidioValor != null;
+    var subsidia = Model.SubsidiaEmpleados ?? true;
+    var subsidioTipo = Model.SubsidioTipo ?? VIP_GATERING.Domain.Entities.SubsidioTipo.Porcentaje;
+    var subsidioValor = Model.SubsidioValor ?? 75m;
 }
-<h1 class="text-2xl font-semibold mb-4">Nueva sucursal</h1>
+<h1 class="text-2xl font-semibold mb-4">Nuevo dependiente</h1>
 
-<form asp-action="Create" method="post" class="space-y-4 card max-w-lg">
+<form asp-action="Create" method="post" class="space-y-4 card max-w-2xl">
     @Html.AntiForgeryToken()
-    <div>
-        <label class="block text-sm">Nombre</label>
-        <input asp-for="Nombre" class="w-full border rounded p-2" />
-    </div>
-    <div>
-        <label class="block text-sm">Dirección</label>
-        <input asp-for="Direccion" class="w-full border rounded p-2" />
+    <div class="text-red-700 text-sm">@Html.ValidationSummary()</div>
+    <div class="grid md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm">Nombre</label>
+            <input asp-for="Nombre" class="w-full border rounded p-2" />
+        </div>
+        <div>
+            <label class="block text-sm">Dirección</label>
+            <input asp-for="Direccion" class="w-full border rounded p-2" />
+        </div>
     </div>
     <div>
         <label class="block text-sm">Cliente</label>
@@ -24,13 +31,52 @@
             }
         </select>
     </div>
+    <div class="space-y-2 border rounded p-3">
+        <div class="flex items-center justify-between">
+            <label class="block text-sm font-semibold">Regla de subsidio</label>
+            <span class="text-xs text-slate-500">Si no personalizas, se hereda la regla de la empresa (75% por defecto).</span>
+        </div>
+        <div class="flex gap-4">
+            <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="subsidioScope" value="inherit" @(usaPersonalizado ? "" : "checked") />
+                <span>Usar regla de la empresa</span>
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="subsidioScope" value="custom" @(usaPersonalizado ? "checked" : "") />
+                <span>Personalizar para este dependiente</span>
+            </label>
+        </div>
+        <div id="subsidio-custom" class="grid md:grid-cols-3 gap-3 @(usaPersonalizado ? "" : "hidden")">
+        <div>
+            <label class="block text-sm">¿Subsidia?</label>
+            <select name="CustomSubsidia" class="w-full border rounded p-2">
+                    <option value="true" selected="@(subsidia ? "selected" : null)">Sí</option>
+                    <option value="false" selected="@(!subsidia ? "selected" : null)">No</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm">Tipo</label>
+                <select name="CustomSubsidioTipo" class="w-full border rounded p-2">
+                    <option value="0" selected="@(subsidioTipo == VIP_GATERING.Domain.Entities.SubsidioTipo.Porcentaje ? "selected" : null)">Porcentaje</option>
+                    <option value="1" selected="@(subsidioTipo == VIP_GATERING.Domain.Entities.SubsidioTipo.MontoFijo ? "selected" : null)">Monto fijo</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm">Valor</label>
+                <input name="CustomSubsidioValor" type="number" min="0" step="0.01" value="@subsidioValor" class="w-full border rounded p-2" />
+            </div>
+        </div>
+    </div>
     <div>
         <label class="block text-sm">Horarios asignados</label>
         <div class="grid grid-cols-2 gap-2">
         @foreach (var h in (IEnumerable<VIP_GATERING.Domain.Entities.Horario>)ViewBag.Horarios)
         {
             <label class="flex items-center gap-2">
-                <input type="checkbox" name="horarios" value="@h.Id" checked />
+                @{
+                    var isDefault = string.Equals(h.Nombre, "Almuerzo", StringComparison.OrdinalIgnoreCase);
+                }
+                <input type="checkbox" name="horarios" value="@h.Id" @(isDefault ? "checked" : "") />
                 <span>@h.Nombre</span>
             </label>
         }
@@ -41,3 +87,17 @@
         <a asp-action="Index" class="btn-outline">Cancelar</a>
     </div>
 </form>
+
+<script>
+    (function () {
+        const radios = document.querySelectorAll('input[name="subsidioScope"]');
+        const custom = document.getElementById('subsidio-custom');
+        function toggle() {
+            const val = document.querySelector('input[name="subsidioScope"]:checked');
+            if (!val) return;
+            custom.classList.toggle('hidden', val.value !== 'custom');
+        }
+        radios.forEach(r => r.addEventListener('change', toggle));
+        toggle();
+    })();
+</script>

@@ -29,6 +29,7 @@
                         if (!u.Roles.Contains(r.Name!))
                         {
                             <form asp-action="AssignRole" method="post">
+                                @Html.AntiForgeryToken()
                                 <input type="hidden" name="userId" value="@u.Id" />
                                 <input type="hidden" name="role" value="@r.Name" />
                                 <button class="btn-outline">Asignar @r.Name</button>
@@ -37,6 +38,7 @@
                         else
                         {
                             <form asp-action="RemoveRole" method="post">
+                                @Html.AntiForgeryToken()
                                 <input type="hidden" name="userId" value="@u.Id" />
                                 <input type="hidden" name="role" value="@r.Name" />
                                 <button class="btn-outline text-red-600">Quitar @r.Name</button>
@@ -50,4 +52,3 @@
     </tbody>
 </table>
 </div>
-

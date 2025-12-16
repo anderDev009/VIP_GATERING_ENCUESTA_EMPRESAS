@@ -3,7 +3,8 @@ Identity Integration: Roles & Permissions
 Summary
 - Added ASP.NET Core Identity with Guid keys (`ApplicationUser`, `ApplicationRole`).
 - Roles: `Admin`, `Empresa`, `Empleado`.
-- Seeded demo users (password `dev123`):
+- Password policy: 8+ chars with upper/lower/digit/symbol, lockout after 5 failed attempts for 10 minutes, auth cookie 60m sliding, SameSite=Strict.
+- Seeded demo users (password `Dev123$!` by default, overridable via `IDENTITY_DEFAULT_PASSWORD`):
   - admin@demo.local → Admin
   - empresa@demo.local → Empresa (linked to first Empresa)
   - empleado@demo.local → Empleado (linked to first Empleado)
@@ -50,7 +51,7 @@ Tests
 
 How To Use
 1) Ejecutar la app (`dotnet run` en `src/VIP_GATERING.WebUI`).
-2) Login en `/Account/Login` con usuarios de demo (pwd `dev123`).
+2) Login en `/Account/Login` con usuarios de demo (pwd `Dev123$!` por defecto).
 3) Navegación:
    - Admin: ver "Administrar" y "Seguridad" en la barra.
    - Empresa: acceder a Empleados/Sucursales limitadas a su empresa.
@@ -59,4 +60,3 @@ How To Use
 Notes
 - CurrentUserService expone `UserId`, `EmpleadoId` y `EmpresaId` desde Identity.
 - Si agregas nuevos controladores de mantenimiento, protégelos con `[Authorize]` y aplica filtros por rol/empresa.
-

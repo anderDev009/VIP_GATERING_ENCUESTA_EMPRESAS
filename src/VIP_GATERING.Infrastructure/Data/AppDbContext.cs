@@ -21,10 +21,25 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<Horario> Horarios => Set<Horario>();
     public DbSet<SucursalHorario> SucursalesHorarios => Set<SucursalHorario>();
     public DbSet<RespuestaFormulario> RespuestasFormulario => Set<RespuestaFormulario>();
+    public DbSet<MenuConfiguracion> ConfiguracionesMenu => Set<MenuConfiguracion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Empresa>()
+            .Property(e => e.SubsidiaEmpleados)
+            .HasDefaultValue(true);
+        modelBuilder.Entity<Empresa>()
+            .Property(e => e.SubsidioTipo)
+            .HasDefaultValue(SubsidioTipo.Porcentaje);
+        modelBuilder.Entity<Empresa>()
+            .Property(e => e.SubsidioValor)
+            .HasDefaultValue(75m);
+
+        modelBuilder.Entity<Empleado>()
+            .Property(e => e.EsSubsidiado)
+            .HasDefaultValue(true);
 
         modelBuilder.Entity<Sucursal>()
             .HasOne(s => s.Empresa)
@@ -92,6 +107,16 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .WithMany()
             .HasForeignKey(om => om.OpcionIdC)
             .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<OpcionMenu>()
+            .HasOne(om => om.OpcionD)
+            .WithMany()
+            .HasForeignKey(om => om.OpcionIdD)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<OpcionMenu>()
+            .HasOne(om => om.OpcionE)
+            .WithMany()
+            .HasForeignKey(om => om.OpcionIdE)
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<OpcionMenu>()
             .HasOne(om => om.Horario)
@@ -117,5 +142,22 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .WithMany()
             .HasForeignKey(sh => sh.HorarioId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MenuConfiguracion>()
+            .Property(c => c.PermitirEdicionSemanaActual)
+            .HasDefaultValue(true);
+        modelBuilder.Entity<MenuConfiguracion>()
+            .Property(c => c.DiasAnticipoSemanaActual)
+            .HasDefaultValue(1);
+        modelBuilder.Entity<MenuConfiguracion>()
+            .Property(c => c.HoraLimiteEdicion)
+            .HasConversion<long>()
+            .HasDefaultValue(new TimeSpan(12, 0, 0));
+        modelBuilder.Entity<MenuConfiguracion>()
+            .Property(c => c.CreadoUtc)
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+        modelBuilder.Entity<MenuConfiguracion>()
+            .Property(c => c.ActualizadoUtc)
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
     }
 }

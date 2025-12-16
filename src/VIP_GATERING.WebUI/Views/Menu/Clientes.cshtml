@@ -8,7 +8,7 @@
     <input type="text" name="q" value="@Model.Q" placeholder="Buscar por nombre o RNC" class="border rounded p-2 grow min-w-[260px]" />
     <button class="btn-outline">Buscar</button>
     <a asp-action="Clientes" class="btn-outline">Limpiar</a>
-    <a asp-controller="Menu" asp-action="Sucursales" class="btn-outline">Ver sucursales (agrupadas)</a>
+    <a asp-controller="Menu" asp-action="Sucursales" class="btn-outline">Ver dependientes (agrupados)</a>
 </form>
 
 <div class="overflow-x-auto">
@@ -17,7 +17,7 @@
             <tr>
                 <th class="text-left p-2">Nombre</th>
                 <th class="text-left p-2">RNC</th>
-                <th class="text-left p-2">Sucursales</th>
+                <th class="text-left p-2">Dependientes</th>
                 <th class="p-2">Acciones</th>
             </tr>
         </thead>
@@ -30,8 +30,8 @@
                 <td class="p-2">@c.Sucursales</td>
                 <td class="p-2 space-x-2 text-right">
                     <a href="@Url.Action("Administrar","Menu", new { empresaId = c.Id, alcance = "empresa" })" class="px-2 py-1 border rounded">Menú del cliente</a>
-                    <a href="@Url.Action("Sucursales","Menu", new { empresaId = c.Id })" class="px-2 py-1 border rounded">Sucursales</a>
-                    <a href="@Url.Action("Copiar","Menu", new { empresaId = c.Id })" class="px-2 py-1 border rounded">Copiar a sucursales</a>
+                    <a href="@Url.Action("Sucursales","Menu", new { empresaId = c.Id })" class="px-2 py-1 border rounded">Dependientes</a>
+                    <a href="@Url.Action("Copiar","Menu", new { empresaId = c.Id })" class="px-2 py-1 border rounded">Copiar a dependientes</a>
                 </td>
             </tr>
         }

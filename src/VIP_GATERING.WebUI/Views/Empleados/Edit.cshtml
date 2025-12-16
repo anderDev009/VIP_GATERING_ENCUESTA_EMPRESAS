@@ -1,4 +1,4 @@
-﻿@model VIP_GATERING.Domain.Entities.Empleado
+@model VIP_GATERING.Domain.Entities.Empleado
 @{
     ViewData["Title"] = "Editar empleado";
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
@@ -19,7 +19,7 @@
         </select>
     </div>
     <div>
-        <label class="block text-sm">Sucursal</label>
+        <label class="block text-sm">Dependiente</label>
         <select asp-for="SucursalId" class="w-full border rounded p-2" id="selSucursal">
             @foreach (var s in sucursales)
             {
@@ -43,6 +43,11 @@
         <label class="block text-sm">Nombre</label>
         <input asp-for="Nombre" class="w-full border rounded p-2" />
     </div>
+    <div class="flex items-center gap-2">
+        <input asp-for="EsSubsidiado" type="checkbox" class="border rounded" id="chkSubsidio" />
+        <label for="chkSubsidio" class="text-sm">Empleado subsidiado</label>
+    </div>
+    <div class="text-xs text-slate-500 -mt-2">Si está desmarcado, el empleado paga el monto completo según el menú.</div>
     <div class="flex gap-2">
         <button class="btn-primary">Guardar</button>
         <a asp-action="Index" class="btn-outline">Cancelar</a>
@@ -79,12 +84,13 @@
                 <input type="hidden" name="id" value="@Model.Id" />
                 <div>
                     <label class="block text-sm">Nueva contraseña</label>
-                    <input type="password" name="newPassword" required minlength="3" class="border rounded p-2 w-full" />
+                    <input type="password" name="newPassword" required minlength="8" class="border rounded p-2 w-full" placeholder="Mínimo 8 caracteres seguros" />
                 </div>
                 <div>
                     <label class="block text-sm">Confirmar nueva contraseña</label>
-                    <input type="password" name="confirmPassword" required minlength="3" class="border rounded p-2 w-full" />
+                    <input type="password" name="confirmPassword" required minlength="8" class="border rounded p-2 w-full" placeholder="Repite la contraseña" />
                 </div>
+                <div class="text-xs text-slate-500">Debe incluir mayúsculas, minúsculas, número y símbolo.</div>
                 <button class="btn-outline">Resetear contraseña</button>
             </form>
             <div class="text-xs text-slate-500 mt-2">Se requerirá cambio de contraseña en el próximo inicio de sesión.</div>
@@ -101,7 +107,7 @@
                 </div>
                 <button class="btn-primary">Crear usuario</button>
             </form>
-            <div class="text-xs text-slate-500 mt-2">Se asignará la contraseña temporal "dev123" y el rol Empleado. Se pedirá cambio al iniciar sesión.</div>
+            <div class="text-xs text-slate-500 mt-2">Se asignará una contraseña temporal segura y el rol Empleado. Se pedirá cambio al iniciar sesión.</div>
         }
     </div>
 }
@@ -129,5 +135,3 @@
         })();
     </script>
 }
-
-

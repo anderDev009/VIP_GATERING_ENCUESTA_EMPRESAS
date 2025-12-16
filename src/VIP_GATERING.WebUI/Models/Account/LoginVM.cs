@@ -9,9 +9,8 @@ public class LoginVM
     public string Email { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "La contraseña es requerida")]
-    [MinLength(3, ErrorMessage = "La contraseña debe tener al menos 3 caracteres")]
+    [MinLength(8, ErrorMessage = "La contraseña debe tener al menos 8 caracteres")]
     public string Password { get; set; } = string.Empty;
 
     public string? ReturnUrl { get; set; }
 }
-

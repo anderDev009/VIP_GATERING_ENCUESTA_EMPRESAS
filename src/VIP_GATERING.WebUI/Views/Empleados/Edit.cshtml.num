@@ -88,7 +88,7 @@
   88:                 </div>
   89:                 <button class="btn-primary">Crear usuario</button>
   90:             </form>
-  91:             <div class="text-xs text-slate-500 mt-2">Se asignará la contraseña temporal "dev123" y el rol Empleado. Se pedirá cambio al iniciar sesión.</div>
+  91:             <div class="text-xs text-slate-500 mt-2">Se asignará la contraseña temporal "Dev123$!" y el rol Empleado. Se pedirá cambio al iniciar sesión.</div>
   92:         }
   93:     </div>
   94: }

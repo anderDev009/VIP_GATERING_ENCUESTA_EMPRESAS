@@ -1,0 +1,51 @@
+# Build outputs
+bin/
+obj/
+**/bin/
+**/obj/
+[Bb]uild/
+[Rr]elease/
+[Dd]ebug/
+[Oo]ut/
+TestResults/
+*.cache
+*.log
+
+# IDE and tooling
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.rsuser
+*.sln.docstates
+*.csproj.user
+*.DotSettings.user
+.dotnet-tools/
+.dotnet-tools-8/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+
+# Databases and temp files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+tmp/
+tmp_*/
+
+# Coverage / analytics
+coverage*/
+*.coverage
+*.coveragexml
+
+# Publish profiles
+*.Publish.xml
+*.publishsettings

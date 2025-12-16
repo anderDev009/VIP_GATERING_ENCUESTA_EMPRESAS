@@ -13,7 +13,7 @@
 <div class="flex justify-between items-center mb-4">
     <div>
         <h1 class="text-2xl font-semibold">Empleados</h1>
-        <p class="text-sm text-slate-500">Administra clientes, sucursales y accesos desde un solo panel.</p>
+        <p class="text-sm text-slate-500">Administra clientes, dependientes y accesos desde un solo panel.</p>
     </div>
     <a asp-action="Create" class="btn-primary">Nuevo empleado</a>
 </div>
@@ -30,7 +30,7 @@
         </select>
     </div>
     <div>
-        <label class="text-xs uppercase tracking-widest text-slate-400">Sucursal</label>
+        <label class="text-xs uppercase tracking-widest text-slate-400">Dependiente</label>
         <select name="sucursalId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
             <option value="">-- Todas --</option>
             @foreach (var s in sucursales)
@@ -54,8 +54,9 @@
             <tr>
                 <th class="text-left px-6 py-4">Código</th>
                 <th class="text-left px-6">Nombre</th>
-                <th class="text-left px-6">Sucursal</th>
+                <th class="text-left px-6">Dependiente</th>
                 <th class="text-left px-6">Cliente</th>
+                <th class="text-left px-6">Subsidiado</th>
                 <th class="px-6 text-right">Acciones</th>
             </tr>
         </thead>
@@ -69,10 +70,21 @@
                 </td>
                 <td class="p-2 text-slate-600">@e.Sucursal?.Nombre</td>
                 <td class="p-2 text-slate-600">@e.Sucursal?.Empresa?.Nombre</td>
+                <td class="p-2">
+                    @if (e.EsSubsidiado)
+                    {
+                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">Sí</span>
+                    }
+                    else
+                    {
+                        <span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600">No</span>
+                    }
+                </td>
                 <td class="p-2 text-right">
                     <div class="flex flex-wrap justify-end gap-2">
                         <a asp-action="Edit" asp-route-id="@e.Id" class="btn-outline">Editar</a>
                         <form asp-action="Delete" method="post" class="inline">
+                            @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@e.Id" />
                             <button class="btn-outline text-rose-500 border-rose-100 hover:border-rose-300">Desactivar</button>
                         </form>

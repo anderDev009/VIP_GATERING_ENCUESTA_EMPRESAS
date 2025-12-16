@@ -15,6 +15,27 @@
         <label class="block text-sm">RNC</label>
         <input asp-for="Rnc" class="w-full border rounded p-2" />
     </div>
+    <div class="grid md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm">Subsidio activo</label>
+            <select asp-for="SubsidiaEmpleados" class="w-full border rounded p-2">
+                <option value="true">Si, la empresa subsidia</option>
+                <option value="false">No subsidia</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm">Tipo de subsidio</label>
+            <select asp-for="SubsidioTipo" class="w-full border rounded p-2">
+                <option value="0">Porcentaje</option>
+                <option value="1">Monto fijo</option>
+            </select>
+        </div>
+    </div>
+    <div>
+        <label class="block text-sm">Valor del subsidio</label>
+        <input asp-for="SubsidioValor" type="number" min="0" step="0.01" class="w-full border rounded p-2" />
+        <p class="text-xs text-slate-500 mt-1">Por defecto 75%. Si el tipo es monto fijo, se resta directamente.</p>
+    </div>
     <div class="flex gap-2">
         <button class="btn-primary">Guardar</button>
         <a asp-action="Index" class="btn-outline">Cancelar</a>

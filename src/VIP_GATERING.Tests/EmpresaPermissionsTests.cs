@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -8,12 +9,14 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using VIP_GATERING.Infrastructure.Data;
+using VIP_GATERING.Infrastructure.Identity;
 
 namespace VIP_GATERING.Tests;
 
 public class EmpresaPermissionsTests : IClassFixture<TestWebAppFactory>
 {
     private readonly TestWebAppFactory _factory;
+    private readonly string _seedPassword = IdentityDefaults.GetDefaultPassword();
     public EmpresaPermissionsTests(TestWebAppFactory factory) { _factory = factory; }
 
     // Nota: las rutas protegidas por alcance responden con AccessDenied o Login según estado de sesión.
@@ -30,7 +33,7 @@ public class EmpresaPermissionsTests : IClassFixture<TestWebAppFactory>
         await client.PostAsync("/Account/Login", new FormUrlEncodedContent(new[]
         {
             new KeyValuePair<string,string>("email","empresa@demo.local"),
-            new KeyValuePair<string,string>("password","dev123")
+            new KeyValuePair<string,string>("password",_seedPassword)
         }));
         var email = $"emp_{Guid.NewGuid():N}@demo.local";
         var create = await client.PostAsync($"/Empleados/CrearUsuario?id={ownEmp}&email={Uri.EscapeDataString(email)}", new FormUrlEncodedContent(Array.Empty<KeyValuePair<string,string>>()));
@@ -49,7 +52,7 @@ public class EmpresaPermissionsTests : IClassFixture<TestWebAppFactory>
         await client.PostAsync("/Account/Login", new FormUrlEncodedContent(new[]
         {
             new KeyValuePair<string,string>("email","empresa@demo.local"),
-            new KeyValuePair<string,string>("password","dev123")
+            new KeyValuePair<string,string>("password",_seedPassword)
         }));
         var resp = await client.GetAsync($"/Empleados/Semana/{ownEmp}");
         resp.EnsureSuccessStatusCode();

@@ -1,3 +1,4 @@
+ï»¿using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -6,12 +7,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using VIP_GATERING.Domain.Entities;
 using VIP_GATERING.Infrastructure.Data;
+using VIP_GATERING.Infrastructure.Identity;
 
 namespace VIP_GATERING.Tests;
 
 public class EmpleadoEstadoTests : IClassFixture<TestWebAppFactory>
 {
     private readonly TestWebAppFactory _factory;
+    private readonly string _seedPassword = IdentityDefaults.GetDefaultPassword();
     public EmpleadoEstadoTests(TestWebAppFactory factory) { _factory = factory; }
 
     [Fact]
@@ -34,7 +37,7 @@ public class EmpleadoEstadoTests : IClassFixture<TestWebAppFactory>
         await client.PostAsync("/Account/Login", new FormUrlEncodedContent(new[]
         {
             new KeyValuePair<string,string>("Email","empleado@demo.local"),
-            new KeyValuePair<string,string>("Password","dev123"),
+            new KeyValuePair<string,string>("Password",_seedPassword),
             new KeyValuePair<string,string>("__RequestVerificationToken", token),
             new KeyValuePair<string,string>("ReturnUrl","/Empleado/MiSemana")
         }));
@@ -43,12 +46,8 @@ public class EmpleadoEstadoTests : IClassFixture<TestWebAppFactory>
         var resp = await client.GetStringAsync("/Empleado/MiSemana");
 
         // Assert: warning message and inputs disabled
-        resp.Should().Contain("Tu cuenta no está habilitada para seleccionar opciones.");
-        resp.Should().Contain("Guardar todo");
+        resp.Should().Contain("habilitada para seleccionar opciones");
+        resp.Should().Contain("Guardar seleccion");
         resp.Should().Contain("disabled");
     }
 }
-
-
-
-

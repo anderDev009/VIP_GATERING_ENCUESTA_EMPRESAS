@@ -6,6 +6,9 @@ public class Sucursal
     public string Nombre { get; set; } = string.Empty;
     public string? Direccion { get; set; }
     public bool Borrado { get; set; } = false;
+    public bool? SubsidiaEmpleados { get; set; }
+    public SubsidioTipo? SubsidioTipo { get; set; }
+    public decimal? SubsidioValor { get; set; }
 
     public Guid EmpresaId { get; set; }
     public Empresa? Empresa { get; set; }

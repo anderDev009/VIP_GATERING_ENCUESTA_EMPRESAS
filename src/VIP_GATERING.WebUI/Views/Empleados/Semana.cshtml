@@ -1,4 +1,4 @@
-@model VIP_GATERING.WebUI.Models.SemanaEmpleadoVM
+﻿@model VIP_GATERING.WebUI.Models.SemanaEmpleadoVM
 @{
     ViewData["Title"] = "Semana del empleado";
 }
@@ -6,7 +6,7 @@
 
 <div class="mb-4">
     <h1 class="text-2xl font-semibold">Semana del empleado</h1>
-    <div class="text-sm text-slate-600">@Model.EmpresaNombre - @Model.SucursalNombre</div>
+    <div class="text-sm text-slate-600">Cliente: @Model.EmpresaNombre - Dependiente: @Model.SucursalNombre</div>
     <div class="text-sm text-slate-600">@Model.FechaInicio.ToString("dd/MM/yyyy") - @Model.FechaTermino.ToString("dd/MM/yyyy") (@Model.OrigenMenu)</div>
     @if (Model.Bloqueado)
     {
@@ -16,12 +16,19 @@
     {
         <div class="mt-2 text-slate-600">Encuesta en progreso (@Model.RespuestasCount/@Model.TotalDias).</div>
     }
+    <div class="mt-2 text-sm text-slate-700">
+        Total empleado: <strong>@Model.TotalEmpleado.ToString("C")</strong>
+        @if (Model.EsVistaAdministrador && Model.TotalEmpresa != null)
+        {
+            <span class="ml-3">Costo empresa: <strong>@Model.TotalEmpresa.Value.ToString("C")</strong></span>
+        }
+    </div>
     @if (User.IsInRole("Admin") || User.IsInRole("Sucursal"))
     {
         <form asp-controller="Encuestas" asp-action="Anular" method="post" class="mt-3">
             @Html.AntiForgeryToken()
             <input type="hidden" name="empleadoId" value="@Model.EmpleadoId" />
-            <button class="btn-primary" onclick="return confirm('�Anular encuesta del empleado?');">Anular encuesta</button>
+            <button class="btn-primary" onclick="return confirm('¿Anular encuesta del empleado?');">Anular encuesta</button>
         </form>
     }
     @if (Model.EsJefe && User.IsInRole("Admin"))
@@ -42,8 +49,10 @@
             {
                 new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA },
                 new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB },
-                new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC }
-            };
+                new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC },
+                new { Clave = "D", Nombre = d.D, Imagen = d.ImagenD },
+                new { Clave = "E", Nombre = d.E, Imagen = d.ImagenE }
+            }.Take(d.OpcionesMaximas <= 0 ? 3 : d.OpcionesMaximas).ToList();
         }
         <div class="space-y-2">
             @foreach (var opc in opcionesDia)
@@ -60,7 +69,7 @@
                 </div>
             }
         </div>
-        <div class="mt-2 text-slate-700">Selecci&oacute;n: <strong>@(d.Seleccion == null ? "�" : d.Seleccion.ToString())</strong></div>
+        <div class="mt-2 text-slate-700">Selecci&oacute;n: <strong>@(d.Seleccion == null ? "Sin seleccionar" : d.Seleccion.ToString())</strong></div>
     </div>
 }
 </div>

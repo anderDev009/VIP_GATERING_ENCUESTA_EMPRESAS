@@ -10,7 +10,6 @@ public class RespuestaFormulario
     public Guid OpcionMenuId { get; set; }
     public OpcionMenu? OpcionMenu { get; set; }
 
-    // Seleccion: 'A', 'B' o 'C'
+    // Seleccion: 'A', 'B', 'C', 'D' o 'E'
     public char Seleccion { get; set; }
 }
-

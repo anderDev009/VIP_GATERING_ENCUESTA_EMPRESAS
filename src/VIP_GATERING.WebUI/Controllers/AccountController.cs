@@ -1,8 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using VIP_GATERING.Infrastructure.Identity;
-using System.Security.Claims;
 using System.Linq;
 using VIP_GATERING.WebUI.Models.Account;
 
@@ -30,7 +29,7 @@ public class AccountController : Controller
         var user = await _userManager.FindByEmailAsync(model.Email);
         if (user != null)
         {
-            var res = await _signInManager.PasswordSignInAsync(user, model.Password, isPersistent: true, lockoutOnFailure: false);
+            var res = await _signInManager.PasswordSignInAsync(user, model.Password, isPersistent: true, lockoutOnFailure: true);
             if (res.Succeeded)
             {
                 var claims = await _userManager.GetClaimsAsync(user);
@@ -40,6 +39,11 @@ public class AccountController : Controller
                 if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
                     return Redirect(model.ReturnUrl);
                 return Redirect(Url.Action("Index", "Home")!);
+            }
+            if (res.IsLockedOut)
+            {
+                ModelState.AddModelError("", "Tu cuenta está bloqueada temporalmente por intentos fallidos. Inténtalo en unos minutos o solicita un restablecimiento.");
+                return View(model);
             }
         }
         ModelState.AddModelError("", "Usuario o contraseña inválidos");

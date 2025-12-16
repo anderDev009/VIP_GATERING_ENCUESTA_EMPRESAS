@@ -95,6 +95,7 @@ public class OpcionesController : Controller
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(Guid id)
     {
         var ent = await _db.Opciones.FindAsync(id);

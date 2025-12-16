@@ -20,7 +20,7 @@
     — Cliente: <strong>@Model.EmpresaNombre</strong>
     @if (Model.SucursalId != null)
     {
-        <text> — Sucursal: <strong>@Model.SucursalNombre</strong></text>
+        <text> — Dependiente: <strong>@Model.SucursalNombre</strong></text>
     }
     <div class="text-xs text-slate-500">Semana @Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd") a @Model.FechaTermino.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")</div>
 </div>
@@ -37,7 +37,7 @@
         </select>
     </div>
     <div>
-        <label class="block text-sm text-slate-600">Sucursal (opcional)</label>
+        <label class="block text-sm text-slate-600">Dependiente (opcional)</label>
         <select name="sucursalId" class="border rounded p-2 w-full">
             <option value="">-- Global por cliente --</option>
             @foreach (var s in Model.Sucursales)
@@ -52,11 +52,11 @@
 </form>
 
 <div class="mb-4 p-4 bg-white border rounded space-y-2">
-    <div class="flex flex-wrap gap-3 justify-between items-center">
-        <div>
-            <div class="text-sm text-slate-500">Estado de encuesta</div>
-            <div class="text-lg font-semibold @(Model.EncuestaCerrada ? "text-red-600" : "text-emerald-600")">
-                @(Model.EncuestaCerrada ? "Cerrada" : "Abierta")
+        <div class="flex flex-wrap gap-3 justify-between items-center">
+            <div>
+                <div class="text-sm text-slate-500">Estado de encuesta</div>
+                <div class="text-lg font-semibold @(Model.EncuestaCerrada ? "text-red-600" : "text-emerald-600")">
+                    @(Model.EncuestaCerrada ? "Cerrada" : "Abierta")
             </div>
         </div>
         <div class="text-sm text-slate-600">
@@ -92,6 +92,13 @@
                         <button class="btn-outline">Reabrir encuesta</button>
                     </form>
                 }
+                <form asp-action="EliminarEncuesta" method="post" class="inline" onsubmit="return confirm('Eliminar encuesta y sus opciones si no hay respuestas?');">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="inicio" value="@Model.FechaInicio.ToString("yyyy-MM-dd")" />
+                    <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
+                    <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
+                    <button class="btn-outline" @(Model.PuedeEliminarEncuesta ? "" : "disabled title='No disponible: ya hay respuestas'")>Eliminar encuesta</button>
+                </form>
             </div>
         }
     </div>
@@ -109,22 +116,49 @@
     <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
     <input type="hidden" name="SucursalId" value="@Model.SucursalId" />
 
-    @for (var i = 0; i < Model.Dias.Count; i++)
+    @{
+        var dias = Model.Dias;
+    }
+    <div class="mb-4 overflow-x-auto">
+        <div class="flex gap-2" id="tabs-dias">
+            @for (var i = 0; i < dias.Count; i++)
+            {
+                var label = $"{System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(dias[i].DiaSemana)} - {dias[i].HorarioNombre}";
+                <button type="button"
+                        class="px-3 py-1.5 border rounded-full text-sm bg-white hover:bg-slate-100"
+                        data-tab-target="tab-@i">@label</button>
+            }
+        </div>
+    </div>
+
+    @for (var i = 0; i < dias.Count; i++)
     {
-        <div class="bg-white border rounded p-4">
-            <input type="hidden" name="Dias[@i].OpcionMenuId" value="@Model.Dias[i].OpcionMenuId" />
-            <div class="flex items-center justify-between gap-3 mb-2">
-                <div class="font-medium">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(Model.Dias[i].DiaSemana)</div>
-                <span class="text-xs uppercase tracking-wide bg-slate-100 text-slate-600 px-2 py-0.5 rounded">@Model.Dias[i].HorarioNombre</span>
+        <div class="bg-white border rounded p-4 mb-3" data-card id="tab-@i" style="display:@(i==0 ? "block" : "none")">
+            <input type="hidden" name="Dias[@i].OpcionMenuId" value="@dias[i].OpcionMenuId" />
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <div>
+                    <div class="font-medium">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(dias[i].DiaSemana)</div>
+                    <span class="text-xs uppercase tracking-wide bg-slate-100 text-slate-600 px-2 py-0.5 rounded">@dias[i].HorarioNombre</span>
+                </div>
+                <div class="text-sm text-slate-600 flex items-center gap-2">
+                    <label class="whitespace-nowrap">Opciones habilitadas</label>
+                    <select name="Dias[@i].OpcionesMaximas" class="border rounded p-2" data-max-select @(Model.EncuestaCerrada ? "disabled" : "")>
+                        @for (var m = 1; m <= 5; m++)
+                        {
+                            if (dias[i].OpcionesMaximas == m) { <option selected value="@m">@m</option>; }
+                            else { <option value="@m">@m</option>; }
+                        }
+                    </select>
+                </div>
             </div>
-            <div class="grid md:grid-cols-4 gap-3">
-                <div>
-                    <label class="text-sm text-slate-600">Opción A</label>
+            <div class="grid lg:grid-cols-5 md:grid-cols-3 sm:grid-cols-2 gap-3" data-slot-container>
+                <div data-slot="1">
+                    <label class="text-sm text-slate-600">Opcion A</label>
                     <select name="Dias[@i].A" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
-                        <option value="">-- Sin opción --</option>
+                        <option value="">-- Sin opcion --</option>
                         @foreach (var o in Model.Opciones)
                         {
-                            if (Model.Dias[i].A.HasValue && Model.Dias[i].A.Value == o.Id)
+                            if (dias[i].A.HasValue && dias[i].A.Value == o.Id)
                             {
                                 <option selected value="@o.Id">@o.Nombre</option>
                             }
@@ -135,13 +169,13 @@
                         }
                     </select>
                 </div>
-                <div>
-                    <label class="text-sm text-slate-600">Opción B</label>
+                <div data-slot="2">
+                    <label class="text-sm text-slate-600">Opcion B</label>
                     <select name="Dias[@i].B" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
-                        <option value="">-- Sin opción --</option>
+                        <option value="">-- Sin opcion --</option>
                         @foreach (var o in Model.Opciones)
                         {
-                            if (Model.Dias[i].B.HasValue && Model.Dias[i].B.Value == o.Id)
+                            if (dias[i].B.HasValue && dias[i].B.Value == o.Id)
                             {
                                 <option selected value="@o.Id">@o.Nombre</option>
                             }
@@ -152,13 +186,47 @@
                         }
                     </select>
                 </div>
-                <div>
-                    <label class="text-sm text-slate-600">Opción C</label>
+                <div data-slot="3">
+                    <label class="text-sm text-slate-600">Opcion C</label>
                     <select name="Dias[@i].C" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
-                        <option value="">-- Sin opción --</option>
+                        <option value="">-- Sin opcion --</option>
                         @foreach (var o in Model.Opciones)
                         {
-                            if (Model.Dias[i].C.HasValue && Model.Dias[i].C.Value == o.Id)
+                            if (dias[i].C.HasValue && dias[i].C.Value == o.Id)
+                            {
+                                <option selected value="@o.Id">@o.Nombre</option>
+                            }
+                            else
+                            {
+                                <option value="@o.Id">@o.Nombre</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div data-slot="4">
+                    <label class="text-sm text-slate-600">Opcion D</label>
+                    <select name="Dias[@i].D" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
+                        <option value="">-- Sin opcion --</option>
+                        @foreach (var o in Model.Opciones)
+                        {
+                            if (dias[i].D.HasValue && dias[i].D.Value == o.Id)
+                            {
+                                <option selected value="@o.Id">@o.Nombre</option>
+                            }
+                            else
+                            {
+                                <option value="@o.Id">@o.Nombre</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div data-slot="5">
+                    <label class="text-sm text-slate-600">Opcion E</label>
+                    <select name="Dias[@i].E" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
+                        <option value="">-- Sin opcion --</option>
+                        @foreach (var o in Model.Opciones)
+                        {
+                            if (dias[i].E.HasValue && dias[i].E.Value == o.Id)
                             {
                                 <option selected value="@o.Id">@o.Nombre</option>
                             }
@@ -181,23 +249,44 @@
 </form>
 
 <script>
-    (function(){
-        // Inserta buscadores para cada select de opciones
-        const selects = document.querySelectorAll('select[name^="Dias["][name$='].A'] , select[name^="Dias["][name$='].B'], select[name^="Dias["][name$='].C']');
-        selects.forEach(sel => {
-            if (sel.previousElementSibling && sel.previousElementSibling.classList && sel.previousElementSibling.classList.contains('option-search')) return;
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.placeholder = 'Buscar...';
-            inp.className = 'option-search border rounded p-2 mb-1 w-full';
-            sel.parentElement.insertBefore(inp, sel);
-            inp.addEventListener('input', () => {
-                const q = inp.value.toLowerCase();
-                Array.from(sel.options).forEach(opt => {
-                    if(!opt.value){ opt.style.display=''; return; }
-                    opt.style.display = opt.text.toLowerCase().includes(q) ? '' : 'none';
+    (() => {
+        // Mostrar/ocultar slots según OpcionesMaximas y limpiar los que queden fuera
+        const cards = document.querySelectorAll('[data-card]');
+        cards.forEach(card => {
+            const maxSel = card.querySelector('[data-max-select]');
+            const slots = card.querySelectorAll('[data-slot]');
+            const updateSlots = () => {
+                const max = parseInt(maxSel?.value || '3', 10);
+                slots.forEach(slot => {
+                    const slotNum = parseInt(slot.getAttribute('data-slot') || '0', 10);
+                    const select = slot.querySelector('select');
+                    if (slotNum > max) {
+                        slot.classList.add('hidden');
+                        if (select) select.value = '';
+                    } else {
+                        slot.classList.remove('hidden');
+                    }
                 });
+            };
+            if (maxSel) {
+                maxSel.addEventListener('change', updateSlots);
+                updateSlots();
+            }
+        });
+
+        // Tabs por día/horario
+        const tabButtons = document.querySelectorAll('[data-tab-target]');
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-tab-target');
+                if (!targetId) return;
+                document.querySelectorAll('[data-card]').forEach(c => c.style.display = 'none');
+                const target = document.getElementById(targetId);
+                if (target) target.style.display = 'block';
+                tabButtons.forEach(b => b.classList.remove('bg-slate-200'));
+                btn.classList.add('bg-slate-200');
             });
         });
+        if (tabButtons.length > 0) tabButtons[0].classList.add('bg-slate-200');
     })();
 </script>

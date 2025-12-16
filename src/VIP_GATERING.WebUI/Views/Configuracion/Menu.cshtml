@@ -1,0 +1,36 @@
+@model VIP_GATERING.WebUI.Models.MenuConfiguracionVM
+@{
+    ViewData["Title"] = "Configuracion de menu";
+}
+
+<h1 class="text-2xl font-semibold mb-4">Ventana de edicion de semana actual</h1>
+<div class="bg-white border rounded-xl shadow-sm p-5">
+    <p class="text-sm text-slate-600 mb-4">
+        Define si los empleados pueden ajustar su menu de la semana actual y hasta cuando.
+    </p>
+    <form asp-action="Menu" method="post" class="space-y-4">
+        @Html.AntiForgeryToken()
+        <div class="flex items-center gap-3">
+            <input asp-for="PermitirEdicionSemanaActual" class="h-5 w-5 text-emerald-600 border-slate-300 rounded" type="checkbox" />
+            <label asp-for="PermitirEdicionSemanaActual" class="text-sm text-slate-700"></label>
+        </div>
+        <div>
+            <label asp-for="DiasAnticipoSemanaActual" class="block text-sm font-medium text-slate-700"></label>
+            <input asp-for="DiasAnticipoSemanaActual" type="number" min="0" max="7" class="mt-1 border rounded-lg px-3 py-2 w-32" />
+            <span asp-validation-for="DiasAnticipoSemanaActual" class="text-rose-600 text-xs"></span>
+            <div class="text-xs text-slate-500 mt-1">1 = se permite hasta un dia antes.</div>
+        </div>
+        <div>
+            <label asp-for="HoraLimite" class="block text-sm font-medium text-slate-700"></label>
+            <input asp-for="HoraLimite" type="time" class="mt-1 border rounded-lg px-3 py-2 w-40" />
+            <span asp-validation-for="HoraLimite" class="text-rose-600 text-xs"></span>
+        </div>
+        <div class="pt-2">
+            <button class="px-4 py-2 bg-emerald-600 text-white rounded-lg shadow-sm hover:bg-emerald-700">Guardar configuracion</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -18,7 +18,7 @@
         </select>
     </div>
     <div>
-        <label class="block text-sm">Sucursal</label>
+        <label class="block text-sm">Dependiente</label>
         <select asp-for="SucursalId" class="w-full border rounded p-2" id="selSucursal">
             @foreach (var s in sucursales)
             {
@@ -42,6 +42,11 @@
         <label class="block text-sm">Nombre</label>
         <input asp-for="Nombre" class="w-full border rounded p-2" />
     </div>
+    <div class="flex items-center gap-2">
+        <input asp-for="EsSubsidiado" type="checkbox" class="border rounded" id="chkSubsidio" />
+        <label for="chkSubsidio" class="text-sm">Empleado subsidiado</label>
+    </div>
+    <div class="text-xs text-slate-500 -mt-2">Si está desmarcado, el empleado paga el monto completo según el menú.</div>
     <div class="flex gap-2">
         <button class="btn-primary">Guardar</button>
         <a asp-action="Index" class="btn-outline">Cancelar</a>

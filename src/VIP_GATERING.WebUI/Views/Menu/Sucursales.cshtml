@@ -1,11 +1,11 @@
 @model VIP_GATERING.WebUI.Controllers.MenuSucursalesVM
 @{
-    ViewData["Title"] = "Sucursales por cliente";
+    ViewData["Title"] = "Dependientes por cliente";
 }
-<h1 class="text-2xl font-semibold mb-4">Sucursales por cliente</h1>
+<h1 class="text-2xl font-semibold mb-4">Dependientes por cliente</h1>
 
 <form method="get" class="mb-4 flex flex-wrap items-end gap-2">
-    <input type="text" name="q" value="@Model.Q" placeholder="Buscar por cliente o sucursal" class="border rounded p-2 grow min-w-[260px]" />
+    <input type="text" name="q" value="@Model.Q" placeholder="Buscar por cliente o dependiente" class="border rounded p-2 grow min-w-[260px]" />
     @if (Model.EmpresaId != null)
     {
         <input type="hidden" name="empresaId" value="@Model.EmpresaId" />

@@ -131,6 +131,11 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.Property<bool>("EsJefe")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("EsSubsidiado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
                     b.Property<int>("Estado")
                         .HasColumnType("INTEGER");
 
@@ -160,6 +165,21 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
 
                     b.Property<string>("Rnc")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("SubsidiaEmpleados")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("SubsidioTipo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0);
+
+                    b.Property<decimal>("SubsidioValor")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue(75m);
 
                     b.HasKey("Id");
 
@@ -226,6 +246,42 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.ToTable("Menus");
                 });
 
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.MenuConfiguracion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ActualizadoUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime>("CreadoUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("DiasAnticipoSemanaActual")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1);
+
+                    b.Property<long>("HoraLimiteEdicion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(432000000000L);
+
+                    b.Property<bool>("PermitirEdicionSemanaActual")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ConfiguracionesMenu");
+                });
+
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.Opcion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -289,6 +345,15 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.Property<Guid?>("OpcionIdC")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("OpcionIdD")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("OpcionIdE")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OpcionesMaximas")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("HorarioId");
@@ -300,6 +365,10 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.HasIndex("OpcionIdB");
 
                     b.HasIndex("OpcionIdC");
+
+                    b.HasIndex("OpcionIdD");
+
+                    b.HasIndex("OpcionIdE");
 
                     b.ToTable("OpcionesMenu");
                 });
@@ -381,6 +450,15 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
 
                     b.Property<string>("Nombre")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool?>("SubsidiaEmpleados")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("SubsidioTipo")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("SubsidioValor")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -646,6 +724,16 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                         .HasForeignKey("OpcionIdC")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("VIP_GATERING.Domain.Entities.Opcion", "OpcionD")
+                        .WithMany()
+                        .HasForeignKey("OpcionIdD")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("VIP_GATERING.Domain.Entities.Opcion", "OpcionE")
+                        .WithMany()
+                        .HasForeignKey("OpcionIdE")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Horario");
 
                     b.Navigation("Menu");
@@ -655,6 +743,10 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.Navigation("OpcionB");
 
                     b.Navigation("OpcionC");
+
+                    b.Navigation("OpcionD");
+
+                    b.Navigation("OpcionE");
                 });
 
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.RespuestaFormulario", b =>

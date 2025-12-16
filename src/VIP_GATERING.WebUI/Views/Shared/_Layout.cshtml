@@ -36,7 +36,7 @@
                         </button>
                         <div class="nav-dropdown__menu">
                             <a asp-controller="Empleados" asp-action="Index" class="nav-dropdown__item">Empleados</a>
-                            <a asp-controller="Sucursales" asp-action="Index" class="nav-dropdown__item">Sucursales</a>
+                            <a asp-controller="Sucursales" asp-action="Index" class="nav-dropdown__item">Dependientes</a>
                             @if (User.IsInRole("Admin"))
                             {
                                 <a asp-controller="Menu" asp-action="Sucursales" class="nav-dropdown__item">Men&uacute;</a>

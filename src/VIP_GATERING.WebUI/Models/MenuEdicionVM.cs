@@ -17,11 +17,12 @@ public class MenuEdicionVM
     public Guid? SucursalId { get; set; }
     public IEnumerable<(Guid id, string nombre)> Empresas { get; set; } = Array.Empty<(Guid, string)>();
     public IEnumerable<(Guid id, string nombre)> Sucursales { get; set; } = Array.Empty<(Guid, string)>();
-    public string OrigenScope => SucursalId != null ? "Sucursal" : "Cliente";
+    public string OrigenScope => SucursalId != null ? "Dependiente" : "Cliente";
     public string? EmpresaNombre { get; set; }
     public string? SucursalNombre { get; set; }
     public bool PuedeCerrarManualmente => !EncuestaCerrada;
     public bool PuedeReabrir => EncuestaCerrada;
+    public bool PuedeEliminarEncuesta { get; set; }
 }
 
 public class DiaEdicion
@@ -34,4 +35,7 @@ public class DiaEdicion
     public Guid? A { get; set; }
     public Guid? B { get; set; }
     public Guid? C { get; set; }
+    public Guid? D { get; set; }
+    public Guid? E { get; set; }
+    public int OpcionesMaximas { get; set; } = 3;
 }

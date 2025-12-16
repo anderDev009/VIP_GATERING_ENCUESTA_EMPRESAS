@@ -1,102 +1,215 @@
-@model VIP_GATERING.WebUI.Models.SemanaEmpleadoVM
+﻿@model VIP_GATERING.WebUI.Models.SemanaEmpleadoVM
 @{
     ViewData["Title"] = "Mi semana";
     var noHabilitado = (bool?)ViewBag.NoHabilitado ?? false;
+    var tituloSemana = Model.SemanaClave == "actual" ? "Menu semana actual" : "Menu semana proxima";
 }
 
-<h1 class="text-2xl font-semibold mb-2">Menú de la próxima semana</h1>
-<div class="mb-4 text-sm text-slate-600">
-    Origen: <span class="inline-block px-2 py-0.5 rounded border bg-white">@Model.OrigenMenu</span>
-    &mdash; Cliente: <strong>@Model.EmpresaNombre</strong>
-    @if (Model.OrigenMenu == "Sucursal")
-    {
-        <text> &mdash; Sucursal: <strong>@Model.SucursalNombre</strong></text>
-    }
-    <div class="text-xs text-slate-500">Semana @Model.FechaInicio.ToString("yyyy-MM-dd") a @Model.FechaTermino.ToString("yyyy-MM-dd")</div>
- </div>
+@if (Model.SemanasDisponibles != null && Model.SemanasDisponibles.Any())
+{
+    <form method="get" asp-action="MiSemana" class="mb-3 flex flex-wrap gap-3 items-center bg-white border rounded-xl shadow-sm p-3">
+        <div class="text-sm text-slate-600">Ver semana:</div>
+        <select name="semana" class="border rounded-lg px-3 py-2 text-sm" onchange="this.form.submit()">
+            @foreach (var s in Model.SemanasDisponibles)
+            {
+                @if (s.Clave == Model.SemanaClave)
+                {
+                    <option value="@s.Clave" selected>@s.Etiqueta</option>
+                }
+                else
+                {
+                    <option value="@s.Clave">@s.Etiqueta</option>
+                }
+            }
+        </select>
+        <noscript>
+            <button class="btn-primary px-3 py-2 rounded-lg">Cambiar</button>
+        </noscript>
+    </form>
+}
+
+<div class="bg-white border rounded-xl shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-center">
+    <div class="flex items-center gap-2">
+        <span class="w-3 h-3 bg-rose-500 rounded-full shadow-inner"></span>
+        <div>
+            <div class="text-xs uppercase tracking-wide text-slate-500">@tituloSemana</div>
+            <div class="text-lg font-semibold text-slate-800">Lunes @Model.FechaInicio.ToString("dd") - Viernes @Model.FechaTermino.ToString("dd 'de' MMMM yyyy")</div>
+        </div>
+    </div>
+    <div class="flex flex-wrap gap-2 text-sm text-slate-700 ml-auto">
+        <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Cliente: @Model.EmpresaNombre</span>
+        @if (Model.OrigenMenu == "Dependiente")
+        {
+            <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Dependiente: @Model.SucursalNombre</span>
+        }
+        <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Origen: @Model.OrigenMenu</span>
+    </div>
+</div>
 
 @if (noHabilitado)
 {
     <div class="p-3 rounded bg-yellow-50 border border-yellow-200 text-yellow-800 mb-4">
-        Tu cuenta no está habilitada para seleccionar opciones. Si crees que es un error, contacta a tu administrador.
+        Tu cuenta no esta habilitada para seleccionar opciones. Si crees que es un error, contacta a tu administrador.
     </div>
 }
 else if (Model.Bloqueado)
 {
     <div class="p-3 rounded bg-yellow-50 border border-yellow-200 text-yellow-800 mb-4">
-        Ya registraste tu menú de esta semana. No se puede modificar.
+        @(string.IsNullOrWhiteSpace(Model.MensajeBloqueo) ? "Ya registraste tu menu de esta semana. No se puede modificar." : Model.MensajeBloqueo)
     </div>
 }
 
-<div class="mb-4">
-    <div class="flex justify-between text-sm text-slate-600 mb-1">
-        <span>Progreso</span>
-        <span>@Model.RespuestasCount/@Model.TotalDias días</span>
+<div class="mb-4 bg-white border rounded-xl shadow-sm p-4">
+    <div class="flex flex-wrap justify-between items-center gap-3 text-sm text-slate-700">
+        <div class="font-medium">Progreso</div>
+        <div class="px-3 py-1 rounded-full border bg-slate-50">@Model.RespuestasCount/@Model.TotalDias dias</div>
     </div>
-    <div class="h-2 rounded bg-slate-200">
+    <div class="h-2 rounded-full bg-slate-200 mt-2">
         @{ var pct = Model.TotalDias == 0 ? 0 : (int)(100.0 * Model.RespuestasCount / Model.TotalDias); }
-        <div style="width:@pct%" class="h-2 rounded bg-emerald-600"></div>
+        <div style="width:@pct%" class="h-2 rounded-full bg-emerald-600 transition-all"></div>
     </div>
     @if (!Model.Bloqueado && !noHabilitado)
     {
-        <div class="text-xs text-slate-500 mt-1">Se bloqueará al completar los @Model.TotalDias días.</div>
+        <div class="text-xs text-slate-500 mt-1">Sigue completando tus dias pendientes.</div>
     }
+    @if (!string.IsNullOrWhiteSpace(Model.NotaVentana))
+    {
+        <div class="text-xs text-slate-500 mt-1">@Model.NotaVentana</div>
+    }
+    <div class="mt-3 text-sm text-slate-700">
+        Total a pagar por tus selecciones: <span class="font-semibold text-emerald-700">@Model.TotalEmpleado.ToString("C")</span>
+    </div>
 </div>
 
 <form asp-action="GuardarSemana" method="post" class="space-y-4">
     @Html.AntiForgeryToken()
     <input type="hidden" name="MenuId" value="@Model.MenuId" />
-    <div class="space-y-4">
-    @for (var i = 0; i < Model.Dias.Count; i++)
+    <input type="hidden" name="SemanaClave" value="@Model.SemanaClave" />
+    <div class="flex flex-wrap items-center gap-3 mb-2">
+        <div class="text-sm text-slate-600">Selecciona tu opcion por dia y horario.</div>
+        <div class="ml-auto flex gap-2">
+            <button type="button" id="clear-all" class="px-4 py-2 border rounded-full text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100" @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>Borrar todo</button>
+            <button class="px-4 py-2 bg-emerald-600 text-white rounded-full shadow-sm hover:bg-emerald-700" @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>Guardar seleccion</button>
+        </div>
+    </div>
+    @{
+        var diasConIndice = Model.Dias.Select((d, idx) => new { Dia = d, Index = idx }).ToList();
+        var grupos = diasConIndice.GroupBy(x => string.IsNullOrWhiteSpace(x.Dia.HorarioNombre) ? "General" : x.Dia.HorarioNombre!).ToList();
+    }
+    <div class="mb-4 overflow-x-auto">
+        <div class="flex gap-2" id="tabs-horario">
+            @for (var gi = 0; gi < grupos.Count; gi++)
+            {
+                var g = grupos[gi];
+                var tabId = $"tab-{gi}";
+                <button type="button" class="px-3 py-1.5 border rounded-full text-sm bg-white hover:bg-slate-100" data-tab-target="@tabId">@g.Key</button>
+            }
+        </div>
+    </div>
+    @for (var gi = 0; gi < grupos.Count; gi++)
     {
-        var d = Model.Dias[i];
-        <div class="bg-white border rounded">
-            <div class="px-4 py-3 border-b font-medium">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana) - @d.HorarioNombre</div>
-            <div class="p-4">
-                @if (d.A == null && d.B == null && d.C == null)
+        var g = grupos[gi];
+        var tabId = $"tab-{gi}";
+        <div id="@tabId" style="display:@(gi == 0 ? "block" : "none")" class="space-y-3" data-tab-panel>
+            @foreach (var item in g)
+            {
+                var d = item.Dia;
+                var i = item.Index;
+                var opcionesDia = new[]
                 {
-                    <div class="text-slate-500">Aún no hay opciones definidas para este día.</div>
-                }
-                else
-                {
-                    <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
-                    var opcionesDia = new[]
-                    {
-                        new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA },
-                        new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB },
-                        new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC }
-                    };
-                    <div class="grid md:grid-cols-3 gap-3">
-                        @foreach (var opc in opcionesDia)
+                    new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA },
+                    new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB },
+                    new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC },
+                    new { Clave = "D", Nombre = d.D, Imagen = d.ImagenD },
+                    new { Clave = "E", Nombre = d.E, Imagen = d.ImagenE }
+                }.Take(d.OpcionesMaximas <= 0 ? 3 : d.OpcionesMaximas).ToList();
+                <div class="bg-white border rounded-xl shadow-sm overflow-hidden">
+                    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-50 border-b">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-slate-800">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana)</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full border bg-white text-slate-600">@d.HorarioNombre</span>
+                        </div>
+                        <button type="button"
+                                class="px-3 py-1 text-sm border rounded-full text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100 clear-day"
+                                data-day="@i"
+                                @((Model.Bloqueado || noHabilitado || !d.Editable) ? "disabled" : "")>
+                            Borrar seleccion
+                        </button>
+                    </div>
+                    <div class="p-4">
+                        @if (!opcionesDia.Any(o => !string.IsNullOrWhiteSpace(o.Nombre)))
                         {
-                            var seleccionada = d.Seleccion == opc.Clave[0];
-                            <label class="border rounded-lg p-3 flex gap-3 items-center hover:border-emerald-500 transition @((seleccionada) ? "border-emerald-500 bg-emerald-50 shadow-sm" : "border-slate-200")">
-                                <input type="radio"
-                                       name="Dias[@i].Seleccion"
-                                       value="@opc.Clave"
-                                       class="mt-1"
-                                       @(seleccionada ? "checked" : "")
-                                       @((Model.Bloqueado || noHabilitado) ? "disabled" : "") />
-                                <div class="flex items-center gap-3 w-full">
-                                    @if (!string.IsNullOrWhiteSpace(opc.Imagen))
-                                    {
-                                        <img src="@opc.Imagen" alt="Opción @opc.Clave de @d.HorarioNombre" class="w-20 h-20 object-cover rounded-md border" />
-                                    }
-                                    <div>
-                                        <div class="text-xs uppercase text-slate-500">Opción @opc.Clave</div>
-                                        <div class="font-medium">@(!string.IsNullOrWhiteSpace(opc.Nombre) ? opc.Nombre : "Sin definir")</div>
-                                    </div>
-                                </div>
-                            </label>
+                            <div class="text-slate-500">Aun no hay opciones definidas para este dia.</div>
+                        }
+                        else
+                        {
+                            @if (!d.Editable)
+                            {
+                                <div class="text-xs text-rose-600 mb-2">Cambios cerrados para este dia.</div>
+                            }
+                            <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
+                            <div class="grid lg:grid-cols-5 md:grid-cols-3 sm:grid-cols-2 gap-3">
+                                @foreach (var opc in opcionesDia)
+                                {
+                                    var seleccionada = d.Seleccion == opc.Clave[0];
+                                    <label class="border rounded-xl p-3 flex gap-3 items-start transition @((seleccionada) ? "border-emerald-500 bg-emerald-50 shadow-sm" : "border-slate-200 hover:border-slate-300")">
+                                            <input type="radio"
+                                               name="Dias[@i].Seleccion"
+                                               value="@opc.Clave"
+                                               class="mt-1 h-5 w-5 text-emerald-600 focus:ring-emerald-500"
+                                               @(seleccionada ? "checked" : "")
+                                               @((Model.Bloqueado || noHabilitado || !d.Editable) ? "disabled" : "") />
+                                        <div class="flex items-center gap-3 w-full">
+                                            @if (!string.IsNullOrWhiteSpace(opc.Imagen))
+                                            {
+                                                <img src="@opc.Imagen" alt="Opcion @opc.Clave de @d.HorarioNombre" class="w-20 h-20 object-cover rounded-md border" />
+                                            }
+                                            <div class="space-y-1">
+                                                <div class="text-xs uppercase tracking-wide text-slate-500">Opcion @opc.Clave</div>
+                                                <div class="font-medium text-slate-800">@(!string.IsNullOrWhiteSpace(opc.Nombre) ? opc.Nombre : "Sin definir")</div>
+                                                <div class="text-xs text-slate-500">@d.HorarioNombre</div>
+                                            </div>
+                                        </div>
+                                    </label>
+                                }
+                            </div>
                         }
                     </div>
-                }
-            </div>
+                </div>
+            }
         </div>
     }
-    </div>
-
-    <div>
-        <button class="px-4 py-2 bg-emerald-600 text-white rounded" @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>Guardar todo</button>
-    </div>
 </form>
+
+<script>
+    (() => {
+        const clearButtons = document.querySelectorAll('.clear-day');
+        clearButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const dayIndex = btn.getAttribute('data-day');
+                if (dayIndex === null) return;
+                const radios = document.querySelectorAll(`input[name="Dias[${dayIndex}].Seleccion"]`);
+                radios.forEach(r => r.checked = false);
+            });
+        });
+        const clearAll = document.getElementById('clear-all');
+        if (clearAll) {
+            clearAll.addEventListener('click', () => {
+                document.querySelectorAll('input[type="radio"][name*="Dias"]').forEach(r => r.checked = false);
+            });
+        }
+        const tabButtons = document.querySelectorAll('[data-tab-target]');
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-tab-target');
+                if (!targetId) return;
+                document.querySelectorAll('[data-tab-panel]').forEach(p => p.style.display = 'none');
+                const target = document.getElementById(targetId);
+                if (target) target.style.display = 'block';
+                tabButtons.forEach(b => b.classList.remove('bg-slate-200'));
+                btn.classList.add('bg-slate-200');
+            });
+        });
+        if (tabButtons.length > 0) tabButtons[0].classList.add('bg-slate-200');
+    })();
+</script>

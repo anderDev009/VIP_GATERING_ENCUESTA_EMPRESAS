@@ -5,6 +5,7 @@ using VIP_GATERING.Infrastructure.Data;
 using VIP_GATERING.Infrastructure.Identity;
 using VIP_GATERING.Application;
 using VIP_GATERING.WebUI.Services;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,11 +14,15 @@ builder.Services.AddControllersWithViews().AddViewLocalization();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 {
-    options.Password.RequireDigit = false;
-    options.Password.RequireLowercase = false;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequiredLength = 3;
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequiredLength = 8;
+    options.Password.RequiredUniqueChars = 3;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.AllowedForNewUsers = true;
     options.User.RequireUniqueEmail = true;
 })
     .AddEntityFrameworkStores<AppDbContext>()
@@ -28,7 +33,9 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = "/Account/Login";
     options.AccessDeniedPath = "/Account/Denied";
     options.SlidingExpiration = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
+    var isDev = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");
+    options.Cookie.SecurePolicy = isDev ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.Name = "VIPGATERING.AUTH";
@@ -78,10 +85,7 @@ app.MapControllerRoute(
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    if (db.Database.IsSqlite())
-        db.Database.EnsureCreated();
-    else
-        db.Database.Migrate();
+    db.Database.Migrate();
     await SeedData.EnsureSeedAsync(db);
     // Ensure Identity roles and demo users
     var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
@@ -95,5 +99,3 @@ namespace VIP_GATERING.WebUI
 {
     public partial class Program { }
 }
-
-

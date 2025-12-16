@@ -1,6 +1,0 @@
-{
-  "VIP_GATERING.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "D:\\Clientes\\VIP_GATERING_ENCUESTAS\\src\\VIP_GATERING.Application",
-  "VIP_GATERING.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "D:\\Clientes\\VIP_GATERING_ENCUESTAS\\src\\VIP_GATERING.Domain",
-  "VIP_GATERING.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "D:\\Clientes\\VIP_GATERING_ENCUESTAS\\src\\VIP_GATERING.Infrastructure",
-  "VIP_GATERING.WebUI, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "D:\\Clientes\\VIP_GATERING_ENCUESTAS\\src\\VIP_GATERING.WebUI"
-}
