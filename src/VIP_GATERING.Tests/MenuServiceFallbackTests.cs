@@ -34,9 +34,12 @@ public class MenuServiceFallbackTests
         IRepository<Opcion> repoOpc = new EfRepository<Opcion>(ctx);
         IRepository<OpcionMenu> repoOpcMenu = new EfRepository<OpcionMenu>(ctx);
         IRepository<RespuestaFormulario> repoResp = new EfRepository<RespuestaFormulario>(ctx);
+        IRepository<Empleado> repoEmp = new EfRepository<Empleado>(ctx);
+        IRepository<EmpleadoSucursal> repoEmpSuc = new EfRepository<EmpleadoSucursal>(ctx);
+        IRepository<MenuAdicional> repoMenuAdi = new EfRepository<MenuAdicional>(ctx);
         IUnitOfWork uow = new UnitOfWork(ctx);
         var fechas = new FechaServicio();
-        var svc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), uow, fechas);
+        var svc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, uow, fechas);
 
         var (inicio, fin) = fechas.RangoSemanaSiguiente();
         // solo crear menú de empresa
@@ -45,6 +48,5 @@ public class MenuServiceFallbackTests
         found!.Id.Should().Be(mEmp.Id);
     }
 }
-
 
 

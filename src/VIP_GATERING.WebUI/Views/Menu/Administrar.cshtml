@@ -116,6 +116,36 @@
     <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
     <input type="hidden" name="SucursalId" value="@Model.SucursalId" />
 
+    <div class="bg-white border rounded p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+                <div class="font-medium">Adicionales fijos</div>
+                <div class="text-xs text-slate-500">Se cobran 100% al empleado y aplican a todos los días/horarios de este menú.</div>
+            </div>
+            @if (Model.EncuestaCerrada)
+            {
+                <div class="text-xs text-amber-700">Encuesta cerrada: no se pueden modificar adicionales.</div>
+            }
+        </div>
+        <div class="mt-3">
+            <label class="block text-sm text-slate-600">Selecciona los adicionales disponibles</label>
+            <select name="AdicionalesIds" multiple size="8" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
+                @foreach (var o in Model.Opciones)
+                {
+                    if (Model.AdicionalesIds != null && Model.AdicionalesIds.Contains(o.Id))
+                    {
+                        <option value="@o.Id" selected>@o.Nombre</option>
+                    }
+                    else
+                    {
+                        <option value="@o.Id">@o.Nombre</option>
+                    }
+                }
+            </select>
+            <div class="text-xs text-slate-500 mt-1">Tip: usa Ctrl/Shift para seleccionar múltiples.</div>
+        </div>
+    </div>
+
     @{
         var dias = Model.Dias;
     }

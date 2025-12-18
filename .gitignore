@@ -40,6 +40,17 @@ build/
 *.sqlite3
 tmp/
 tmp_*/
+tmp_*
+appsettings.*.local.json
+appsettings.Local.json
+secrets.json
+*.pfx
+*.pem
+*.key
+*.crt
+*.cer
+.env
+.env.*
 
 # Coverage / analytics
 coverage*/

@@ -18,4 +18,7 @@ public class Menu
     public bool EncuestaReabiertaManualmente { get; set; }
 
     public ICollection<OpcionMenu> OpcionesPorDia { get; set; } = new List<OpcionMenu>();
+
+    // Adicionales fijos disponibles para este menú (se cobran 100% al empleado)
+    public ICollection<MenuAdicional> Adicionales { get; set; } = new List<MenuAdicional>();
 }

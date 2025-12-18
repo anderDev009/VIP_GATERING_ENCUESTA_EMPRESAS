@@ -14,6 +14,7 @@ public interface IMenuService
     Task<Menu?> FindEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, Guid empresaId, Guid? sucursalId, bool requireOpcionesConfiguradas = false, CancellationToken ct = default);
     Task<IReadOnlyList<OpcionMenu>> ObtenerOpcionesEmpleadoAsync(Guid empleadoId, CancellationToken ct = default);
     Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, CancellationToken ct = default);
+    Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, Guid sucursalEntregaId, Guid? adicionalOpcionId, CancellationToken ct = default);
 }
 
 public class MenuService : IMenuService
@@ -24,6 +25,9 @@ public class MenuService : IMenuService
     private readonly IRepository<Horario> _horarios;
     private readonly IRepository<RespuestaFormulario> _respuestas;
     private readonly IRepository<SucursalHorario> _sucursalHorarios;
+    private readonly IRepository<Empleado> _empleados;
+    private readonly IRepository<EmpleadoSucursal> _empleadosSucursales;
+    private readonly IRepository<MenuAdicional> _menusAdicionales;
     private readonly IUnitOfWork _uow;
     private readonly IFechaServicio _fechaSvc;
 
@@ -33,6 +37,9 @@ public class MenuService : IMenuService
         IRepository<Horario> horarios,
         IRepository<RespuestaFormulario> respuestas,
         IRepository<SucursalHorario> sucursalHorarios,
+        IRepository<Empleado> empleados,
+        IRepository<EmpleadoSucursal> empleadosSucursales,
+        IRepository<MenuAdicional> menusAdicionales,
         IUnitOfWork uow,
         IFechaServicio fechaSvc)
     {
@@ -42,6 +49,9 @@ public class MenuService : IMenuService
         _horarios = horarios;
         _respuestas = respuestas;
         _sucursalHorarios = sucursalHorarios;
+        _empleados = empleados;
+        _empleadosSucursales = empleadosSucursales;
+        _menusAdicionales = menusAdicionales;
         _uow = uow;
         _fechaSvc = fechaSvc;
     }
@@ -199,8 +209,37 @@ public class MenuService : IMenuService
 
     public async Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, CancellationToken ct = default)
     {
+        var empleado = await _empleados.GetByIdAsync(empleadoId, ct);
+        if (empleado == null) throw new ArgumentException("Empleado no existe", nameof(empleadoId));
+
+        await RegistrarSeleccionAsync(empleadoId, opcionMenuId, seleccion, empleado.SucursalId, null, ct);
+    }
+
+    public async Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, Guid sucursalEntregaId, Guid? adicionalOpcionId, CancellationToken ct = default)
+    {
         var opcionMenu = await _opcionesMenu.GetByIdAsync(opcionMenuId, ct);
         if (opcionMenu == null) throw new ArgumentException("OpcionMenu no existe", nameof(opcionMenuId));
+
+        if (sucursalEntregaId == Guid.Empty)
+            throw new ArgumentException("Sucursal de entrega invalida", nameof(sucursalEntregaId));
+
+        // Validar que la sucursal de entrega está asignada al empleado (principal o adicional)
+        var empleado = await _empleados.GetByIdAsync(empleadoId, ct);
+        if (empleado == null) throw new ArgumentException("Empleado no existe", nameof(empleadoId));
+        var asignadas = await _empleadosSucursales.ListAsync(es => es.EmpleadoId == empleadoId, ct);
+        var sucursalesPermitidas = asignadas.Select(a => a.SucursalId).ToHashSet();
+        sucursalesPermitidas.Add(empleado.SucursalId);
+        if (!sucursalesPermitidas.Contains(sucursalEntregaId))
+            throw new InvalidOperationException("La sucursal de entrega no está asignada al empleado.");
+
+        // Validar adicional: debe estar configurado como adicional fijo para el menú
+        if (adicionalOpcionId != null)
+        {
+            var adicionalesMenu = await _menusAdicionales.ListAsync(a => a.MenuId == opcionMenu.MenuId, ct);
+            var set = adicionalesMenu.Select(a => a.OpcionId).ToHashSet();
+            if (!set.Contains(adicionalOpcionId.Value))
+                throw new InvalidOperationException("El adicional seleccionado no está disponible para este menú.");
+        }
 
         var max = opcionMenu.OpcionesMaximas <= 0 ? 3 : Math.Clamp(opcionMenu.OpcionesMaximas, 1, 5);
         var slot = seleccion switch
@@ -235,12 +274,16 @@ public class MenuService : IMenuService
             {
                 EmpleadoId = empleadoId,
                 OpcionMenuId = opcionMenuId,
-                Seleccion = seleccion
+                Seleccion = seleccion,
+                SucursalEntregaId = sucursalEntregaId,
+                AdicionalOpcionId = adicionalOpcionId
             }, ct);
         }
         else
         {
             actual.Seleccion = seleccion;
+            actual.SucursalEntregaId = sucursalEntregaId;
+            actual.AdicionalOpcionId = adicionalOpcionId;
         }
         await _uow.SaveChangesAsync(ct);
     }

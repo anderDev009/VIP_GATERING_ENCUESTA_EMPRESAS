@@ -46,9 +46,12 @@ public class MenuCloneTests
         IRepository<Opcion> repoOpc = new EfRepository<Opcion>(ctx);
         IRepository<OpcionMenu> repoOpcMenu = new EfRepository<OpcionMenu>(ctx);
         IRepository<RespuestaFormulario> repoResp = new EfRepository<RespuestaFormulario>(ctx);
+        IRepository<Empleado> repoEmp = new EfRepository<Empleado>(ctx);
+        IRepository<EmpleadoSucursal> repoEmpSuc = new EfRepository<EmpleadoSucursal>(ctx);
+        IRepository<MenuAdicional> repoMenuAdi = new EfRepository<MenuAdicional>(ctx);
         IUnitOfWork uow = new UnitOfWork(ctx);
         IFechaServicio fechas = new FechaServicio();
-        IMenuService menuSvc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), uow, fechas);
+        IMenuService menuSvc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, uow, fechas);
         var cloneSvc = new MenuCloneService(menuSvc, repoMenu, repoOpcMenu, repoResp, uow);
 
         // Clonar a dos sucursales
@@ -64,7 +67,7 @@ public class MenuCloneTests
         await ctx.Empleados.AddAsync(emp);
         await ctx.SaveChangesAsync();
         foreach (var d in diasS2)
-            await ctx.RespuestasFormulario.AddAsync(new RespuestaFormulario { EmpleadoId = emp.Id, OpcionMenuId = d.Id, Seleccion = 'A' });
+            await ctx.RespuestasFormulario.AddAsync(new RespuestaFormulario { EmpleadoId = emp.Id, OpcionMenuId = d.Id, Seleccion = 'A', SucursalEntregaId = s2.Id });
         await ctx.SaveChangesAsync();
 
         // Intentar clonar nuevamente: s1 actualiza, s2 se omite
@@ -73,6 +76,5 @@ public class MenuCloneTests
         result2.skipped.Should().Be(1);
     }
 }
-
 
 

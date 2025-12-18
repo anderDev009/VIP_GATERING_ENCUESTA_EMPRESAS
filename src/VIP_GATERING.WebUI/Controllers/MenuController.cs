@@ -172,6 +172,11 @@ public class MenuController : Controller
             .ToListAsync();
         var diasVm = MapDias(diasDb, null);
         var opciones = await _db.Opciones.OrderBy(o => o.Nombre).ToListAsync();
+        var adicionalesIds = await _db.MenusAdicionales
+            .AsNoTracking()
+            .Where(a => a.MenuId == menu.Id)
+            .Select(a => a.OpcionId)
+            .ToListAsync();
         // Calcular empleados con encuesta completa (toda la semana)
         var opcionIds = diasDb.Select(d => d.Id).ToList();
         var completos = await _db.RespuestasFormulario
@@ -198,7 +203,8 @@ public class MenuController : Controller
             EmpresaNombre = empresas.FirstOrDefault(e => e.Id == empresaSel)?.Nombre,
             SucursalNombre = sucursales.FirstOrDefault(s => s.Id == sucursalSel)?.Nombre,
             Dias = diasVm,
-            PuedeEliminarEncuesta = sinRespuestas
+            PuedeEliminarEncuesta = sinRespuestas,
+            AdicionalesIds = adicionalesIds
         };
         return View(vm);
     }
@@ -320,6 +326,18 @@ public class MenuController : Controller
                 dia.OpcionIdD = max >= 4 ? d.D : null;
                 dia.OpcionIdE = max >= 5 ? d.E : null;
             }
+            // Actualizar adicionales fijos del menú (se cobran 100% al empleado)
+            var nuevosIds = (model.AdicionalesIds ?? new List<Guid>())
+                .Where(x => x != Guid.Empty)
+                .Distinct()
+                .ToHashSet();
+            var actuales = await _db.MenusAdicionales.Where(a => a.MenuId == menuDb.Id).ToListAsync();
+            var actualesSet = actuales.Select(a => a.OpcionId).ToHashSet();
+            var toRemove = actuales.Where(a => !nuevosIds.Contains(a.OpcionId)).ToList();
+            if (toRemove.Count > 0) _db.MenusAdicionales.RemoveRange(toRemove);
+            var toAdd = nuevosIds.Except(actualesSet).Select(id => new MenuAdicional { MenuId = menuDb.Id, OpcionId = id }).ToList();
+            if (toAdd.Count > 0) await _db.MenusAdicionales.AddRangeAsync(toAdd);
+
             await _db.SaveChangesAsync();
             TempData["Success"] = "Menú actualizado correctamente.";
             _logger.LogInformation("[POST Guardar] Cambios guardados OK.");

@@ -38,6 +38,8 @@ public class ReportesController : Controller
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado)!.ThenInclude(e => e.Sucursal)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.SucursalEntrega)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.AdicionalOpcion)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionA)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionB)
@@ -45,35 +47,37 @@ public class ReportesController : Controller
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionD)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionE)
             .Where(r => r.OpcionMenu!.Menu!.FechaInicio == inicio && r.OpcionMenu.Menu!.FechaTermino == fin);
-        baseQuery = baseQuery.Where(x => x.Empleado != null && x.Empleado.Sucursal != null && x.Empleado.Sucursal.Empresa != null && x.OpcionMenu != null && x.OpcionMenu.Menu != null);
-        baseQuery = baseQuery.Where(x => x.Empleado != null && x.Empleado.Sucursal != null && x.Empleado.Sucursal.Empresa != null && x.OpcionMenu != null && x.OpcionMenu.Menu != null);
-        baseQuery = baseQuery.Where(x => x.Empleado != null && x.Empleado.Sucursal != null && x.Empleado.Sucursal.Empresa != null && x.OpcionMenu != null && x.OpcionMenu.Menu != null);
 
         if (empresaId != null)
-            baseQuery = baseQuery.Where(x => x.Empleado!.Sucursal!.EmpresaId == empresaId);
+            baseQuery = baseQuery.Where(x => x.SucursalEntrega!.EmpresaId == empresaId);
         if (sucursalId != null)
-            baseQuery = baseQuery.Where(x => x.Empleado!.SucursalId == sucursalId);
+            baseQuery = baseQuery.Where(x => x.SucursalEntregaId == sucursalId);
 
         var respuestas = await baseQuery.ToListAsync();
 
-        var itemsRaw = respuestas
-            .Select(r =>
+        var itemsRaw = new List<(Guid OpcionId, string Nombre, decimal Costo, decimal PrecioEmpleado)>();
+        foreach (var r in respuestas)
+        {
+            if (r.OpcionMenu == null || r.Empleado == null) continue;
+            var sucEmpleado = r.Empleado.Sucursal;
+            var empresaEmpleado = sucEmpleado?.Empresa;
+            if (sucEmpleado == null || empresaEmpleado == null) continue;
+
+            var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
+            if (opcion != null)
             {
-                var opcion = GetOpcionSeleccionada(r.OpcionMenu!, r.Seleccion);
-                if (opcion == null || r.Empleado?.Sucursal?.Empresa == null) return null;
-                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, r.Empleado.Sucursal, r.Empleado.Sucursal.Empresa);
+                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, sucEmpleado, empresaEmpleado);
                 var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
-                return new
-                {
-                    OpcionId = opcion.Id,
-                    Nombre = opcion.Nombre,
-                    Costo = opcion.Costo,
-                    PrecioEmpleado = precio
-                };
-            })
-            .Where(x => x != null)
-            .Select(x => x!)
-            .ToList();
+                itemsRaw.Add((opcion.Id, opcion.Nombre ?? "Sin definir", opcion.Costo, precio));
+            }
+
+            if (r.AdicionalOpcionId != null && r.AdicionalOpcion != null)
+            {
+                var adicional = r.AdicionalOpcion;
+                var precio = adicional.Precio ?? adicional.Costo;
+                itemsRaw.Add((adicional.Id, adicional.Nombre ?? "Sin definir", adicional.Costo, precio));
+            }
+        }
 
         var items = itemsRaw
             .GroupBy(x => new { x.OpcionId, x.Nombre, x.Costo, x.PrecioEmpleado })
@@ -124,6 +128,8 @@ public class ReportesController : Controller
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado)!.ThenInclude(e => e.Sucursal)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.SucursalEntrega)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.AdicionalOpcion)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionA)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionB)
@@ -133,38 +139,42 @@ public class ReportesController : Controller
             .Where(r => r.OpcionMenu!.Menu!.FechaInicio == inicio && r.OpcionMenu.Menu!.FechaTermino == fin);
 
         if (empresaId != null)
-            baseQuery = baseQuery.Where(x => x.Empleado!.Sucursal!.EmpresaId == empresaId);
+            baseQuery = baseQuery.Where(x => x.SucursalEntrega!.EmpresaId == empresaId);
         if (sucursalId != null)
-            baseQuery = baseQuery.Where(x => x.Empleado!.SucursalId == sucursalId);
+            baseQuery = baseQuery.Where(x => x.SucursalEntregaId == sucursalId);
 
         var respuestas = await baseQuery.ToListAsync();
 
-        var detalleRaw = respuestas
-            .Select(r =>
+        var detalleRaw = new List<(Guid EmpleadoId, string EmpleadoNombre, Guid SucursalId, string SucursalNombre, decimal Costo, decimal Precio)>();
+        foreach (var r in respuestas)
+        {
+            if (r.OpcionMenu == null || r.Empleado == null) continue;
+            var suc = r.SucursalEntrega;
+            var sucEmpleado = r.Empleado.Sucursal;
+            var empresaEmpleado = sucEmpleado?.Empresa;
+            if (suc == null || sucEmpleado == null || empresaEmpleado == null) continue;
+
+            var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
+            if (opcion != null)
             {
-                var opcion = GetOpcionSeleccionada(r.OpcionMenu!, r.Seleccion);
-                if (opcion == null || r.Empleado?.Sucursal?.Empresa == null) return null;
-                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, r.Empleado.Sucursal, r.Empleado.Sucursal.Empresa);
+                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, sucEmpleado, empresaEmpleado);
                 var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
-                return new
-                {
-                    r.Empleado.Id,
-                    EmpleadoNombre = r.Empleado.Nombre,
-                    SucursalId = r.Empleado.SucursalId,
-                    SucursalNombre = r.Empleado.Sucursal!.Nombre,
-                    Costo = opcion.Costo,
-                    Precio = precio
-                };
-            })
-            .Where(x => x != null)
-            .Select(x => x!)
-            .ToList();
+                detalleRaw.Add((r.Empleado.Id, r.Empleado.Nombre, suc.Id, suc.Nombre, opcion.Costo, precio));
+            }
+
+            if (r.AdicionalOpcionId != null && r.AdicionalOpcion != null)
+            {
+                var adicional = r.AdicionalOpcion;
+                var precio = adicional.Precio ?? adicional.Costo;
+                detalleRaw.Add((r.Empleado.Id, r.Empleado.Nombre, suc.Id, suc.Nombre, adicional.Costo, precio));
+            }
+        }
 
         var detalle = detalleRaw
-            .GroupBy(x => new { x.Id, x.EmpleadoNombre, x.SucursalId, x.SucursalNombre })
+            .GroupBy(x => new { x.EmpleadoId, x.EmpleadoNombre, x.SucursalId, x.SucursalNombre })
             .Select(g => new SeleccionesVM.EmpleadoResumen
             {
-                EmpleadoId = g.Key.Id,
+                EmpleadoId = g.Key.EmpleadoId,
                 Empleado = g.Key.EmpleadoNombre,
                 SucursalId = g.Key.SucursalId,
                 Sucursal = g.Key.SucursalNombre,
@@ -227,6 +237,8 @@ public class ReportesController : Controller
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado)!.ThenInclude(e => e.Sucursal)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.SucursalEntrega)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.AdicionalOpcion)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionA)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionB)
@@ -236,36 +248,41 @@ public class ReportesController : Controller
             .Where(r => r.OpcionMenu!.Menu!.FechaInicio == inicio && r.OpcionMenu.Menu!.FechaTermino == fin);
 
         if (empresaId != null)
-            baseQuery = baseQuery.Where(x => x.Empleado!.Sucursal!.EmpresaId == empresaId);
+            baseQuery = baseQuery.Where(x => x.SucursalEntrega!.EmpresaId == empresaId);
         if (sucursalId != null)
-            baseQuery = baseQuery.Where(x => x.Empleado!.SucursalId == sucursalId);
+            baseQuery = baseQuery.Where(x => x.SucursalEntregaId == sucursalId);
 
         var respuestas = await baseQuery.ToListAsync();
 
-        var rowsRaw = respuestas
-            .Select(r =>
+        var rowsRaw = new List<(Guid EmpleadoId, string EmpleadoNombre, decimal Costo, decimal Precio)>();
+        foreach (var r in respuestas)
+        {
+            if (r.OpcionMenu == null || r.Empleado == null) continue;
+            var sucEmpleado = r.Empleado.Sucursal;
+            var empresaEmpleado = sucEmpleado?.Empresa;
+            if (sucEmpleado == null || empresaEmpleado == null) continue;
+
+            var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
+            if (opcion != null)
             {
-                var opcion = GetOpcionSeleccionada(r.OpcionMenu!, r.Seleccion);
-                if (opcion == null || r.Empleado?.Sucursal?.Empresa == null) return null;
-                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, r.Empleado.Sucursal, r.Empleado.Sucursal.Empresa);
+                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, sucEmpleado, empresaEmpleado);
                 var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
-                return new
-                {
-                    r.Empleado.Id,
-                    EmpleadoNombre = r.Empleado.Nombre,
-                    Costo = opcion.Costo,
-                    Precio = precio
-                };
-            })
-            .Where(x => x != null)
-            .Select(x => x!)
-            .ToList();
+                rowsRaw.Add((r.Empleado.Id, r.Empleado.Nombre, opcion.Costo, precio));
+            }
+
+            if (r.AdicionalOpcionId != null && r.AdicionalOpcion != null)
+            {
+                var adicional = r.AdicionalOpcion;
+                var precio = adicional.Precio ?? adicional.Costo;
+                rowsRaw.Add((r.Empleado.Id, r.Empleado.Nombre, adicional.Costo, precio));
+            }
+        }
 
         var rows = rowsRaw
-            .GroupBy(x => new { x.Id, x.EmpleadoNombre })
+            .GroupBy(x => new { x.EmpleadoId, x.EmpleadoNombre })
             .Select(g => new TotalesEmpleadosVM.Row
             {
-                EmpleadoId = g.Key.Id,
+                EmpleadoId = g.Key.EmpleadoId,
                 Empleado = g.Key.EmpleadoNombre,
                 Cantidad = g.Count(),
                 TotalCosto = g.Sum(i => i.Costo),
@@ -312,6 +329,8 @@ public class ReportesController : Controller
         var hastaValue = hasta.Value;
 
         var respuestas = await _db.RespuestasFormulario
+            .Include(r => r.SucursalEntrega)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.AdicionalOpcion)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Horario)
             .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionA)
@@ -331,16 +350,24 @@ public class ReportesController : Controller
                 if (fecha < desdeValue || fecha > hastaValue) return null;
                 var opcion = GetOpcionSeleccionada(r.OpcionMenu!, r.Seleccion);
                 if (opcion == null) return null;
-                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, empleadoDatos, empleadoDatos.Sucursal!, empleadoDatos.Sucursal!.Empresa!);
+                var suc = empleadoDatos.Sucursal!;
+                var emp = suc.Empresa!;
+                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, empleadoDatos, suc, emp);
                 var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
+
+                var adicionalNombre = r.AdicionalOpcion != null ? r.AdicionalOpcion.Nombre : null;
+                var precioAdicional = r.AdicionalOpcion != null ? (r.AdicionalOpcion.Precio ?? r.AdicionalOpcion.Costo) : 0m;
+                var nombre = opcion.Nombre ?? "Sin definir";
+                if (!string.IsNullOrWhiteSpace(adicionalNombre))
+                    nombre += $" + {adicionalNombre}";
                 return new EstadoCuentaEmpleadoVM.MovimientoRow
                 {
                     Fecha = fecha,
                     DiaNombre = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
                     Horario = r.OpcionMenu.Horario != null ? r.OpcionMenu.Horario.Nombre : null,
                     Seleccion = r.Seleccion.ToString(),
-                    OpcionNombre = opcion.Nombre ?? "Sin definir",
-                    PrecioEmpleado = precio
+                    OpcionNombre = nombre,
+                    PrecioEmpleado = precio + precioAdicional
                 };
             })
             .Where(m => m != null)

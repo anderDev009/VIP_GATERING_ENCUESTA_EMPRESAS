@@ -9,6 +9,7 @@ public class MenuEdicionVM
     public Guid MenuId { get; set; }
     public List<DiaEdicion> Dias { get; set; } = new();
     public IEnumerable<Opcion> Opciones { get; set; } = Enumerable.Empty<Opcion>();
+    public List<Guid> AdicionalesIds { get; set; } = new();
     public bool EncuestaCerrada { get; set; }
     public DateTime FechaCierreAutomatica { get; set; }
     public DateTime? FechaCierreManual { get; set; }

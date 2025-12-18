@@ -39,7 +39,7 @@ public class EmpleadosController : Controller
                 query = query.Where(e => e.Sucursal!.EmpresaId == currentEmpresaId);
         }
         if (empresaId != null) query = query.Where(e => e.Sucursal!.EmpresaId == empresaId);
-        if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId);
+        if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId || e.SucursalesAsignadas.Any(a => a.SucursalId == sucursalId));
         if (!string.IsNullOrWhiteSpace(q))
         {
             var ql = q.ToLower();
@@ -71,12 +71,13 @@ public class EmpleadosController : Controller
         }
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
+        ViewBag.SucursalesAsignadasIds = new List<Guid>();
         return View(new Empleado());
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Empleado model)
+    public async Task<IActionResult> Create(Empleado model, [FromForm] List<Guid> sucursalesAsignadas)
     {
         if (!ModelState.IsValid)
         {
@@ -90,6 +91,7 @@ public class EmpleadosController : Controller
             }
             ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
+            ViewBag.SucursalesAsignadasIds = sucursalesAsignadas ?? new List<Guid>();
             return View(model);
         }
         // Seguridad: Empresa solo puede crear en sus sucursales
@@ -99,15 +101,40 @@ public class EmpleadosController : Controller
             var sucEmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
             if (empresaId == null || sucEmpresaId != empresaId) return Forbid();
         }
+
+        var extras = (sucursalesAsignadas ?? new List<Guid>())
+            .Where(x => x != Guid.Empty && x != model.SucursalId)
+            .Distinct()
+            .ToList();
+        if (extras.Count > 0)
+        {
+            var empresaPrimaria = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
+            var empresasExtra = await _db.Sucursales.Where(s => extras.Contains(s.Id)).Select(s => s.EmpresaId).Distinct().ToListAsync();
+            if (empresasExtra.Any(e => e != empresaPrimaria))
+            {
+                TempData["Error"] = "Todas las sucursales asignadas deben pertenecer al mismo cliente.";
+                return RedirectToAction(nameof(Create));
+            }
+            if (User.IsInRole("Empresa") && _currentUser.EmpresaId != null && empresaPrimaria != _currentUser.EmpresaId)
+                return Forbid();
+        }
+
         await _db.Empleados.AddAsync(model);
         await _db.SaveChangesAsync();
+
+        if (extras.Count > 0)
+        {
+            var rows = extras.Select(sid => new EmpleadoSucursal { EmpleadoId = model.Id, SucursalId = sid }).ToList();
+            await _db.EmpleadosSucursales.AddRangeAsync(rows);
+            await _db.SaveChangesAsync();
+        }
         TempData["Success"] = "Empleado creado.";
         return RedirectToAction(nameof(Index), new { sucursalId = model.SucursalId });
     }
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var ent = await _db.Empleados.FindAsync(id);
+        var ent = await _db.Empleados.Include(e => e.Sucursal).FirstOrDefaultAsync(e => e.Id == id);
         if (ent == null) return NotFound();
         if (User.IsInRole("Empresa"))
         {
@@ -125,6 +152,7 @@ public class EmpleadosController : Controller
         }
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
+        ViewBag.SucursalesAsignadasIds = await _db.EmpleadosSucursales.Where(es => es.EmpleadoId == ent.Id).Select(es => es.SucursalId).ToListAsync();
         var user = await _db.Set<ApplicationUser>().FirstOrDefaultAsync(u => u.EmpleadoId == ent.Id);
         ViewBag.UsuarioExiste = user != null;
         ViewBag.UsuarioEmail = user?.Email;
@@ -133,7 +161,7 @@ public class EmpleadosController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Empleado model)
+    public async Task<IActionResult> Edit(Guid id, Empleado model, [FromForm] List<Guid> sucursalesAsignadas)
     {
         if (!ModelState.IsValid)
         {
@@ -147,6 +175,7 @@ public class EmpleadosController : Controller
             }
             ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
+            ViewBag.SucursalesAsignadasIds = sucursalesAsignadas ?? new List<Guid>();
             return View(model);
         }
         var ent = await _db.Empleados.FindAsync(id);
@@ -162,6 +191,30 @@ public class EmpleadosController : Controller
         ent.SucursalId = model.SucursalId;
         ent.Estado = model.Estado;
         ent.EsSubsidiado = model.EsSubsidiado;
+
+        var extras = (sucursalesAsignadas ?? new List<Guid>())
+            .Where(x => x != Guid.Empty && x != ent.SucursalId)
+            .Distinct()
+            .ToList();
+        if (extras.Count > 0)
+        {
+            var empresaPrimaria = await _db.Sucursales.Where(s => s.Id == ent.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
+            var empresasExtra = await _db.Sucursales.Where(s => extras.Contains(s.Id)).Select(s => s.EmpresaId).Distinct().ToListAsync();
+            if (empresasExtra.Any(e => e != empresaPrimaria))
+            {
+                TempData["Error"] = "Todas las sucursales asignadas deben pertenecer al mismo cliente.";
+                return RedirectToAction(nameof(Edit), new { id });
+            }
+        }
+
+        var actuales = await _db.EmpleadosSucursales.Where(es => es.EmpleadoId == ent.Id).ToListAsync();
+        var actualesSet = actuales.Select(a => a.SucursalId).ToHashSet();
+        var nuevosSet = extras.ToHashSet();
+        var toRemove = actuales.Where(a => !nuevosSet.Contains(a.SucursalId)).ToList();
+        if (toRemove.Count > 0) _db.EmpleadosSucursales.RemoveRange(toRemove);
+        var toAdd = nuevosSet.Except(actualesSet).Select(sid => new EmpleadoSucursal { EmpleadoId = ent.Id, SucursalId = sid }).ToList();
+        if (toAdd.Count > 0) await _db.EmpleadosSucursales.AddRangeAsync(toAdd);
+
         await _db.SaveChangesAsync();
         TempData["Success"] = "Empleado actualizado.";
         return RedirectToAction(nameof(Index), new { sucursalId = model.SucursalId });
@@ -270,11 +323,46 @@ public class EmpleadosController : Controller
         }
         if (removals) await _db.SaveChangesAsync();
 
+        var sucursalesAsignadas = await _db.EmpleadosSucursales
+            .AsNoTracking()
+            .Where(es => es.EmpleadoId == empleadoId)
+            .Select(es => es.SucursalId)
+            .ToListAsync();
+        var sucursalesPermitidas = sucursalesAsignadas.ToHashSet();
+        sucursalesPermitidas.Add(empleado.SucursalId);
+
+        var menuIds = await _db.OpcionesMenu
+            .AsNoTracking()
+            .Where(om => opcionIds.Contains(om.Id))
+            .Select(om => om.MenuId)
+            .Distinct()
+            .ToListAsync();
+        var menuId = menuIds.Count == 1 ? menuIds[0] : model.MenuId;
+        var adicionalesPermitidos = await _db.MenusAdicionales
+            .AsNoTracking()
+            .Where(a => a.MenuId == menuId)
+            .Select(a => a.OpcionId)
+            .ToListAsync();
+        var setAdicionales = adicionalesPermitidos.ToHashSet();
+
+        var respuestasPorOpcion = respuestasActuales
+            .GroupBy(r => r.OpcionMenuId)
+            .ToDictionary(g => g.Key, g => g.First());
+
         foreach (var d in model.Dias)
         {
             if (d.Seleccion is 'A' or 'B' or 'C' or 'D' or 'E')
             {
-                await _menuService.RegistrarSeleccionAsync(empleadoId, d.OpcionMenuId, d.Seleccion.Value);
+                respuestasPorOpcion.TryGetValue(d.OpcionMenuId, out var existente);
+                var sucursalEntregaId = existente?.SucursalEntregaId ?? empleado.SucursalId;
+                if (!sucursalesPermitidas.Contains(sucursalEntregaId))
+                    sucursalEntregaId = empleado.SucursalId;
+
+                Guid? adicionalOpcionId = existente?.AdicionalOpcionId;
+                if (adicionalOpcionId != null && !setAdicionales.Contains(adicionalOpcionId.Value))
+                    adicionalOpcionId = null;
+
+                await _menuService.RegistrarSeleccionAsync(empleadoId, d.OpcionMenuId, d.Seleccion.Value, sucursalEntregaId, adicionalOpcionId);
             }
         }
 
@@ -452,7 +540,20 @@ public class EmpleadosController : Controller
 
         var fechas = new FechaServicio();
         var (inicio, fin) = fechas.RangoSemanaSiguiente();
-        var menu = await _menuService.GetEffectiveMenuForSemanaAsync(inicio, fin, info.EmpresaId, info.SucursalId);
+
+        // Si el empleado ya tiene respuestas para la semana, inferir el menA§ y la sucursal de entrega desde esas respuestas
+        var respuestaSemana = await _db.RespuestasFormulario
+            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
+            .Where(r => r.EmpleadoId == empleadoId && r.OpcionMenu!.Menu!.FechaInicio == inicio && r.OpcionMenu.Menu!.FechaTermino == fin)
+            .FirstOrDefaultAsync();
+
+        var menu = respuestaSemana?.OpcionMenu?.Menu
+            ?? await _menuService.GetEffectiveMenuForSemanaAsync(inicio, fin, info.EmpresaId, info.SucursalId);
+
+        var sucursalEntregaId = respuestaSemana?.SucursalEntregaId ?? info.SucursalId;
+        var sucursalEntrega = await _db.Sucursales
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == sucursalEntregaId);
         var fechaCierreAuto = _cierre.GetFechaCierreAutomatica(menu);
         var encuestaCerrada = _cierre.EstaCerrada(menu);
         var opciones = await _db.OpcionesMenu
@@ -471,10 +572,12 @@ public class EmpleadosController : Controller
             opciones = await _db.OpcionesMenu
                 .Include(o => o.OpcionA).Include(o => o.OpcionB).Include(o => o.OpcionC)
                 .Include(o => o.OpcionD).Include(o => o.OpcionE)
+                .Include(o => o.Horario)
                 .Where(o => o.MenuId == menu.Id).OrderBy(o => o.DiaSemana).ToListAsync();
         }
         var opcionIds = opciones.Select(o => o.Id).ToList();
         var respuestas = await _db.RespuestasFormulario
+            .Include(r => r.AdicionalOpcion)
             .Where(r => r.EmpleadoId == empleadoId && opcionIds.Contains(r.OpcionMenuId))
             .ToListAsync();
         var totalEmpleado = 0m;
@@ -488,6 +591,13 @@ public class EmpleadosController : Controller
             var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
             totalEmpleado += precio;
             totalEmpresa += opcion.Costo;
+
+            if (r.AdicionalOpcionId != null && r.AdicionalOpcion != null)
+            {
+                var adicionalPrecio = r.AdicionalOpcion.Precio ?? r.AdicionalOpcion.Costo;
+                totalEmpleado += adicionalPrecio;
+                totalEmpresa += r.AdicionalOpcion.Costo;
+            }
         }
 
         return new SemanaEmpleadoVM
@@ -497,6 +607,7 @@ public class EmpleadosController : Controller
             MenuId = menu.Id,
             FechaInicio = menu.FechaInicio,
             FechaTermino = menu.FechaTermino,
+            SucursalEntregaId = sucursalEntregaId,
             Bloqueado = encuestaCerrada,
             MensajeBloqueo = encuestaCerrada ? $"La encuesta está cerrada desde {fechaCierreAuto:dd/MM/yyyy}." : null,
             RespuestasCount = respuestas.Count,
@@ -504,6 +615,7 @@ public class EmpleadosController : Controller
             OrigenMenu = menu.SucursalId != null ? "Dependiente" : "Cliente",
             EmpresaNombre = info.EmpresaNombre,
             SucursalNombre = info.SucursalNombre,
+            SucursalEntregaNombre = sucursalEntrega?.Nombre ?? info.SucursalNombre,
             EsJefe = info.EsJefe,
             EsVistaAdministrador = paraAdministrador,
             TotalEmpleado = totalEmpleado,
@@ -524,6 +636,7 @@ public class EmpleadosController : Controller
                 ImagenD = o.OpcionD?.ImagenUrl,
                 ImagenE = o.OpcionE?.ImagenUrl,
                 OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas,
+                AdicionalOpcionId = respuestas.FirstOrDefault(r => r.OpcionMenuId == o.Id)?.AdicionalOpcionId,
                 Seleccion = respuestas.FirstOrDefault(r => r.OpcionMenuId == o.Id)?.Seleccion
             }).ToList()
         };

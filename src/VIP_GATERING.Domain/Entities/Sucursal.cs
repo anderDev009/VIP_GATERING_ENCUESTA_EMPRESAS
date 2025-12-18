@@ -14,4 +14,7 @@ public class Sucursal
     public Empresa? Empresa { get; set; }
 
     public ICollection<Empleado> Empleados { get; set; } = new List<Empleado>();
+
+    // Empleados asignados a esta sucursal como adicional
+    public ICollection<EmpleadoSucursal> EmpleadosAsignados { get; set; } = new List<EmpleadoSucursal>();
 }

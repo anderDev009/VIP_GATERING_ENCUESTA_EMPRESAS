@@ -8,6 +8,9 @@ public class SemanaEmpleadoVM
     public Guid MenuId { get; set; }
     public DateOnly FechaInicio { get; set; }
     public DateOnly FechaTermino { get; set; }
+    public Guid SucursalEntregaId { get; set; }
+    public List<(Guid id, string nombre)> SucursalesEntregaDisponibles { get; set; } = new();
+    public List<AdicionalDisponibleVM> AdicionalesDisponibles { get; set; } = new();
     public string SemanaClave { get; set; } = "siguiente";
     public List<SemanaOpcionVM> SemanasDisponibles { get; set; } = new();
     public bool Bloqueado { get; set; }
@@ -22,6 +25,7 @@ public class SemanaEmpleadoVM
     public string OrigenMenu { get; set; } = string.Empty; // "Cliente" o "Dependiente"
     public string? EmpresaNombre { get; set; }
     public string? SucursalNombre { get; set; }
+    public string? SucursalEntregaNombre { get; set; }
     public List<DiaEmpleadoVM> Dias { get; set; } = new();
     public decimal TotalEmpleado { get; set; }
     public decimal? TotalEmpresa { get; set; }
@@ -52,6 +56,14 @@ public class DiaEmpleadoVM
     public string? ImagenE { get; set; }
     public int OpcionesMaximas { get; set; } = 3;
     public bool Editable { get; set; } = true;
+    public Guid? AdicionalOpcionId { get; set; }
     [RegularExpression("[ABCDE]", ErrorMessage = "Seleccione A, B, C, D o E")]
     public char? Seleccion { get; set; }
+}
+
+public class AdicionalDisponibleVM
+{
+    public Guid Id { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public decimal Precio { get; set; }
 }

@@ -22,6 +22,23 @@
                 }
             }
         </select>
+        @if (Model.SucursalesEntregaDisponibles != null && Model.SucursalesEntregaDisponibles.Count > 0)
+        {
+            <div class="text-sm text-slate-600 ml-4">Enviar a:</div>
+            <select name="sucursalId" class="border rounded-lg px-3 py-2 text-sm" onchange="this.form.submit()">
+                @foreach (var s in Model.SucursalesEntregaDisponibles)
+                {
+                    if (s.id == Model.SucursalEntregaId)
+                    {
+                        <option value="@s.id" selected>@s.nombre</option>
+                    }
+                    else
+                    {
+                        <option value="@s.id">@s.nombre</option>
+                    }
+                }
+            </select>
+        }
         <noscript>
             <button class="btn-primary px-3 py-2 rounded-lg">Cambiar</button>
         </noscript>
@@ -38,6 +55,10 @@
     </div>
     <div class="flex flex-wrap gap-2 text-sm text-slate-700 ml-auto">
         <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Cliente: @Model.EmpresaNombre</span>
+        @if (!string.IsNullOrWhiteSpace(Model.SucursalEntregaNombre))
+        {
+            <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Entrega: @Model.SucursalEntregaNombre</span>
+        }
         @if (Model.OrigenMenu == "Dependiente")
         {
             <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Dependiente: @Model.SucursalNombre</span>
@@ -85,6 +106,7 @@ else if (Model.Bloqueado)
     @Html.AntiForgeryToken()
     <input type="hidden" name="MenuId" value="@Model.MenuId" />
     <input type="hidden" name="SemanaClave" value="@Model.SemanaClave" />
+    <input type="hidden" name="SucursalEntregaId" value="@Model.SucursalEntregaId" />
     <div class="flex flex-wrap items-center gap-3 mb-2">
         <div class="text-sm text-slate-600">Selecciona tu opcion por dia y horario.</div>
         <div class="ml-auto flex gap-2">
@@ -173,6 +195,26 @@ else if (Model.Bloqueado)
                                     </label>
                                 }
                             </div>
+                            @if (Model.AdicionalesDisponibles != null && Model.AdicionalesDisponibles.Count > 0)
+                            {
+                                <div class="mt-4">
+                                    <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Adicional (se cobra 100%)</label>
+                                    <select name="Dias[@i].AdicionalOpcionId" class="w-full border rounded-lg px-3 py-2 text-sm" @((Model.Bloqueado || noHabilitado || !d.Editable) ? "disabled" : "")>
+                                        <option value="">-- Sin adicional --</option>
+                                        @foreach (var a in Model.AdicionalesDisponibles)
+                                        {
+                                            if (d.AdicionalOpcionId != null && d.AdicionalOpcionId.Value == a.Id)
+                                            {
+                                                <option value="@a.Id" selected>@a.Nombre (@a.Precio.ToString("C"))</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@a.Id">@a.Nombre (@a.Precio.ToString("C"))</option>
+                                            }
+                                        }
+                                    </select>
+                                </div>
+                            }
                         }
                     </div>
                 </div>
@@ -190,12 +232,15 @@ else if (Model.Bloqueado)
                 if (dayIndex === null) return;
                 const radios = document.querySelectorAll(`input[name="Dias[${dayIndex}].Seleccion"]`);
                 radios.forEach(r => r.checked = false);
+                const adicional = document.querySelector(`select[name="Dias[${dayIndex}].AdicionalOpcionId"]`);
+                if (adicional) adicional.value = '';
             });
         });
         const clearAll = document.getElementById('clear-all');
         if (clearAll) {
             clearAll.addEventListener('click', () => {
                 document.querySelectorAll('input[type="radio"][name*="Dias"]').forEach(r => r.checked = false);
+                document.querySelectorAll('select[name*=\"Dias\"][name$=\".AdicionalOpcionId\"]').forEach(s => s.value = '');
             });
         }
         const tabButtons = document.querySelectorAll('[data-tab-target]');

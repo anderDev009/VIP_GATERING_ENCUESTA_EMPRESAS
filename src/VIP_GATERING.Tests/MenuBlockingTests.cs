@@ -33,7 +33,7 @@ public class MenuBlockingTests
 
         var opcionIds = await ctx.OpcionesMenu.Where(x => x.MenuId == menu.Id).Select(x => x.Id).ToListAsync();
         foreach (var id in opcionIds)
-            await ctx.RespuestasFormulario.AddAsync(new RespuestaFormulario { EmpleadoId = emp.Id, OpcionMenuId = id, Seleccion = 'A' });
+            await ctx.RespuestasFormulario.AddAsync(new RespuestaFormulario { EmpleadoId = emp.Id, OpcionMenuId = id, Seleccion = 'A', SucursalEntregaId = emp.Sucursal!.Id });
         await ctx.SaveChangesAsync();
 
         var completos = await ctx.RespuestasFormulario.Where(r => opcionIds.Contains(r.OpcionMenuId))

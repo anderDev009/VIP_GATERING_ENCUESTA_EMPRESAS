@@ -25,23 +25,21 @@ public class EncuestasController : Controller
         // Seguridad: si es Sucursal, solo sobre su propia sucursal
         if (User.IsInRole("Sucursal"))
         {
-            var sucEmpleado = await _db.Empleados.Where(e => e.Id == empleadoId).Select(e => e.SucursalId).FirstOrDefaultAsync();
-            if (_current.SucursalId == null || sucEmpleado != _current.SucursalId) return Forbid();
+            var sucActual = _current.SucursalId;
+            if (sucActual == null) return Forbid();
+            var principal = await _db.Empleados.Where(e => e.Id == empleadoId).Select(e => e.SucursalId).FirstOrDefaultAsync();
+            var extra = await _db.EmpleadosSucursales.Where(es => es.EmpleadoId == empleadoId).Select(es => es.SucursalId).ToListAsync();
+            if (principal != sucActual && !extra.Contains(sucActual.Value)) return Forbid();
         }
 
         // Determinar semana siguiente y menú efectivo del empleado
         var (inicio, fin) = _fechas.RangoSemanaSiguiente();
-        var info = await _db.Empleados.Include(e => e.Sucursal)!.ThenInclude(s => s!.Empresa)
-            .Where(e => e.Id == empleadoId)
-            .Select(e => new { e.SucursalId, EmpresaId = e.Sucursal!.EmpresaId })
-            .FirstOrDefaultAsync();
-        if (info == null) return NotFound();
-
-        var menu = await _menus.GetEffectiveMenuForSemanaAsync(inicio, fin, info.EmpresaId, info.SucursalId);
-        var opcionIds = await _db.OpcionesMenu.Where(om => om.MenuId == menu.Id).Select(om => om.Id).ToListAsync();
+        var existeEmpleado = await _db.Empleados.AnyAsync(e => e.Id == empleadoId);
+        if (!existeEmpleado) return NotFound();
 
         var respuestas = await _db.RespuestasFormulario
-            .Where(r => r.EmpleadoId == empleadoId && opcionIds.Contains(r.OpcionMenuId))
+            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
+            .Where(r => r.EmpleadoId == empleadoId && r.OpcionMenu!.Menu!.FechaInicio == inicio && r.OpcionMenu.Menu.FechaTermino == fin)
             .ToListAsync();
         if (respuestas.Count == 0)
         {
@@ -55,4 +53,3 @@ public class EncuestasController : Controller
         return RedirectToAction("Semana", "Empleados", new { id = empleadoId });
     }
 }
-

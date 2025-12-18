@@ -22,6 +22,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<SucursalHorario> SucursalesHorarios => Set<SucursalHorario>();
     public DbSet<RespuestaFormulario> RespuestasFormulario => Set<RespuestaFormulario>();
     public DbSet<MenuConfiguracion> ConfiguracionesMenu => Set<MenuConfiguracion>();
+    public DbSet<EmpleadoSucursal> EmpleadosSucursales => Set<EmpleadoSucursal>();
+    public DbSet<MenuAdicional> MenusAdicionales => Set<MenuAdicional>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,6 +52,20 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .HasOne(e => e.Sucursal)
             .WithMany(s => s.Empleados)
             .HasForeignKey(e => e.SucursalId);
+
+        modelBuilder.Entity<EmpleadoSucursal>()
+            .HasIndex(es => new { es.EmpleadoId, es.SucursalId })
+            .IsUnique();
+        modelBuilder.Entity<EmpleadoSucursal>()
+            .HasOne(es => es.Empleado)
+            .WithMany(e => e.SucursalesAsignadas)
+            .HasForeignKey(es => es.EmpleadoId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<EmpleadoSucursal>()
+            .HasOne(es => es.Sucursal)
+            .WithMany(s => s.EmpleadosAsignados)
+            .HasForeignKey(es => es.SucursalId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // Legacy Usuario entity mapping (kept for backward compatibility in the domain layer)
         modelBuilder.Entity<Usuario>()
@@ -128,6 +144,32 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .HasOne(r => r.OpcionMenu)
             .WithMany(om => om.Respuestas)
             .HasForeignKey(r => r.OpcionMenuId);
+
+        modelBuilder.Entity<RespuestaFormulario>()
+            .HasOne(r => r.SucursalEntrega)
+            .WithMany()
+            .HasForeignKey(r => r.SucursalEntregaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<RespuestaFormulario>()
+            .HasOne(r => r.AdicionalOpcion)
+            .WithMany()
+            .HasForeignKey(r => r.AdicionalOpcionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MenuAdicional>()
+            .HasIndex(ma => new { ma.MenuId, ma.OpcionId })
+            .IsUnique();
+        modelBuilder.Entity<MenuAdicional>()
+            .HasOne(ma => ma.Menu)
+            .WithMany(m => m.Adicionales)
+            .HasForeignKey(ma => ma.MenuId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<MenuAdicional>()
+            .HasOne(ma => ma.Opcion)
+            .WithMany()
+            .HasForeignKey(ma => ma.OpcionId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<SucursalHorario>()
             .HasIndex(sh => new { sh.SucursalId, sh.HorarioId })
