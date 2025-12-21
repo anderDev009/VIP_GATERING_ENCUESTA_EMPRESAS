@@ -3,6 +3,7 @@
     var nombre = User.Identity?.IsAuthenticated == true ? User.Identity.Name : "Invitado";
     var esAdmin = User.IsInRole("Admin");
     var esEmpresa = User.IsInRole("Empresa");
+    var reportesActivos = esAdmin ? "1" : (esEmpresa ? "0" : "1");
 }
 
 <section class="dashboard-hero">
@@ -18,7 +19,7 @@
         </div>
         <div class="dashboard-metric">
             <p class="label">Reportes activos</p>
-            <p class="value">@((esAdmin || esEmpresa) ? "3" : "1")</p>
+            <p class="value">@reportesActivos</p>
         </div>
         <div class="dashboard-metric">
             <p class="label">Atajos</p>
@@ -45,11 +46,14 @@
             <a asp-controller="Sucursales" asp-action="Index">Filiales</a>
             <p>Actualiza la informacion de Filiales, horarios y reglas de subsidio por Empresa.</p>
         </div>
-        <div class="dashboard-card">
-            <span class="text-xs uppercase text-slate-400">Analisis</span>
-            <a asp-controller="Reportes" asp-action="Selecciones">Reportes</a>
-            <p>Consulta selecciones, totales por empleado e items de la semana.</p>
-        </div>
+        @if (esAdmin)
+        {
+            <div class="dashboard-card">
+                <span class="text-xs uppercase text-slate-400">Analisis</span>
+                <a asp-controller="Reportes" asp-action="Distribucion">Distribucion</a>
+                <p>Resumen por filial y detalle por empleado para preparar la entrega.</p>
+            </div>
+        }
     }
     else
     {

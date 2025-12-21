@@ -1,0 +1,170 @@
+@model VIP_GATERING.WebUI.Models.Reportes.DistribucionVM
+@{
+    ViewData["Title"] = "Distribucion";
+}
+
+<h1 class="text-xl font-semibold mb-4">Distribucion (@Model.Inicio:yyyy-MM-dd a @Model.Fin:yyyy-MM-dd)</h1>
+
+<form method="get" class="mb-6 grid gap-4 md:grid-cols-4 items-end">
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Empresa</label>
+        <select name="empresaId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="">Todas</option>
+            @foreach (var e in Model.Empresas)
+            {
+                <option value="@e.Id" selected="@(Model.EmpresaId == e.Id ? "selected" : null)">@e.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Filial</label>
+        <select name="sucursalId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="">Todas</option>
+            @foreach (var s in Model.Sucursales)
+            {
+                <option value="@s.Id" selected="@(Model.SucursalId == s.Id ? "selected" : null)">@s.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="flex gap-3 md:col-span-4">
+        <button type="submit" class="btn-primary">Filtrar</button>
+        <a class="btn-outline" asp-action="Distribucion">Limpiar</a>
+    </div>
+    <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3">
+        <div class="text-sm text-slate-600">Total base: <span class="font-semibold">@Model.TotalBase.ToString("C")</span></div>
+        <div class="text-sm text-slate-600">ITBIS: <span class="font-semibold">@Model.TotalItbis.ToString("C")</span></div>
+        <div class="text-sm text-slate-600">Total general: <span class="font-semibold">@Model.TotalGeneral.ToString("C")</span></div>
+        <div class="text-sm text-slate-600">Empresa paga: <span class="font-semibold">@Model.TotalEmpresa.ToString("C")</span></div>
+        <div class="text-sm text-slate-600">Empleado paga: <span class="font-semibold">@Model.TotalEmpleado.ToString("C")</span></div>
+    </div>
+    <input type="hidden" name="_" value="@DateTime.UtcNow.Ticks" />
+</form>
+
+<div class="tab-switch tab-switch--panel mb-4">
+    <div class="tab-switch__label">Vista</div>
+    <div class="tab-switch__group">
+        <button type="button" class="tab-pill is-active" data-tab-target="tab-resumen">Resumen por filial</button>
+        <button type="button" class="tab-pill" data-tab-target="tab-detalle">Detalle por empleado</button>
+        <button type="button" class="tab-pill" data-tab-target="tab-localizacion">Distribucion por localizacion</button>
+    </div>
+</div>
+
+<div id="tab-resumen" class="tab-panel is-active space-y-3" data-tab-panel>
+    <table>
+        <thead>
+        <tr>
+            <th>Filial</th>
+            <th class="text-right">Base</th>
+            <th class="text-right">ITBIS</th>
+            <th class="text-right">Total</th>
+            <th class="text-right">Empresa paga</th>
+            <th class="text-right">Empleado paga</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.ResumenFiliales)
+        {
+            <tr>
+                <td>@r.Filial</td>
+                <td class="text-right">@r.Base.ToString("C")</td>
+                <td class="text-right">@r.Itbis.ToString("C")</td>
+                <td class="text-right">@r.Total.ToString("C")</td>
+                <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
+                <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+            </tr>
+        }
+        </tbody>
+        <tfoot>
+        <tr>
+            <th>Total</th>
+            <th class="text-right">@Model.TotalBase.ToString("C")</th>
+            <th class="text-right">@Model.TotalItbis.ToString("C")</th>
+            <th class="text-right">@Model.TotalGeneral.ToString("C")</th>
+            <th class="text-right">@Model.TotalEmpresa.ToString("C")</th>
+            <th class="text-right">@Model.TotalEmpleado.ToString("C")</th>
+        </tr>
+        </tfoot>
+    </table>
+</div>
+
+<div id="tab-detalle" class="tab-panel space-y-3" data-tab-panel>
+    <table>
+        <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Filial</th>
+            <th>Empleado</th>
+            <th>Tanda</th>
+            <th>Plato</th>
+            <th class="text-right">Cantidad</th>
+            <th class="text-right">Monto total</th>
+            <th class="text-right">Monto empresa</th>
+            <th class="text-right">Monto empleado</th>
+            <th class="text-right">ITBIS empresa</th>
+            <th class="text-right">ITBIS empleado</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.DetalleEmpleados)
+        {
+            <tr>
+                <td>@r.Fecha.ToString("yyyy-MM-dd")</td>
+                <td>@r.Filial</td>
+                <td>@r.Empleado</td>
+                <td>@r.Tanda</td>
+                <td>@r.Opcion</td>
+                <td class="text-right">@r.Cantidad</td>
+                <td class="text-right">@r.MontoTotal.ToString("C")</td>
+                <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
+                <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+                <td class="text-right">@r.ItbisEmpresa.ToString("C")</td>
+                <td class="text-right">@r.ItbisEmpleado.ToString("C")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<div id="tab-localizacion" class="tab-panel space-y-3" data-tab-panel>
+    <table>
+        <thead>
+        <tr>
+            <th>Localizacion</th>
+            <th>Plato</th>
+            <th class="text-right">Cantidad</th>
+            <th class="text-right">Monto total</th>
+            <th class="text-right">Monto empresa</th>
+            <th class="text-right">Monto empleado</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.PorLocalizacion)
+        {
+            <tr>
+                <td>@r.Localizacion</td>
+                <td>@r.Opcion</td>
+                <td class="text-right">@r.Cantidad</td>
+                <td class="text-right">@r.MontoTotal.ToString("C")</td>
+                <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
+                <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script>
+        const distribucionTabs = document.querySelectorAll('.tab-pill');
+        distribucionTabs.forEach(btn => {
+            btn.addEventListener('click', () => {
+                distribucionTabs.forEach(b => b.classList.remove('is-active'));
+                btn.classList.add('is-active');
+                const target = btn.getAttribute('data-tab-target');
+                document.querySelectorAll('[data-tab-panel]').forEach(p => p.classList.remove('is-active'));
+                const panel = document.getElementById(target);
+                if (panel) panel.classList.add('is-active');
+            });
+        });
+    </script>
+}

@@ -356,35 +356,43 @@ public class ReportesController : Controller
             .ToListAsync();
 
         var culture = CultureInfo.CurrentCulture;
-        var movimientos = respuestas
-            .Select(r =>
+        var movimientos = new List<EstadoCuentaEmpleadoVM.MovimientoRow>();
+        foreach (var r in respuestas)
+        {
+            var fecha = ObtenerFechaDiaSemana(r.OpcionMenu!.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
+            if (fecha < desdeValue || fecha > hastaValue) continue;
+            var opcion = GetOpcionSeleccionada(r.OpcionMenu!, r.Seleccion);
+            if (opcion == null) continue;
+            var suc = empleadoDatos.Sucursal!;
+            var emp = suc.Empresa!;
+            var ctx = BuildSubsidioContext(opcion.EsSubsidiado, empleadoDatos, suc, emp);
+            var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
+            movimientos.Add(new EstadoCuentaEmpleadoVM.MovimientoRow
             {
-                var fecha = ObtenerFechaDiaSemana(r.OpcionMenu!.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
-                if (fecha < desdeValue || fecha > hastaValue) return null;
-                var opcion = GetOpcionSeleccionada(r.OpcionMenu!, r.Seleccion);
-                if (opcion == null) return null;
-                var suc = empleadoDatos.Sucursal!;
-                var emp = suc.Empresa!;
-                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, empleadoDatos, suc, emp);
-                var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
+                Fecha = fecha,
+                DiaNombre = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
+                Horario = r.OpcionMenu.Horario != null ? r.OpcionMenu.Horario.Nombre : null,
+                Seleccion = r.Seleccion.ToString(),
+                OpcionNombre = opcion.Nombre ?? "Sin definir",
+                PrecioEmpleado = precio
+            });
 
-                var adicionalNombre = r.AdicionalOpcion != null ? r.AdicionalOpcion.Nombre : null;
-                var precioAdicional = r.AdicionalOpcion != null ? (r.AdicionalOpcion.Precio ?? r.AdicionalOpcion.Costo) : 0m;
-                var nombre = opcion.Nombre ?? "Sin definir";
-                if (!string.IsNullOrWhiteSpace(adicionalNombre))
-                    nombre += $" + {adicionalNombre}";
-                return new EstadoCuentaEmpleadoVM.MovimientoRow
+            if (r.AdicionalOpcion != null)
+            {
+                var adicional = r.AdicionalOpcion;
+                movimientos.Add(new EstadoCuentaEmpleadoVM.MovimientoRow
                 {
                     Fecha = fecha,
                     DiaNombre = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
                     Horario = r.OpcionMenu.Horario != null ? r.OpcionMenu.Horario.Nombre : null,
                     Seleccion = r.Seleccion.ToString(),
-                    OpcionNombre = nombre,
-                    PrecioEmpleado = precio + precioAdicional
-                };
-            })
-            .Where(m => m != null)
-            .Select(m => m!)
+                    OpcionNombre = $"Adicional: {adicional.Nombre ?? "Sin definir"}",
+                    PrecioEmpleado = adicional.Precio ?? adicional.Costo
+                });
+            }
+        }
+
+        movimientos = movimientos
             .OrderByDescending(m => m.Fecha)
             .ThenBy(m => m.Horario)
             .ToList();
@@ -397,6 +405,159 @@ public class ReportesController : Controller
             Desde = desdeValue,
             Hasta = hastaValue,
             Movimientos = movimientos
+        };
+        return View(vm);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> Distribucion(Guid? empresaId = null, Guid? sucursalId = null)
+    {
+        var (inicio, fin) = _fechas.RangoSemanaSiguiente();
+
+        var empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
+        var sucursalesBase = _db.Sucursales.AsQueryable();
+        if (empresaId != null)
+            sucursalesBase = sucursalesBase.Where(s => s.EmpresaId == empresaId);
+        var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
+
+        var baseQuery = _db.RespuestasFormulario
+            .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
+            .Include(r => r.SucursalEntrega).ThenInclude(s => s!.Empresa)
+            .Include(r => r.LocalizacionEntrega)
+            .Include(r => r.AdicionalOpcion)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Horario)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionA)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionB)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionC)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionD)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
+            .Where(r => r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio == inicio
+                && r.OpcionMenu.Menu.FechaTermino == fin);
+
+        if (empresaId != null)
+            baseQuery = baseQuery.Where(x => x.SucursalEntrega != null && x.SucursalEntrega.EmpresaId == empresaId);
+        if (sucursalId != null)
+            baseQuery = baseQuery.Where(x => x.SucursalEntregaId == sucursalId);
+
+        var respuestas = await baseQuery.ToListAsync();
+
+        const decimal itbisRate = 0.18m;
+        var items = new List<(DateOnly Fecha, Guid FilialId, string Filial, Guid EmpleadoId, string Empleado, string Tanda, string Opcion, string Localizacion, decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado)>();
+
+        foreach (var r in respuestas)
+        {
+            if (r.OpcionMenu == null || r.Empleado == null) continue;
+            if (r.SucursalEntrega == null) continue;
+            var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
+            var sucEmpleado = r.Empleado.Sucursal;
+            var empresaEmpleado = sucEmpleado?.Empresa;
+            if (sucEmpleado == null || empresaEmpleado == null) continue;
+
+            var tanda = r.OpcionMenu.Horario?.Nombre ?? "Sin horario";
+            var filial = r.SucursalEntrega.Nombre;
+            var filialId = r.SucursalEntrega.Id;
+            var empleadoNombre = r.Empleado.Nombre;
+            var empleadoId = r.Empleado.Id;
+            var localizacion = r.LocalizacionEntrega?.Nombre ?? "Sin asignar";
+
+            void AddItem(Opcion opcion, string nombre, bool aplicaSubsidio)
+            {
+                var basePrecio = opcion.Precio ?? opcion.Costo;
+                if (basePrecio < 0) basePrecio = 0;
+                var itbis = opcion.LlevaItbis ? Math.Round(basePrecio * itbisRate, 2) : 0m;
+                decimal precioEmpleado = basePrecio;
+                if (aplicaSubsidio)
+                {
+                    var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, sucEmpleado, empresaEmpleado);
+                    precioEmpleado = _subsidios.CalcularPrecioEmpleado(basePrecio, ctx).PrecioEmpleado;
+                }
+                var ratio = basePrecio > 0 ? precioEmpleado / basePrecio : 1m;
+                if (ratio < 0) ratio = 0;
+                if (ratio > 1) ratio = 1;
+                var total = basePrecio + itbis;
+                var empleadoPaga = Math.Round(total * ratio, 2);
+                var empresaPaga = total - empleadoPaga;
+                var itbisEmpleado = Math.Round(itbis * ratio, 2);
+                var itbisEmpresa = itbis - itbisEmpleado;
+
+                items.Add((fecha, filialId, filial, empleadoId, empleadoNombre, tanda, nombre, localizacion, basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado));
+            }
+
+            var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
+            if (opcion != null)
+                AddItem(opcion, opcion.Nombre ?? "Sin definir", true);
+
+            if (r.AdicionalOpcion != null)
+                AddItem(r.AdicionalOpcion, $"Adicional: {r.AdicionalOpcion.Nombre ?? "Sin definir"}", false);
+        }
+
+        var resumen = items
+            .GroupBy(i => new { i.FilialId, i.Filial })
+            .Select(g => new DistribucionVM.ResumenFilialRow
+            {
+                FilialId = g.Key.FilialId,
+                Filial = g.Key.Filial,
+                Base = g.Sum(x => x.Base),
+                Itbis = g.Sum(x => x.Itbis),
+                Total = g.Sum(x => x.Total),
+                EmpresaPaga = g.Sum(x => x.EmpresaPaga),
+                EmpleadoPaga = g.Sum(x => x.EmpleadoPaga)
+            })
+            .OrderBy(r => r.Filial)
+            .ToList();
+
+        var detalle = items
+            .GroupBy(i => new { i.Fecha, i.FilialId, i.Filial, i.EmpleadoId, i.Empleado, i.Tanda, i.Opcion })
+            .Select(g => new DistribucionVM.DetalleEmpleadoRow
+            {
+                Fecha = g.Key.Fecha,
+                Filial = g.Key.Filial,
+                Empleado = g.Key.Empleado,
+                Tanda = g.Key.Tanda,
+                Opcion = g.Key.Opcion,
+                Cantidad = g.Count(),
+                MontoTotal = g.Sum(x => x.Total),
+                EmpresaPaga = g.Sum(x => x.EmpresaPaga),
+                EmpleadoPaga = g.Sum(x => x.EmpleadoPaga),
+                ItbisEmpresa = g.Sum(x => x.ItbisEmpresa),
+                ItbisEmpleado = g.Sum(x => x.ItbisEmpleado)
+            })
+            .OrderBy(r => r.Fecha)
+            .ThenBy(r => r.Filial)
+            .ThenBy(r => r.Empleado)
+            .ThenBy(r => r.Opcion)
+            .ToList();
+
+        var porLocalizacion = items
+            .GroupBy(i => new { i.Localizacion, i.Opcion })
+            .Select(g => new DistribucionVM.DistribucionLocalizacionRow
+            {
+                Localizacion = g.Key.Localizacion,
+                Opcion = g.Key.Opcion,
+                Cantidad = g.Count(),
+                MontoTotal = g.Sum(x => x.Total),
+                EmpresaPaga = g.Sum(x => x.EmpresaPaga),
+                EmpleadoPaga = g.Sum(x => x.EmpleadoPaga)
+            })
+            .OrderBy(r => r.Localizacion)
+            .ThenBy(r => r.Opcion)
+            .ToList();
+
+        var vm = new DistribucionVM
+        {
+            Inicio = inicio,
+            Fin = fin,
+            EmpresaId = empresaId,
+            SucursalId = sucursalId,
+            Empresas = empresas,
+            Sucursales = sucursales,
+            ResumenFiliales = resumen,
+            DetalleEmpleados = detalle,
+            PorLocalizacion = porLocalizacion
         };
         return View(vm);
     }
