@@ -412,7 +412,8 @@ public class EmpleadosController : Controller
             .AsNoTracking()
             .Where(s => s.EmpresaId == empresaId)
             .Select(s => s.Id)
-            .ToHashSetAsync();
+            .ToListAsync();
+        var sucursalesPermitidasSet = sucursalesPermitidas.ToHashSet();
 
         var menuIds = await _db.OpcionesMenu
             .AsNoTracking()
@@ -438,7 +439,7 @@ public class EmpleadosController : Controller
             {
                 respuestasPorOpcion.TryGetValue(d.OpcionMenuId, out var existente);
                 var sucursalEntregaId = existente?.SucursalEntregaId ?? empleado.SucursalId;
-                if (!sucursalesPermitidas.Contains(sucursalEntregaId))
+                if (!sucursalesPermitidasSet.Contains(sucursalEntregaId))
                     sucursalEntregaId = empleado.SucursalId;
 
                 var localizacionEntregaId = existente?.LocalizacionEntregaId;

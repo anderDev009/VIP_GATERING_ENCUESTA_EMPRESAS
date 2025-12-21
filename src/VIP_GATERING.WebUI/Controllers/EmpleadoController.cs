@@ -412,7 +412,8 @@ public class EmpleadoController : Controller
             .AsNoTracking()
             .Where(s => s.EmpresaId == empresaId)
             .Select(s => s.Id)
-            .ToHashSetAsync();
+            .ToListAsync();
+        var sucursalesPermitidasSet = sucursalesPermitidas.ToHashSet();
 
         Guid? localizacionEntregaId = model.LocalizacionEntregaId;
         var localizacionesAsignadas = await _db.EmpleadosLocalizaciones
@@ -450,7 +451,7 @@ public class EmpleadoController : Controller
         var sucursalEntregaId = localizacionEntrega?.SucursalId ?? model.SucursalEntregaId;
         if (sucursalEntregaId == Guid.Empty)
             sucursalEntregaId = empleado.SucursalId;
-        if (!sucursalesPermitidas.Contains(sucursalEntregaId))
+        if (!sucursalesPermitidasSet.Contains(sucursalEntregaId))
         {
             TempData["Error"] = "Filial de entrega no permitida.";
             return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
