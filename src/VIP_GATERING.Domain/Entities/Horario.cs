@@ -7,4 +7,5 @@ public class Horario
     public int Orden { get; set; } = 0;
     public bool Activo { get; set; } = true;
     public bool Borrado { get; set; } = false;
+    public ICollection<OpcionHorario> Opciones { get; set; } = new List<OpcionHorario>();
 }

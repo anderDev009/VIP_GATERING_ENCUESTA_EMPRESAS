@@ -2,6 +2,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 using VIP_GATERING.Infrastructure.Data;
 using VIP_GATERING.Infrastructure.Identity;
 
@@ -17,9 +20,7 @@ public static class IdentitySeeder
             await db.Database.MigrateAsync();
         }
 
-        var seedPassword = IdentityDefaults.GetDefaultPassword();
-
-        // Roles: Admin, Empresa, Empleado
+        // Roles: Admin, Empresa, Empleado, Sucursal, Monitor
         async Task EnsureRole(string name)
         {
             if (await roles.FindByNameAsync(name) == null)
@@ -35,59 +36,75 @@ public static class IdentitySeeder
         await EnsureRole("Sucursal");
         await EnsureRole("Monitor");
 
-        // Create or get base domain entities
-        var empresa = await db.Empresas.FirstOrDefaultAsync();
-        if (empresa == null)
-        {
-            empresa = new VIP_GATERING.Domain.Entities.Empresa { Nombre = "Empresa Demo", Rnc = "RNC-000" };
-            db.Empresas.Add(empresa);
-            await db.SaveChangesAsync();
-        }
-        var sucursal = await db.Sucursales.FirstOrDefaultAsync() ??
-                       (await db.Sucursales.AddAsync(new VIP_GATERING.Domain.Entities.Sucursal { Nombre = "Principal", EmpresaId = empresa.Id })).Entity;
-        await db.SaveChangesAsync();
-
-        var empleado = await db.Empleados.FirstOrDefaultAsync() ??
-                       (await db.Empleados.AddAsync(new VIP_GATERING.Domain.Entities.Empleado { Nombre = "Empleado Demo", SucursalId = sucursal.Id })).Entity;
-        await db.SaveChangesAsync();
-
         // Users
-        async Task EnsurePasswordAsync(ApplicationUser user)
+        async Task EnsurePasswordAsync(ApplicationUser user, string expectedPassword)
         {
-            // Reasegurar contraseña demo y limpiar lockout para usuarios conocidos en Dev/Testing
+            // Reasegurar contrasena demo y limpiar lockout para usuarios conocidos en Dev/Testing
             var hasPwd = await users.HasPasswordAsync(user);
-            var validPwd = hasPwd && await users.CheckPasswordAsync(user, seedPassword);
+            var validPwd = hasPwd && await users.CheckPasswordAsync(user, expectedPassword);
             if (!validPwd)
             {
                 if (hasPwd)
                     await users.RemovePasswordAsync(user);
-                await users.AddPasswordAsync(user, seedPassword);
+                await users.AddPasswordAsync(user, expectedPassword);
             }
             await users.ResetAccessFailedCountAsync(user);
             await users.SetLockoutEndDateAsync(user, null);
         }
 
-        async Task<ApplicationUser> EnsureUser(string email, string role, Guid? empresaId = null, Guid? empleadoId = null)
+        async Task<ApplicationUser> EnsureUser(string userName, string role, Guid? empresaId = null, Guid? empleadoId = null, string? legacyEmail = null)
         {
-            var user = await users.FindByEmailAsync(email);
+            var user = await users.FindByNameAsync(userName);
+            if (user == null && !string.IsNullOrWhiteSpace(legacyEmail))
+            {
+                user = await users.FindByEmailAsync(legacyEmail);
+            }
             if (user == null)
             {
                 user = new ApplicationUser
                 {
-                    UserName = email,
-                    Email = email,
+                    UserName = userName,
+                    Email = null,
                     EmailConfirmed = true,
                     EmpresaId = empresaId,
                     EmpleadoId = empleadoId
                 };
-                await users.CreateAsync(user, seedPassword);
+                await users.CreateAsync(user, userName);
             }
             else
             {
-                // Si ya existía, asegurar contraseña y desbloqueo en entornos no productivos
-                if (!env.IsProduction())
-                    await EnsurePasswordAsync(user);
+                var changed = false;
+                if (!string.Equals(user.UserName, userName, StringComparison.Ordinal))
+                {
+                    user.UserName = userName;
+                    user.NormalizedUserName = userName.ToUpperInvariant();
+                    changed = true;
+                }
+                if (!string.IsNullOrWhiteSpace(user.Email))
+                {
+                    user.Email = null;
+                    user.NormalizedEmail = null;
+                    user.EmailConfirmed = true;
+                    changed = true;
+                }
+                if (user.EmpresaId != empresaId)
+                {
+                    user.EmpresaId = empresaId;
+                    changed = true;
+                }
+                if (user.EmpleadoId != empleadoId)
+                {
+                    user.EmpleadoId = empleadoId;
+                    changed = true;
+                }
+                if (changed)
+                    await users.UpdateAsync(user);
             }
+
+            // Si ya existe, asegurar contrasena y desbloqueo en entornos no productivos
+            if (!env.IsProduction())
+                await EnsurePasswordAsync(user, userName);
+
             if (!await users.IsInRoleAsync(user, role))
             {
                 await users.AddToRoleAsync(user, role);
@@ -95,13 +112,63 @@ public static class IdentitySeeder
             return user;
         }
 
-        await EnsureUser("admin@demo.local", "Admin");
-        var empUser = await EnsureUser("empresa@demo.local", "Empresa", empresaId: empresa.Id);
-        var empleadoUser = await EnsureUser("empleado@demo.local", "Empleado", empleadoId: empleado.Id);
-        await EnsureUser("sucursal@demo.local", "Sucursal", empresaId: empresa.Id, empleadoId: empleado.Id);
-        // Marcar empleado para cambio de contraseña en primer login (vía claim)
-        var claims = await users.GetClaimsAsync(empleadoUser);
-        if (!claims.Any(c => c.Type == "must_change_password" && c.Value == "1"))
-            await users.AddClaimAsync(empleadoUser, new System.Security.Claims.Claim("must_change_password", "1"));
+        var adminUserName = EnsurePasswordCompliance("ADMIN");
+        await EnsureUser(adminUserName, "Admin");
+    }
+
+    private static string BuildUserName(string filialNombre, string? empleadoCodigo, Guid empleadoId)
+    {
+        var filial = ToTitleToken(filialNombre);
+        var codigo = ToToken(empleadoCodigo);
+        if (string.IsNullOrWhiteSpace(codigo))
+            codigo = empleadoId.ToString("N").Substring(0, 6).ToUpperInvariant();
+
+        var baseUser = $"{filial}_{codigo}";
+        return EnsurePasswordCompliance(baseUser);
+    }
+
+    private static string ToTitleToken(string value)
+    {
+        var cleaned = RemoveDiacritics(value ?? string.Empty);
+        var parts = Regex.Split(cleaned, "[^A-Za-z0-9]+");
+        var sb = new StringBuilder();
+        foreach (var part in parts)
+        {
+            if (string.IsNullOrWhiteSpace(part)) continue;
+            sb.Append(char.ToUpperInvariant(part[0]));
+            if (part.Length > 1) sb.Append(part.Substring(1).ToLowerInvariant());
+        }
+        return sb.Length == 0 ? "Filial" : sb.ToString();
+    }
+
+    private static string ToToken(string? value)
+    {
+        var cleaned = RemoveDiacritics(value ?? string.Empty);
+        var chars = cleaned.Where(char.IsLetterOrDigit).ToArray();
+        return new string(chars).ToUpperInvariant();
+    }
+
+    private static string RemoveDiacritics(string value)
+    {
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder();
+        foreach (var ch in normalized)
+        {
+            var cat = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (cat != UnicodeCategory.NonSpacingMark)
+                sb.Append(ch);
+        }
+        return sb.ToString().Normalize(NormalizationForm.FormC);
+    }
+
+    private static string EnsurePasswordCompliance(string value)
+    {
+        var result = value;
+        if (!result.Any(char.IsLower)) result += "a";
+        if (!result.Any(char.IsUpper)) result += "A";
+        if (!result.Any(char.IsDigit)) result += "1";
+        if (!result.Any(ch => !char.IsLetterOrDigit(ch))) result += "_";
+        if (result.Length < 20) result += new string('0', 20 - result.Length);
+        return result;
     }
 }

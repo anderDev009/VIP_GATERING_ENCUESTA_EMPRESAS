@@ -3,7 +3,11 @@ namespace VIP_GATERING.WebUI.Controllers;
 public class MenuClientesVM
 {
     public string? Q { get; set; }
-    public List<Item> Clientes { get; set; } = new();
+    public List<Item> Sucursales { get; set; } = new();
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public int TotalItems { get; set; }
+    public int TotalPages => PageSize <= 0 ? 1 : (int)Math.Ceiling(TotalItems / (double)PageSize);
     public class Item
     {
         public Guid Id { get; set; }
@@ -30,4 +34,5 @@ public class MenuSucursalesVM
         public string Nombre { get; set; } = string.Empty;
     }
 }
+
 

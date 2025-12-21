@@ -18,12 +18,12 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
     options.Password.RequireLowercase = true;
     options.Password.RequireNonAlphanumeric = true;
     options.Password.RequireUppercase = true;
-    options.Password.RequiredLength = 8;
+    options.Password.RequiredLength = 20;
     options.Password.RequiredUniqueChars = 3;
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.AllowedForNewUsers = true;
-    options.User.RequireUniqueEmail = true;
+    options.User.RequireUniqueEmail = false;
 })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
@@ -86,7 +86,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-    await SeedData.EnsureSeedAsync(db);
+    await SeedData.EnsureSeedAsync(db, app.Environment.ContentRootPath);
     // Ensure Identity roles and demo users
     var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
     var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();

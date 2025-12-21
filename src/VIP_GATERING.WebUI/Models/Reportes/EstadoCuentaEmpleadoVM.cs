@@ -4,6 +4,7 @@ public class EstadoCuentaEmpleadoVM
 {
     public Guid EmpleadoId { get; set; }
     public string EmpleadoNombre { get; set; } = string.Empty;
+    public string? EmpleadoCodigo { get; set; }
     public DateOnly Desde { get; set; }
     public DateOnly Hasta { get; set; }
 

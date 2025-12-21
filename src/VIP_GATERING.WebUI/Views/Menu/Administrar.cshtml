@@ -1,34 +1,38 @@
 @using Microsoft.AspNetCore.Mvc.Rendering
 @model VIP_GATERING.WebUI.Models.MenuEdicionVM
 @{
-    ViewData["Title"] = "Administrar menú";
+    ViewData["Title"] = "Administrar menu";
 }
-<h1 class="text-2xl font-semibold mb-1">Administrar menú semanal</h1>
+<h1 class="text-2xl font-semibold mb-1">Administrar menu semanal</h1>
 
-<form method="get" class="mb-6 flex items-end gap-3">
+<form method="get" class="page-panel mb-6 flex items-end gap-3">
     <input type='hidden' name='empresaId' value='@Model.EmpresaId' />
     <input type='hidden' name='sucursalId' value='@Model.SucursalId' />
     <div>
-        <label class="block text-sm text-slate-600">Semana (elige cualquier día)</label>
+        <label class="block text-sm text-slate-600">Semana (elige cualquier dia)</label>
         <input type="date" name="fecha" value="@Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")" class="border rounded p-2" />
     </div>
     <button class="btn-outline">Ir</button>
 </form>
 
-<div class="mb-4 text-sm text-slate-600">
-    Alcance: <span class="inline-block px-2 py-0.5 rounded border bg-white">@Model.OrigenScope</span>
-    — Cliente: <strong>@Model.EmpresaNombre</strong>
-    @if (Model.SucursalId != null)
-    {
-        <text> — Dependiente: <strong>@Model.SucursalNombre</strong></text>
-    }
-    <div class="text-xs text-slate-500">Semana @Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd") a @Model.FechaTermino.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")</div>
+<div class="page-panel mb-4">
+    <div class="meta-row">
+        <span class="meta-pill">Alcance: @Model.OrigenScope</span>
+        <span class="meta-pill meta-pill--ghost">Empresa: @Model.EmpresaNombre</span>
+        @if (Model.SucursalId != null)
+        {
+            <span class="meta-pill">Filial: @Model.SucursalNombre</span>
+        }
+        <span class="meta-pill meta-pill--accent">
+            Semana @Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd") a @Model.FechaTermino.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")
+        </span>
+    </div>
 </div>
 
-<form method="get" class="mb-6 p-4 bg-white border rounded grid md:grid-cols-4 gap-3 items-end">
+<form method="get" class="page-panel mb-6 grid md:grid-cols-4 gap-3 items-end">
     <input type='hidden' name='fecha' value='@Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")' />
     <div>
-        <label class="block text-sm text-slate-600">Cliente</label>
+        <label class="block text-sm text-slate-600">Empresa</label>
         <select name="empresaId" class="border rounded p-2 w-full">
             @foreach (var e in Model.Empresas)
             {
@@ -37,12 +41,12 @@
         </select>
     </div>
     <div>
-        <label class="block text-sm text-slate-600">Dependiente (opcional)</label>
-        <select name="sucursalId" class="border rounded p-2 w-full">
-            <option value="">-- Global por cliente --</option>
+        <label class="block text-sm text-slate-600">Filial (opcional)</label>
+        <select id="sucursal-select" name="sucursalId" class="border rounded p-2 w-full">
+            <option value="" data-empresa="">-- Global por Empresa --</option>
             @foreach (var s in Model.Sucursales)
             {
-                if (Model.SucursalId == s.id) {<option selected value="@s.id">@s.nombre</option>} else {<option value="@s.id">@s.nombre</option>}
+                if (Model.SucursalId == s.id) {<option selected value="@s.id" data-empresa="@s.empresaId">@s.nombre</option>} else {<option value="@s.id" data-empresa="@s.empresaId">@s.nombre</option>}
             }
         </select>
     </div>
@@ -51,15 +55,22 @@
     </div>
 </form>
 
-<div class="mb-4 p-4 bg-white border rounded space-y-2">
-        <div class="flex flex-wrap gap-3 justify-between items-center">
-            <div>
-                <div class="text-sm text-slate-500">Estado de encuesta</div>
-                <div class="text-lg font-semibold @(Model.EncuestaCerrada ? "text-red-600" : "text-emerald-600")">
-                    @(Model.EncuestaCerrada ? "Cerrada" : "Abierta")
+<div class="page-panel mb-4 space-y-2">
+    <div class="flex flex-wrap gap-3 justify-between items-center">
+        <div>
+            <div class="text-sm text-slate-500">Estado del menu</div>
+            <div class="text-lg font-semibold @(Model.EncuestaCerrada ? "text-red-600" : "text-emerald-600")">
+                @(Model.EncuestaCerrada ? "Cerrado" : "Abierto")
             </div>
         </div>
-        <div class="text-sm text-slate-600">
+        <div class="flex items-center gap-2">
+            <a class="btn-outline" target="_blank" rel="noopener"
+               href="@Url.Action("VistaPrevia", new { inicio = Model.FechaInicio.ToString("yyyy-MM-dd"), fin = Model.FechaTermino.ToString("yyyy-MM-dd"), empresaId = Model.EmpresaId, sucursalId = Model.SucursalId })">
+                Vista previa
+            </a>
+        </div>
+    </div>
+    <div class="text-sm text-slate-600">
             Cierre autom&aacute;tico: @Model.FechaCierreAutomatica.ToString("dd/MM/yyyy")
             @if (Model.FechaCierreManual != null)
             {
@@ -67,7 +78,7 @@
             }
         </div>
         <div class="text-sm text-slate-600">
-            Empleados con encuesta completa: <strong>@Model.EmpleadosCompletos</strong>
+            Empleados con menu completo: <strong>@Model.EmpleadosCompletos</strong>
         </div>
         @if (User.IsInRole("Admin"))
         {
@@ -79,7 +90,7 @@
                         <input type="hidden" name="inicio" value="@Model.FechaInicio.ToString("yyyy-MM-dd")" />
                         <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
                         <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
-                        <button class="btn-outline" onclick="return confirm('¿Cerrar encuesta para esta semana?');">Cerrar encuesta</button>
+                        <button class="btn-outline" onclick="return confirm('Cerrar menu para esta semana?');">Cerrar menu</button>
                     </form>
                 }
                 else
@@ -89,26 +100,26 @@
                         <input type="hidden" name="inicio" value="@Model.FechaInicio.ToString("yyyy-MM-dd")" />
                         <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
                         <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
-                        <button class="btn-outline">Reabrir encuesta</button>
+                        <button class="btn-outline">Reabrir menu</button>
                     </form>
                 }
-                <form asp-action="EliminarEncuesta" method="post" class="inline" onsubmit="return confirm('Eliminar encuesta y sus opciones si no hay respuestas?');">
+                <form asp-action="EliminarEncuesta" method="post" class="inline" onsubmit="return confirm('Eliminar menu y sus platos si no hay respuestas?');">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="inicio" value="@Model.FechaInicio.ToString("yyyy-MM-dd")" />
                     <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
                     <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
-                    <button class="btn-outline" @(Model.PuedeEliminarEncuesta ? "" : "disabled title='No disponible: ya hay respuestas'")>Eliminar encuesta</button>
+                    <button class="btn-outline" @(Model.PuedeEliminarEncuesta ? "" : "disabled title='No disponible: ya hay respuestas'")>Eliminar menu</button>
                 </form>
             </div>
         }
     </div>
     @if (Model.EncuestaCerrada)
     {
-        <div class="text-sm text-amber-700">Mientras la encuesta esté cerrada no se pueden modificar las opciones.</div>
+        <div class="text-sm text-amber-700">Mientras el menu esta cerrado no se pueden modificar los platos.</div>
     }
 </div>
 
-<form asp-action="Guardar" method="post" class="space-y-4">
+<form asp-action="Guardar" method="post" class="space-y-4 menu-config">
     @Html.AntiForgeryToken()
     <div class="text-red-700 mb-2">@Html.ValidationSummary()</div>
     <input type="hidden" asp-for="FechaInicio" />
@@ -116,159 +127,211 @@
     <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
     <input type="hidden" name="SucursalId" value="@Model.SucursalId" />
 
-    <div class="bg-white border rounded p-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
+    <div class="page-panel page-panel--compact mb-4">
+        <div class="panel-header">
             <div>
-                <div class="font-medium">Adicionales fijos</div>
-                <div class="text-xs text-slate-500">Se cobran 100% al empleado y aplican a todos los días/horarios de este menú.</div>
+                <div class="panel-title">Adicionales fijos</div>
+                <div class="panel-subtitle">Se cobran 100% al empleado y aplican a todos los dias/horarios de este menu.</div>
             </div>
             @if (Model.EncuestaCerrada)
             {
-                <div class="text-xs text-amber-700">Encuesta cerrada: no se pueden modificar adicionales.</div>
+                <span class="chip chip--muted">Menu cerrado</span>
             }
         </div>
-        <div class="mt-3">
-            <label class="block text-sm text-slate-600">Selecciona los adicionales disponibles</label>
-            <select name="AdicionalesIds" multiple size="8" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
-                @foreach (var o in Model.Opciones)
-                {
-                    if (Model.AdicionalesIds != null && Model.AdicionalesIds.Contains(o.Id))
+        <div class="addon-field addon-field--split">
+            <div class="addon-field__meta">
+                <label>Selecciona los adicionales disponibles</label>
+                <div class="addon-field__hint">Tip: escribe para filtrar y usa Enter para elegir multiples.</div>
+            </div>
+            <div class="addon-field__control">
+                <select id="adicionales-select" name="AdicionalesIds" multiple class="w-full" @(Model.EncuestaCerrada ? "disabled" : "")>
+                    @foreach (var o in Model.Opciones)
                     {
-                        <option value="@o.Id" selected>@o.Nombre</option>
+                        if (Model.AdicionalesIds != null && Model.AdicionalesIds.Contains(o.Id))
+                        {
+                            <option value="@o.Id" selected>@o.Nombre</option>
+                        }
+                        else
+                        {
+                            <option value="@o.Id">@o.Nombre</option>
+                        }
                     }
-                    else
-                    {
-                        <option value="@o.Id">@o.Nombre</option>
-                    }
-                }
-            </select>
-            <div class="text-xs text-slate-500 mt-1">Tip: usa Ctrl/Shift para seleccionar múltiples.</div>
+                </select>
+            </div>
         </div>
     </div>
 
     @{
         var dias = Model.Dias;
+        var tabs = (Model.HorariosPermitidos ?? Array.Empty<VIP_GATERING.Domain.Entities.Horario>())
+            .Select(h => h.Nombre)
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .ToArray();
+        var diasConIndice = dias.Select((d, idx) => new
+        {
+            Dia = d,
+            Index = idx,
+            Tab = tabs.FirstOrDefault(t => string.Equals(t, d.HorarioNombre, StringComparison.OrdinalIgnoreCase))
+        }).Where(x => x.Tab != null).ToList();
     }
-    <div class="mb-4 overflow-x-auto">
-        <div class="flex gap-2" id="tabs-dias">
-            @for (var i = 0; i < dias.Count; i++)
+    @if (tabs.Length == 0)
+    {
+        <div class="alert alert-warning mb-4">No hay horarios habilitados para esta empresa o filial. Configura los horarios en Filiales.</div>
+    }
+    <div class="tab-switch tab-switch--panel mb-4 @(tabs.Length == 0 ? "hidden" : "")">
+        <div class="tab-switch__label">Horarios</div>
+        <div class="tab-switch__group" id="tabs-horario">
+            @for (var i = 0; i < tabs.Length; i++)
             {
-                var label = $"{System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(dias[i].DiaSemana)} - {dias[i].HorarioNombre}";
-                <button type="button"
-                        class="px-3 py-1.5 border rounded-full text-sm bg-white hover:bg-slate-100"
-                        data-tab-target="tab-@i">@label</button>
+                var tabId = $"tab-{tabs[i].ToLowerInvariant()}";
+                <button type="button" class="tab-pill" data-tab-target="@tabId">@tabs[i]</button>
             }
         </div>
     </div>
 
-    @for (var i = 0; i < dias.Count; i++)
+    @if (tabs.Length > 0)
     {
-        <div class="bg-white border rounded p-4 mb-3" data-card id="tab-@i" style="display:@(i==0 ? "block" : "none")">
-            <input type="hidden" name="Dias[@i].OpcionMenuId" value="@dias[i].OpcionMenuId" />
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <div>
-                    <div class="font-medium">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(dias[i].DiaSemana)</div>
-                    <span class="text-xs uppercase tracking-wide bg-slate-100 text-slate-600 px-2 py-0.5 rounded">@dias[i].HorarioNombre</span>
-                </div>
-                <div class="text-sm text-slate-600 flex items-center gap-2">
-                    <label class="whitespace-nowrap">Opciones habilitadas</label>
-                    <select name="Dias[@i].OpcionesMaximas" class="border rounded p-2" data-max-select @(Model.EncuestaCerrada ? "disabled" : "")>
-                        @for (var m = 1; m <= 5; m++)
-                        {
-                            if (dias[i].OpcionesMaximas == m) { <option selected value="@m">@m</option>; }
-                            else { <option value="@m">@m</option>; }
-                        }
-                    </select>
-                </div>
+        @for (var t = 0; t < tabs.Length; t++)
+        {
+            var tabId = $"tab-{tabs[t].ToLowerInvariant()}";
+            var items = diasConIndice.Where(x => x.Tab == tabs[t]).ToList();
+            <div id="@tabId" class="tab-panel @(t == 0 ? "is-active" : "") space-y-4" data-tab-panel>
+                @if (items.Count == 0)
+                {
+                    <div class="empty-state">No hay platos configurados para este horario.</div>
+                }
+                else
+                {
+                    <div class="overflow-x-auto">
+                        <table class="menu-table">
+                            <thead>
+                                <tr>
+                                    <th>D&iacute;a</th>
+                                    <th>Plato A</th>
+                                    <th>Plato B</th>
+                                    <th>Plato C</th>
+                                    <th>Plato D</th>
+                                    <th>Plato E</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in items)
+                                {
+                                    var d = item.Dia;
+                                    var i = item.Index;
+                                    var horarioId = d.HorarioId;
+                                    var opcionesHorario = Model.Opciones
+                                        .Where(o => horarioId == null || o.Horarios == null || o.Horarios.Count == 0 || o.Horarios.Any(h => h.HorarioId == horarioId))
+                                        .ToList();
+                                    <tr data-card>
+                                        <td class="menu-daycell">
+                                            <div class="menu-day-title">
+                                                <span>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana)</span>
+                                                <span class="menu-day-meta">
+                                                    <span class="icon-dot icon-dot--teal"></span>
+                                                    @d.HorarioNombre
+                                                </span>
+                                            </div>
+                                            <div class="menu-day-actions">
+                                                <label class="text-xs text-slate-500">Platos habilitados</label>
+                                                <select name="Dias[@i].OpcionesMaximas" class="border rounded p-2 max-w-[5.5rem]" data-max-select @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                                    @for (var m = 1; m <= 5; m++)
+                                                    {
+                                                        if (d.OpcionesMaximas == m) { <option selected value="@m">@m</option>; }
+                                                        else { <option value="@m">@m</option>; }
+                                                    }
+                                                </select>
+                                            </div>
+                                            <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
+                                        </td>
+                                        <td class="menu-option-cell" data-slot="1">
+                                            <select name="Dias[@i].A" class="w-full border rounded p-2" aria-label="Plato A" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                                <option value="">-- Sin plato --</option>
+                                                @foreach (var o in opcionesHorario)
+                                                {
+                                                    if (d.A.HasValue && d.A.Value == o.Id)
+                                                    {
+                                                        <option selected value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="menu-option-cell" data-slot="2">
+                                            <select name="Dias[@i].B" class="w-full border rounded p-2" aria-label="Plato B" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                                <option value="">-- Sin plato --</option>
+                                                @foreach (var o in opcionesHorario)
+                                                {
+                                                    if (d.B.HasValue && d.B.Value == o.Id)
+                                                    {
+                                                        <option selected value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="menu-option-cell" data-slot="3">
+                                            <select name="Dias[@i].C" class="w-full border rounded p-2" aria-label="Plato C" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                                <option value="">-- Sin plato --</option>
+                                                @foreach (var o in opcionesHorario)
+                                                {
+                                                    if (d.C.HasValue && d.C.Value == o.Id)
+                                                    {
+                                                        <option selected value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="menu-option-cell" data-slot="4">
+                                            <select name="Dias[@i].D" class="w-full border rounded p-2" aria-label="Plato D" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                                <option value="">-- Sin plato --</option>
+                                                @foreach (var o in opcionesHorario)
+                                                {
+                                                    if (d.D.HasValue && d.D.Value == o.Id)
+                                                    {
+                                                        <option selected value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="menu-option-cell" data-slot="5">
+                                            <select name="Dias[@i].E" class="w-full border rounded p-2" aria-label="Plato E" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                                <option value="">-- Sin plato --</option>
+                                                @foreach (var o in opcionesHorario)
+                                                {
+                                                    if (d.E.HasValue && d.E.Value == o.Id)
+                                                    {
+                                                        <option selected value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@o.Id">@o.Nombre</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
             </div>
-            <div class="grid lg:grid-cols-5 md:grid-cols-3 sm:grid-cols-2 gap-3" data-slot-container>
-                <div data-slot="1">
-                    <label class="text-sm text-slate-600">Opcion A</label>
-                    <select name="Dias[@i].A" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
-                        <option value="">-- Sin opcion --</option>
-                        @foreach (var o in Model.Opciones)
-                        {
-                            if (dias[i].A.HasValue && dias[i].A.Value == o.Id)
-                            {
-                                <option selected value="@o.Id">@o.Nombre</option>
-                            }
-                            else
-                            {
-                                <option value="@o.Id">@o.Nombre</option>
-                            }
-                        }
-                    </select>
-                </div>
-                <div data-slot="2">
-                    <label class="text-sm text-slate-600">Opcion B</label>
-                    <select name="Dias[@i].B" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
-                        <option value="">-- Sin opcion --</option>
-                        @foreach (var o in Model.Opciones)
-                        {
-                            if (dias[i].B.HasValue && dias[i].B.Value == o.Id)
-                            {
-                                <option selected value="@o.Id">@o.Nombre</option>
-                            }
-                            else
-                            {
-                                <option value="@o.Id">@o.Nombre</option>
-                            }
-                        }
-                    </select>
-                </div>
-                <div data-slot="3">
-                    <label class="text-sm text-slate-600">Opcion C</label>
-                    <select name="Dias[@i].C" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
-                        <option value="">-- Sin opcion --</option>
-                        @foreach (var o in Model.Opciones)
-                        {
-                            if (dias[i].C.HasValue && dias[i].C.Value == o.Id)
-                            {
-                                <option selected value="@o.Id">@o.Nombre</option>
-                            }
-                            else
-                            {
-                                <option value="@o.Id">@o.Nombre</option>
-                            }
-                        }
-                    </select>
-                </div>
-                <div data-slot="4">
-                    <label class="text-sm text-slate-600">Opcion D</label>
-                    <select name="Dias[@i].D" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
-                        <option value="">-- Sin opcion --</option>
-                        @foreach (var o in Model.Opciones)
-                        {
-                            if (dias[i].D.HasValue && dias[i].D.Value == o.Id)
-                            {
-                                <option selected value="@o.Id">@o.Nombre</option>
-                            }
-                            else
-                            {
-                                <option value="@o.Id">@o.Nombre</option>
-                            }
-                        }
-                    </select>
-                </div>
-                <div data-slot="5">
-                    <label class="text-sm text-slate-600">Opcion E</label>
-                    <select name="Dias[@i].E" class="w-full border rounded p-2" @(Model.EncuestaCerrada ? "disabled" : "")>
-                        <option value="">-- Sin opcion --</option>
-                        @foreach (var o in Model.Opciones)
-                        {
-                            if (dias[i].E.HasValue && dias[i].E.Value == o.Id)
-                            {
-                                <option selected value="@o.Id">@o.Nombre</option>
-                            }
-                            else
-                            {
-                                <option value="@o.Id">@o.Nombre</option>
-                            }
-                        }
-                    </select>
-                </div>
-            </div>
-        </div>
+        }
     }
 
     <div class="flex items-center gap-3">
@@ -278,9 +341,62 @@
     </div>
 </form>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" />
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
     (() => {
-        // Mostrar/ocultar slots según OpcionesMaximas y limpiar los que queden fuera
+        const sel = document.getElementById('adicionales-select');
+        if (sel && typeof TomSelect !== 'undefined') {
+            const isDisabled = sel.hasAttribute('disabled');
+            const ts = new TomSelect(sel, {
+                plugins: ['remove_button'],
+                maxItems: null,
+                persist: false,
+                create: false,
+                placeholder: 'Selecciona adicionales...',
+                render: {
+                    option: (data, escape) => `<div class="ts-option-inner">${escape(data.text)}</div>`,
+                    item: (data, escape) => `<div class="ts-item-inner">${escape(data.text)}</div>`
+                }
+            });
+            if (isDisabled) ts.disable();
+        }
+    })();
+</script>
+
+<script>
+    (() => {
+        const empresaSelect = document.querySelector('select[name="empresaId"]');
+        const sucursalSelect = document.getElementById('sucursal-select');
+        if (!empresaSelect || !sucursalSelect) return;
+
+        const filterSucursales = () => {
+            const empresaId = empresaSelect.value;
+            let selectedOk = false;
+            Array.from(sucursalSelect.options).forEach(option => {
+                if (!option.value) {
+                    option.hidden = false;
+                    option.disabled = false;
+                    return;
+                }
+                const match = option.dataset.empresa === empresaId;
+                option.hidden = !match;
+                option.disabled = !match;
+                if (option.selected) selectedOk = match;
+            });
+            if (!selectedOk) {
+                sucursalSelect.value = '';
+            }
+        };
+
+        empresaSelect.addEventListener('change', filterSucursales);
+        filterSucursales();
+    })();
+</script>
+
+<script>
+    (() => {
+        // Ajustar slots segun OpcionesMaximas y limpiar los que queden fuera
         const cards = document.querySelectorAll('[data-card]');
         cards.forEach(card => {
             const maxSel = card.querySelector('[data-max-select]');
@@ -290,11 +406,18 @@
                 slots.forEach(slot => {
                     const slotNum = parseInt(slot.getAttribute('data-slot') || '0', 10);
                     const select = slot.querySelector('select');
+                    const isLocked = select?.getAttribute('data-locked') === '1';
                     if (slotNum > max) {
-                        slot.classList.add('hidden');
-                        if (select) select.value = '';
+                        slot.classList.add('menu-slot--disabled');
+                        if (select && !isLocked) {
+                            select.value = '';
+                            select.disabled = true;
+                        }
                     } else {
-                        slot.classList.remove('hidden');
+                        slot.classList.remove('menu-slot--disabled');
+                        if (select && !isLocked) {
+                            select.disabled = false;
+                        }
                     }
                 });
             };
@@ -304,19 +427,23 @@
             }
         });
 
-        // Tabs por día/horario
-        const tabButtons = document.querySelectorAll('[data-tab-target]');
+        // Tabs por horario
+        const tabButtons = document.querySelectorAll('.tab-pill');
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetId = btn.getAttribute('data-tab-target');
                 if (!targetId) return;
-                document.querySelectorAll('[data-card]').forEach(c => c.style.display = 'none');
+                document.querySelectorAll('[data-tab-panel]').forEach(p => p.classList.remove('is-active'));
                 const target = document.getElementById(targetId);
-                if (target) target.style.display = 'block';
-                tabButtons.forEach(b => b.classList.remove('bg-slate-200'));
-                btn.classList.add('bg-slate-200');
+                if (target) target.classList.add('is-active');
+                tabButtons.forEach(b => b.classList.remove('is-active'));
+                btn.classList.add('is-active');
             });
         });
-        if (tabButtons.length > 0) tabButtons[0].classList.add('bg-slate-200');
+        if (tabButtons.length > 0) tabButtons[0].classList.add('is-active');
     })();
 </script>
+
+
+
+

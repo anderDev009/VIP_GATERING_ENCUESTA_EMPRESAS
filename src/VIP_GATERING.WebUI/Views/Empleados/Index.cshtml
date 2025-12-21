@@ -1,4 +1,4 @@
-﻿@model VIP_GATERING.WebUI.Models.PagedResult<VIP_GATERING.Domain.Entities.Empleado>
+@model VIP_GATERING.WebUI.Models.PagedResult<VIP_GATERING.Domain.Entities.Empleado>
 @{
     var empUserIds = (IEnumerable<System.Guid>)(ViewBag.EmpleadoUsuarioIds ?? new List<System.Guid>());
 }
@@ -13,14 +13,14 @@
 <div class="flex justify-between items-center mb-4">
     <div>
         <h1 class="text-2xl font-semibold">Empleados</h1>
-        <p class="text-sm text-slate-500">Administra clientes, dependientes y accesos desde un solo panel.</p>
+        <p class="text-sm text-slate-500">Administra Empresas, Filiales y accesos desde un solo panel.</p>
     </div>
     <a asp-action="Create" class="btn-primary">Nuevo empleado</a>
 </div>
 
 <form method="get" class="mb-6 grid md:grid-cols-4 gap-4 items-end max-w-4xl">
     <div>
-        <label class="text-xs uppercase tracking-widest text-slate-400">Cliente</label>
+        <label class="text-xs uppercase tracking-widest text-slate-400">Empresa</label>
         <select name="empresaId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
             <option value="">-- Todos --</option>
             @foreach (var e in empresas)
@@ -30,7 +30,7 @@
         </select>
     </div>
     <div>
-        <label class="text-xs uppercase tracking-widest text-slate-400">Dependiente</label>
+        <label class="text-xs uppercase tracking-widest text-slate-400">Filial</label>
         <select name="sucursalId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
             <option value="">-- Todas --</option>
             @foreach (var s in sucursales)
@@ -52,10 +52,10 @@
     <table class="min-w-full bg-white border rounded">
         <thead class="bg-slate-100 text-xs uppercase tracking-[0.25em] text-slate-500">
             <tr>
-                <th class="text-left px-6 py-4">Código</th>
+                <th class="text-left px-6 py-4">Codigo</th>
                 <th class="text-left px-6">Nombre</th>
-                <th class="text-left px-6">Dependiente</th>
-                <th class="text-left px-6">Cliente</th>
+                <th class="text-left px-6">Filial</th>
+                <th class="text-left px-6">Empresa</th>
                 <th class="text-left px-6">Subsidiado</th>
                 <th class="px-6 text-right">Acciones</th>
             </tr>
@@ -73,7 +73,7 @@
                 <td class="p-2">
                     @if (e.EsSubsidiado)
                     {
-                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">Sí</span>
+                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">Si</span>
                     }
                     else
                     {
@@ -93,18 +93,13 @@
                         {
                             if (!empUserIds.Contains(e.Id))
                             {
-                                <form asp-action="CrearUsuario" method="post" class="inline-flex gap-2 items-center">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@e.Id" />
-                                    <input type="email" name="email" required placeholder="correo" class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-100" data-val="true" data-val-remote="Ya existe un usuario con ese correo." data-val-remote-url="@Url.Action("CheckEmailAvailable","Empleados")" data-val-remote-type="GET" />
-                                    <button class="btn-outline">Crear usuario</button>
-                                </form>
+                                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Sin usuario</span>
                             }
                             else
                             {
                                 <span class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">Usuario</span>
                             }
-                        }
+}
                     </div>
                 </td>
             </tr>
@@ -114,28 +109,3 @@
 </div>
 
 @await Html.PartialAsync("_Pagination", new VIP_GATERING.WebUI.Models.PagedResult<object>{ Items = Model.Items.Cast<object>().ToList(), Page=Model.Page, PageSize=Model.PageSize, TotalItems=Model.TotalItems })
-
-
-@section Scripts{
-    <partial name="_ValidationScriptsPartial" />
-    <script>
-        (function(){
-            var emails = document.querySelectorAll("form[action*='CrearUsuario'] input[name='email']");
-            emails.forEach(function(input){
-                function style(){
-                    var hasErr = input.classList.contains('input-validation-error');
-                    input.classList.toggle('border-red-500', hasErr);
-                    input.classList.toggle('border-green-500', !hasErr && input.value.length>0);
-                }
-                ['input','blur'].forEach(function(evt){
-                    input.addEventListener(evt, function(){
-                        var form = input.closest('form');
-                        if (form && window.jQuery && jQuery(form).data('validator')) { jQuery(form).validate().element(input); }
-                        style();
-                    });
-                });
-                style();
-            });
-        })();
-    </script>
-}

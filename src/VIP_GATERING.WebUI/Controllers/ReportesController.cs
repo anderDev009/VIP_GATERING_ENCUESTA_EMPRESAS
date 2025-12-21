@@ -37,19 +37,22 @@ public class ReportesController : Controller
             .ToListAsync();
 
         var baseQuery = _db.RespuestasFormulario
-            .Include(r => r.Empleado)!.ThenInclude(e => e.Sucursal)!.ThenInclude(s => s.Empresa)
-            .Include(r => r.SucursalEntrega)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
+            .Include(r => r.SucursalEntrega).ThenInclude(s => s!.Empresa)
             .Include(r => r.AdicionalOpcion)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionA)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionB)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionC)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionD)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionE)
-            .Where(r => r.OpcionMenu!.Menu!.FechaInicio == inicio && r.OpcionMenu.Menu!.FechaTermino == fin);
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionA)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionB)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionC)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionD)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
+            .Where(r => r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio == inicio
+                && r.OpcionMenu.Menu.FechaTermino == fin);
 
         if (empresaId != null)
-            baseQuery = baseQuery.Where(x => x.SucursalEntrega!.EmpresaId == empresaId);
+            baseQuery = baseQuery.Where(x => x.SucursalEntrega != null && x.SucursalEntrega.EmpresaId == empresaId);
         if (sucursalId != null)
             baseQuery = baseQuery.Where(x => x.SucursalEntregaId == sucursalId);
 
@@ -127,19 +130,22 @@ public class ReportesController : Controller
         var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
 
         var baseQuery = _db.RespuestasFormulario
-            .Include(r => r.Empleado)!.ThenInclude(e => e.Sucursal)!.ThenInclude(s => s.Empresa)
-            .Include(r => r.SucursalEntrega)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
+            .Include(r => r.SucursalEntrega).ThenInclude(s => s!.Empresa)
             .Include(r => r.AdicionalOpcion)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionA)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionB)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionC)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionD)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionE)
-            .Where(r => r.OpcionMenu!.Menu!.FechaInicio == inicio && r.OpcionMenu.Menu!.FechaTermino == fin);
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionA)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionB)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionC)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionD)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
+            .Where(r => r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio == inicio
+                && r.OpcionMenu.Menu.FechaTermino == fin);
 
         if (empresaId != null)
-            baseQuery = baseQuery.Where(x => x.SucursalEntrega!.EmpresaId == empresaId);
+            baseQuery = baseQuery.Where(x => x.SucursalEntrega != null && x.SucursalEntrega.EmpresaId == empresaId);
         if (sucursalId != null)
             baseQuery = baseQuery.Where(x => x.SucursalEntregaId == sucursalId);
 
@@ -236,19 +242,22 @@ public class ReportesController : Controller
         var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
 
         var baseQuery = _db.RespuestasFormulario
-            .Include(r => r.Empleado)!.ThenInclude(e => e.Sucursal)!.ThenInclude(s => s.Empresa)
-            .Include(r => r.SucursalEntrega)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
+            .Include(r => r.SucursalEntrega).ThenInclude(s => s!.Empresa)
             .Include(r => r.AdicionalOpcion)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionA)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionB)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionC)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionD)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionE)
-            .Where(r => r.OpcionMenu!.Menu!.FechaInicio == inicio && r.OpcionMenu.Menu!.FechaTermino == fin);
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionA)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionB)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionC)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionD)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
+            .Where(r => r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio == inicio
+                && r.OpcionMenu.Menu.FechaTermino == fin);
 
         if (empresaId != null)
-            baseQuery = baseQuery.Where(x => x.SucursalEntrega!.EmpresaId == empresaId);
+            baseQuery = baseQuery.Where(x => x.SucursalEntrega != null && x.SucursalEntrega.EmpresaId == empresaId);
         if (sucursalId != null)
             baseQuery = baseQuery.Where(x => x.SucursalEntregaId == sucursalId);
 
@@ -312,10 +321,11 @@ public class ReportesController : Controller
         if (empleadoId == null) return Forbid();
 
         var empleadoDatos = await _db.Empleados
-            .Include(e => e.Sucursal)!.ThenInclude(s => s.Empresa)
+            .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
             .FirstOrDefaultAsync(e => e.Id == empleadoId);
         if (empleadoDatos == null || empleadoDatos.Sucursal?.Empresa == null) return Forbid();
         var empleadoNombre = empleadoDatos.Nombre;
+        var empleadoCodigo = empleadoDatos.Codigo;
 
         var hoy = _fechas.Hoy();
         hasta ??= hoy;
@@ -329,17 +339,20 @@ public class ReportesController : Controller
         var hastaValue = hasta.Value;
 
         var respuestas = await _db.RespuestasFormulario
-            .Include(r => r.SucursalEntrega)!.ThenInclude(s => s.Empresa)
+            .Include(r => r.SucursalEntrega).ThenInclude(s => s!.Empresa)
             .Include(r => r.AdicionalOpcion)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Horario)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionA)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionB)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionC)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionD)
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.OpcionE)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Horario)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionA)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionB)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionC)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionD)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
             .Where(r => r.EmpleadoId == empleadoId)
-            .Where(r => r.OpcionMenu!.Menu!.FechaInicio <= hastaValue && r.OpcionMenu.Menu!.FechaTermino >= desdeValue)
+            .Where(r => r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio <= hastaValue
+                && r.OpcionMenu.Menu.FechaTermino >= desdeValue)
             .ToListAsync();
 
         var culture = CultureInfo.CurrentCulture;
@@ -380,6 +393,7 @@ public class ReportesController : Controller
         {
             EmpleadoId = empleadoId.Value,
             EmpleadoNombre = empleadoNombre,
+            EmpleadoCodigo = empleadoCodigo,
             Desde = desdeValue,
             Hasta = hastaValue,
             Movimientos = movimientos
@@ -472,7 +486,7 @@ public class ReportesController : Controller
                     col.Item().Text(text =>
                     {
                         if (vm.EmpresaId != null) text.Span("Empresa filtrada").SemiBold().FontSize(10);
-                        if (vm.SucursalId != null) text.Span("  | Sucursal filtrada").SemiBold().FontSize(10);
+                        if (vm.SucursalId != null) text.Span("  | Filial filtrada").SemiBold().FontSize(10);
                     });
                     col.Spacing(5);
                     col.Item().Table(t =>
@@ -543,7 +557,7 @@ public class ReportesController : Controller
                         col.Item().Text($"Consumo empleados: {vm.TotalPrecio:C} | Beneficio: {vm.TotalBeneficio:C}").FontSize(10);
                     }
                     col.Spacing(10);
-                    col.Item().Text("Subtotales por sucursal").SemiBold();
+                    col.Item().Text("Subtotales por filial").SemiBold();
                     col.Item().Table(t =>
                     {
                         t.ColumnsDefinition(c =>
@@ -559,7 +573,7 @@ public class ReportesController : Controller
                         });
                         t.Header(h =>
                         {
-                            h.Cell().Text("Sucursal").SemiBold();
+                            h.Cell().Text("Filial").SemiBold();
                             h.Cell().AlignRight().Text("Selecciones").SemiBold();
                             h.Cell().AlignRight().Text("Costo").SemiBold();
                             if (isAdmin)
@@ -607,7 +621,7 @@ public class ReportesController : Controller
                         t.Header(h =>
                         {
                             h.Cell().Text("Empleado").SemiBold();
-                            h.Cell().Text("Sucursal").SemiBold();
+                            h.Cell().Text("Filial").SemiBold();
                             h.Cell().AlignRight().Text("Selecciones").SemiBold();
                             h.Cell().AlignRight().Text("Costo").SemiBold();
                             if (isAdmin)
@@ -667,7 +681,9 @@ public class ReportesController : Controller
             empresa.SubsidioValor,
             sucursal.SubsidiaEmpleados,
             sucursal.SubsidioTipo,
-            sucursal.SubsidioValor);
+            sucursal.SubsidioValor,
+            empleado.SubsidioTipo,
+            empleado.SubsidioValor);
 
     private static DateOnly ObtenerFechaDiaSemana(DateOnly inicioSemana, DayOfWeek dia)
     {

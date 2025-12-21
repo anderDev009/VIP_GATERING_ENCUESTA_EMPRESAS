@@ -26,7 +26,7 @@ public class AccountController : Controller
     public async Task<IActionResult> Login(LoginVM model)
     {
         if (!ModelState.IsValid) return View(model);
-        var user = await _userManager.FindByEmailAsync(model.Email);
+        var user = await _userManager.FindByNameAsync(model.UserName);
         if (user != null)
         {
             var res = await _signInManager.PasswordSignInAsync(user, model.Password, isPersistent: true, lockoutOnFailure: true);

@@ -6,7 +6,7 @@ namespace VIP_GATERING.Infrastructure.Identity;
 public static class IdentityDefaults
 {
     public const string EnvPasswordKey = "IDENTITY_DEFAULT_PASSWORD";
-    public const string FallbackPassword = "Dev123$!";
+    public const string FallbackPassword = "Dev123$!Dev123$!Dev1";
 
     public static string GetDefaultPassword()
     {
@@ -20,7 +20,7 @@ public static class IdentityDefaults
 
     private static bool MeetsPolicy(string pwd)
     {
-        if (pwd.Length < 8) return false;
+        if (pwd.Length < 20) return false;
         var hasUpper = pwd.Any(char.IsUpper);
         var hasLower = pwd.Any(char.IsLower);
         var hasDigit = pwd.Any(char.IsDigit);

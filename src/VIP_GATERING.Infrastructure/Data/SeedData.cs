@@ -1,11 +1,12 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using VIP_GATERING.Domain.Entities;
 
 namespace VIP_GATERING.Infrastructure.Data;
 
 public static class SeedData
 {
-    public static async Task EnsureSeedAsync(AppDbContext db)
+    public static async Task EnsureSeedAsync(AppDbContext db, string? contentRootPath = null)
     {
         // Horarios por defecto
         var horariosPermitidos = new (string nombre, int orden)[]
@@ -34,105 +35,259 @@ public static class SeedData
 
         await db.SaveChangesAsync();
 
-        // Configuración global de menú (única)
+        // ConfiguraciÃ³n global de menÃº (Ãºnica)
         if (!await db.ConfiguracionesMenu.AnyAsync())
         {
             await db.ConfiguracionesMenu.AddAsync(new MenuConfiguracion());
             await db.SaveChangesAsync();
         }
 
-        // Empresas
-        var empresaDemo = await db.Empresas.FirstOrDefaultAsync(e => e.Nombre == "Empresa Demo");
-        if (empresaDemo == null)
-        {
-            empresaDemo = new Empresa
-            {
-                Nombre = "Empresa Demo",
-                Rnc = "RNC-000",
-                SubsidiaEmpleados = true,
-                SubsidioTipo = SubsidioTipo.Porcentaje,
-                SubsidioValor = 75m
-            };
-            db.Empresas.Add(empresaDemo);
-        }
-        var empresaBeta = await db.Empresas.FirstOrDefaultAsync(e => e.Nombre == "Empresa Beta");
-        if (empresaBeta == null)
-        {
-            empresaBeta = new Empresa
-            {
-                Nombre = "Empresa Beta",
-                Rnc = "RNC-111",
-                SubsidiaEmpleados = true,
-                SubsidioTipo = SubsidioTipo.Porcentaje,
-                SubsidioValor = 75m
-            };
-            db.Empresas.Add(empresaBeta);
-        }
-        await db.SaveChangesAsync();
+        var etlData = LoadMenuEtlData(contentRootPath);
+        var defaultPrecioDesayuno = etlData?.Empresas?.Select(x => x.PrecioDesayuno).FirstOrDefault(x => x.HasValue);
+        var defaultPrecioAlmuerzo = etlData?.Empresas?.Select(x => x.PrecioAlmuerzo).FirstOrDefault(x => x.HasValue);
+        var defaultPrecioCena = etlData?.Empresas?.Select(x => x.PrecioCena).FirstOrDefault(x => x.HasValue);
 
-        // Sucursales
-        async Task<Sucursal> EnsureSucursal(string nombre, Guid empresaId)
+        if (etlData?.Empresas != null && etlData.Empresas.Count > 0)
         {
-            var s = await db.Sucursales.FirstOrDefaultAsync(x => x.Nombre == nombre && x.EmpresaId == empresaId);
-            if (s == null)
+            foreach (var item in etlData.Empresas)
             {
-                s = new Sucursal { Nombre = nombre, EmpresaId = empresaId };
-                db.Sucursales.Add(s);
-                await db.SaveChangesAsync();
-            }
-            return s;
-        }
+                if (string.IsNullOrWhiteSpace(item.Empresa) || string.IsNullOrWhiteSpace(item.Filial))
+                    continue;
 
-        var sucDemoPrincipal = await EnsureSucursal("Principal", empresaDemo.Id);
-        var sucDemoNorte = await EnsureSucursal("Norte", empresaDemo.Id);
-        var sucBetaEste = await EnsureSucursal("Este", empresaBeta.Id);
-        var sucBetaOeste = await EnsureSucursal("Oeste", empresaBeta.Id);
+                var empresa = await db.Empresas.FirstOrDefaultAsync(e => e.Nombre == item.Empresa);
+                if (empresa == null)
+                {
+                    empresa = new Empresa
+                    {
+                        Nombre = item.Empresa.Trim(),
+                        SubsidiaEmpleados = true,
+                        SubsidioTipo = SubsidioTipo.Porcentaje,
+                        SubsidioValor = item.SubsidioEmpresaPct ?? 75m
+                    };
+                    db.Empresas.Add(empresa);
+                    await db.SaveChangesAsync();
+                }
+                else if (item.SubsidioEmpresaPct.HasValue && empresa.SubsidioValor <= 0)
+                {
+                    empresa.SubsidiaEmpleados = true;
+                    empresa.SubsidioTipo = SubsidioTipo.Porcentaje;
+                    empresa.SubsidioValor = item.SubsidioEmpresaPct.Value;
+                }
 
-        // Empleados
-        async Task EnsureEmpleado(string nombre, Guid sucursalId)
-        {
-            if (!await db.Empleados.AnyAsync(e => e.Nombre == nombre && e.SucursalId == sucursalId))
-            {
-                db.Empleados.Add(new Empleado { Nombre = nombre, SucursalId = sucursalId });
-                await db.SaveChangesAsync();
-            }
-        }
-        await EnsureEmpleado("Juan Perez", sucDemoPrincipal.Id);
-        await EnsureEmpleado("Ana Gomez", sucDemoPrincipal.Id);
-        await EnsureEmpleado("Carlos Diaz", sucDemoNorte.Id);
-        await EnsureEmpleado("Maria Lopez", sucBetaEste.Id);
-        await EnsureEmpleado("Pedro Santos", sucBetaOeste.Id);
-
-        // Opciones (si hay pocas, completar catálogo de ejemplo)
-        if (await db.Opciones.CountAsync() < 10)
-        {
-            var opciones = new[]
-            {
-                new Opcion{ Nombre = "Pollo a la plancha", Descripcion = "Con ensalada", Costo = 5.5m },
-                new Opcion{ Nombre = "Pasta bolognesa", Descripcion = "Con parmesano", Costo = 6.2m },
-                new Opcion{ Nombre = "Ensalada mixta", Descripcion = "Veg", Costo = 4.0m },
-                new Opcion{ Nombre = "Carne guisada", Descripcion = "Con arroz", Costo = 6.5m },
-                new Opcion{ Nombre = "Pescado al horno", Descripcion = "Con verduras", Costo = 7.1m },
-                new Opcion{ Nombre = "Lasaña de carne", Descripcion = "Con salsa bechamel", Costo = 6.9m },
-                new Opcion{ Nombre = "Sopa de verduras", Descripcion = "Ligera", Costo = 3.2m },
-                new Opcion{ Nombre = "Sandwich de pavo", Descripcion = "Con queso", Costo = 4.8m },
-                new Opcion{ Nombre = "Arroz con pollo", Descripcion = "Clásico", Costo = 5.9m },
-                new Opcion{ Nombre = "Tacos mixtos", Descripcion = "3 unidades", Costo = 6.1m }
-            };
-            // Evitar duplicados por nombre
-            foreach (var op in opciones)
-            {
-                if (!await db.Opciones.AnyAsync(o => o.Nombre == op.Nombre))
-                    await db.Opciones.AddAsync(op);
+                var suc = await db.Sucursales.FirstOrDefaultAsync(s => s.Nombre == item.Filial && s.EmpresaId == empresa.Id);
+                if (suc == null)
+                {
+                    suc = new Sucursal
+                    {
+                        Nombre = item.Filial.Trim(),
+                        EmpresaId = empresa.Id,
+                        SubsidiaEmpleados = true,
+                        SubsidioTipo = SubsidioTipo.Porcentaje,
+                        SubsidioValor = item.SubsidioEmpresaPct ?? empresa.SubsidioValor
+                    };
+                    db.Sucursales.Add(suc);
+                }
+                else if (item.SubsidioEmpresaPct.HasValue && (suc.SubsidioValor == null || suc.SubsidioValor <= 0))
+                {
+                    suc.SubsidiaEmpleados = true;
+                    suc.SubsidioTipo = SubsidioTipo.Porcentaje;
+                    suc.SubsidioValor = item.SubsidioEmpresaPct.Value;
+                }
             }
             await db.SaveChangesAsync();
         }
 
-        // Semilla legacy mínima de roles/usuarios de dominio (sin duplicar)
+        // Localizaciones por empresa (desde ETL si existe)
+        if (etlData?.Localizaciones != null && etlData.Localizaciones.Count > 0)
+        {
+            var nombresLoc = etlData.Localizaciones
+                .Select(l => l?.Trim())
+                .Where(l => !string.IsNullOrWhiteSpace(l))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (nombresLoc.Count > 0)
+            {
+                var sucursalesPorEmpresa = await db.Sucursales
+                    .AsNoTracking()
+                    .GroupBy(s => s.EmpresaId)
+                    .Select(g => new { EmpresaId = g.Key, SucursalId = g.Select(s => s.Id).FirstOrDefault() })
+                    .ToListAsync();
+                var existentes = await db.Localizaciones
+                    .AsNoTracking()
+                    .Select(l => new { l.SucursalId, l.Nombre })
+                    .ToListAsync();
+                var existentesSet = new HashSet<string>(
+                    existentes.Select(e => $"{e.SucursalId:N}|{e.Nombre}"),
+                    StringComparer.OrdinalIgnoreCase);
+
+                foreach (var suc in sucursalesPorEmpresa)
+                {
+                    if (suc.SucursalId == Guid.Empty) continue;
+                    foreach (var nombre in nombresLoc)
+                    {
+                        var key = $"{suc.SucursalId:N}|{nombre}";
+                        if (existentesSet.Contains(key)) continue;
+                        db.Localizaciones.Add(new Localizacion { Nombre = nombre, SucursalId = suc.SucursalId });
+                        existentesSet.Add(key);
+                    }
+                }
+                await db.SaveChangesAsync();
+            }
+        }
+
+        if (etlData?.Productos != null && etlData.Productos.Count > 0)
+        {
+            var horariosActivos = await db.Horarios.Where(h => h.Activo).ToListAsync();
+            var horarioMap = horariosActivos.ToDictionary(h => h.Nombre, h => h.Id, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var prod in etlData.Productos)
+            {
+                if (string.IsNullOrWhiteSpace(prod.Descripcion))
+                    continue;
+
+                var codigo = string.IsNullOrWhiteSpace(prod.Codigo) ? null : prod.Codigo.Trim();
+                var nombre = prod.Descripcion.Trim();
+
+                var opcion = codigo == null
+                    ? await db.Opciones.FirstOrDefaultAsync(o => o.Nombre == nombre)
+                    : await db.Opciones.FirstOrDefaultAsync(o => o.Codigo == codigo || o.Nombre == nombre);
+
+                if (opcion == null)
+                {
+                    opcion = new Opcion
+                    {
+                        Codigo = codigo,
+                        Nombre = nombre,
+                        Descripcion = nombre,
+                        EsSubsidiado = true
+                    };
+                    db.Opciones.Add(opcion);
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(opcion.Codigo) && codigo != null)
+                        opcion.Codigo = codigo;
+                    if (string.IsNullOrWhiteSpace(opcion.Descripcion))
+                        opcion.Descripcion = nombre;
+                    if (!opcion.EsSubsidiado)
+                        opcion.EsSubsidiado = true;
+                }
+
+                var categorias = ParseCategorias(prod.Categoria);
+                var precioBase = prod.Precio ?? ResolveDefaultPrecio(categorias, defaultPrecioDesayuno, defaultPrecioAlmuerzo, defaultPrecioCena);
+                if (precioBase.HasValue && opcion.Costo <= 0)
+                    opcion.Costo = precioBase.Value;
+                if (precioBase.HasValue && opcion.Precio == null)
+                    opcion.Precio = precioBase.Value;
+
+                foreach (var cat in categorias)
+                {
+                    if (!horarioMap.TryGetValue(cat, out var horarioId))
+                        continue;
+                    var existe = await db.OpcionesHorarios.AnyAsync(oh => oh.OpcionId == opcion.Id && oh.HorarioId == horarioId);
+                    if (!existe)
+                        db.OpcionesHorarios.Add(new OpcionHorario { OpcionId = opcion.Id, HorarioId = horarioId });
+                }
+            }
+            await db.SaveChangesAsync();
+        }
+
+        var opcionesNoSubsidiadas = await db.Opciones.Where(o => !o.EsSubsidiado).ToListAsync();
+        if (opcionesNoSubsidiadas.Count > 0)
+        {
+            foreach (var opcion in opcionesNoSubsidiadas)
+                opcion.EsSubsidiado = true;
+            await db.SaveChangesAsync();
+        }
+
+        // Semilla legacy mÃ­nima de roles/usuarios de dominio (sin duplicar)
         if (!await db.Roles.AnyAsync(r => r.Nombre == "Admin"))
             db.Roles.Add(new Rol { Nombre = "Admin" });
         if (!await db.Roles.AnyAsync(r => r.Nombre == "Empleado"))
             db.Roles.Add(new Rol { Nombre = "Empleado" });
         await db.SaveChangesAsync();
     }
+
+    private static MenuEtlData? LoadMenuEtlData(string? contentRootPath)
+    {
+        var basePath = string.IsNullOrWhiteSpace(contentRootPath) ? AppContext.BaseDirectory : contentRootPath;
+        var filePath = Path.Combine(basePath, "App_Data", "menu_etl_data.json");
+        if (!File.Exists(filePath))
+            return null;
+
+        try
+        {
+            var json = File.ReadAllText(filePath);
+            return JsonSerializer.Deserialize<MenuEtlData>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static HashSet<string> ParseCategorias(string? raw)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(raw))
+            return result;
+
+        var tokens = raw.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var token in tokens)
+        {
+            var upper = token.Trim().ToUpperInvariant();
+            if (upper == "A" || upper.Contains("ALMUERZO"))
+                result.Add("Almuerzo");
+            else if (upper == "D" || upper.Contains("DESAYUNO"))
+                result.Add("Desayuno");
+            else if (upper == "C" || upper.Contains("CENA"))
+                result.Add("Cena");
+        }
+        return result;
+    }
+
+    private static decimal? ResolveDefaultPrecio(HashSet<string> categorias, decimal? desayuno, decimal? almuerzo, decimal? cena)
+    {
+        if (categorias.Contains("Almuerzo") && almuerzo.HasValue)
+            return almuerzo;
+        if (categorias.Contains("Desayuno") && desayuno.HasValue)
+            return desayuno;
+        if (categorias.Contains("Cena") && cena.HasValue)
+            return cena;
+        return null;
+    }
+
+    private sealed class MenuEtlData
+    {
+        public List<MenuEtlEmpresa> Empresas { get; set; } = new();
+        public List<MenuEtlProducto> Productos { get; set; } = new();
+        public List<string> Localizaciones { get; set; } = new();
+    }
+
+    private sealed class MenuEtlEmpresa
+    {
+        public string? Empresa { get; set; }
+        public string? Filial { get; set; }
+        public string? Departamento { get; set; }
+        public string? Producto { get; set; }
+        public decimal? PrecioDesayuno { get; set; }
+        public decimal? PrecioCena { get; set; }
+        public decimal? PrecioAlmuerzo { get; set; }
+        public decimal? SubsidioEmpresaPct { get; set; }
+        public decimal? SubsidioEmpleadoPct { get; set; }
+    }
+
+    private sealed class MenuEtlProducto
+    {
+        public string? Codigo { get; set; }
+        public string? Descripcion { get; set; }
+        public decimal? Precio { get; set; }
+        public string? Categoria { get; set; }
+    }
 }
+
+

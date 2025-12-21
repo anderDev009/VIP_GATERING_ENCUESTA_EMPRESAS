@@ -32,16 +32,17 @@ public class MenuServiceTests
         var repoEmp = new EfRepository<Empleado>(ctx);
         var repoEmpSuc = new EfRepository<EmpleadoSucursal>(ctx);
         var repoMenuAdi = new EfRepository<MenuAdicional>(ctx);
+        var repoLoc = new EfRepository<Localizacion>(ctx);
+        var repoEmpLoc = new EfRepository<EmpleadoLocalizacion>(ctx);
         IUnitOfWork uow = new UnitOfWork(ctx);
         IFechaServicio fechas = new FechaServicio();
 
-        var service = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, uow, fechas);
+        var service = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, repoLoc, repoEmpLoc, uow, fechas);
         var menu = await service.GetOrCreateMenuSemanaSiguienteAsync();
 
         menu.Id.Should().NotBeEmpty();
         (await ctx.OpcionesMenu.Where(o=>o.MenuId==menu.Id).CountAsync()).Should().Be(10);
     }
 }
-
 
 

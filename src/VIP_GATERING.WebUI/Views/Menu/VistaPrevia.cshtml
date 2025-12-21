@@ -1,0 +1,127 @@
+@model VIP_GATERING.WebUI.Models.MenuPreviewVM
+@{
+    ViewData["Title"] = "Vista previa del menu";
+    var empresa = string.IsNullOrWhiteSpace(Model.EmpresaNombre) ? "Empresa" : Model.EmpresaNombre;
+    var filial = string.IsNullOrWhiteSpace(Model.FilialNombre) ? "Filial" : Model.FilialNombre;
+    var letras = new[] { "A", "B", "C", "D", "E" };
+    var tabs = Model.Dias
+        .Where(d => !string.IsNullOrWhiteSpace(d.HorarioNombre))
+        .GroupBy(d => d.HorarioNombre!)
+        .OrderBy(g => g.Min(x => x.HorarioOrden))
+        .Select(g => g.Key)
+        .ToList();
+}
+
+<section class="page-panel space-y-3 mb-4">
+    <div class="meta-row">
+        <span class="meta-pill meta-pill--accent">Vista previa</span>
+        <span class="meta-pill">Empresa: @empresa</span>
+        @if (!string.IsNullOrWhiteSpace(Model.FilialNombre))
+        {
+            <span class="meta-pill meta-pill--ghost">Filial: @filial</span>
+        }
+        <span class="meta-pill">Origen: @Model.OrigenScope</span>
+        <span class="meta-pill meta-pill--accent">
+            Semana @Model.FechaInicio.ToString("yyyy-MM-dd") a @Model.FechaTermino.ToString("yyyy-MM-dd")
+        </span>
+    </div>
+    <div class="panel-subtitle">Esta vista muestra como se vera el menu para los empleados.</div>
+</section>
+
+@if (Model.Dias == null || Model.Dias.Count == 0)
+{
+    <div class="page-panel">
+        <div class="empty-state">No hay platos configurados para este rango.</div>
+    </div>
+}
+else
+{
+    <div class="tab-switch mb-4">
+        <div class="tab-switch__label">Horarios</div>
+        <div class="tab-switch__group" id="tabs-preview">
+            @for (var i = 0; i < tabs.Count; i++)
+            {
+                var tabId = $"tab-preview-{i}";
+                <button type="button" class="tab-pill" data-tab-target="@tabId">@tabs[i]</button>
+            }
+        </div>
+    </div>
+
+    @for (var i = 0; i < tabs.Count; i++)
+    {
+        var tabId = $"tab-preview-{i}";
+        var items = Model.Dias.Where(d => string.Equals(d.HorarioNombre, tabs[i], StringComparison.OrdinalIgnoreCase)).ToList();
+        var maxOpciones = items.Count == 0 ? 3 : items.Max(x => x.OpcionesMaximas <= 0 ? 3 : x.OpcionesMaximas);
+        <div id="@tabId" class="tab-panel @(i == 0 ? "is-active" : "") space-y-3" data-tab-panel>
+            <div class="overflow-x-auto">
+                <table class="menu-table">
+                    <thead>
+                        <tr>
+                            <th>Dia</th>
+                            @for (var c = 0; c < maxOpciones; c++)
+                            {
+                                <th>Plato @letras[c]</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in items)
+                        {
+                            <tr>
+                                <td class="menu-daycell">
+                                    <div class="menu-day-title">
+                                        <span>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana)</span>
+                                        <span class="menu-day-meta">
+                                            <span class="icon-dot icon-dot--teal"></span>
+                                            @d.HorarioNombre
+                                        </span>
+                                    </div>
+                                </td>
+                                @for (var c = 0; c < maxOpciones; c++)
+                                {
+                                    string? nombre = c switch
+                                    {
+                                        0 => d.A,
+                                        1 => d.B,
+                                        2 => d.C,
+                                        3 => d.D,
+                                        4 => d.E,
+                                        _ => null
+                                    };
+                                    <td class="menu-option-cell">
+                                        @if (string.IsNullOrWhiteSpace(nombre))
+                                        {
+                                            <div class="menu-option-empty">Sin definir</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="option-card__title">@nombre</div>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+<script>
+    (() => {
+        const tabButtons = document.querySelectorAll('.tab-pill');
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-tab-target');
+                if (!targetId) return;
+                document.querySelectorAll('[data-tab-panel]').forEach(p => p.classList.remove('is-active'));
+                const target = document.getElementById(targetId);
+                if (target) target.classList.add('is-active');
+                tabButtons.forEach(b => b.classList.remove('is-active'));
+                btn.classList.add('is-active');
+            });
+        });
+        if (tabButtons.length > 0) tabButtons[0].classList.add('is-active');
+    })();
+</script>

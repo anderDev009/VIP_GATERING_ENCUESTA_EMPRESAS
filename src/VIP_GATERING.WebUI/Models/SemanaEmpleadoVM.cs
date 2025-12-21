@@ -9,7 +9,8 @@ public class SemanaEmpleadoVM
     public DateOnly FechaInicio { get; set; }
     public DateOnly FechaTermino { get; set; }
     public Guid SucursalEntregaId { get; set; }
-    public List<(Guid id, string nombre)> SucursalesEntregaDisponibles { get; set; } = new();
+    public Guid? LocalizacionEntregaId { get; set; }
+    public List<(Guid id, string nombre)> LocalizacionesEntregaDisponibles { get; set; } = new();
     public List<AdicionalDisponibleVM> AdicionalesDisponibles { get; set; } = new();
     public string SemanaClave { get; set; } = "siguiente";
     public List<SemanaOpcionVM> SemanasDisponibles { get; set; } = new();
@@ -18,14 +19,16 @@ public class SemanaEmpleadoVM
     public string? MensajeBloqueo { get; set; }
     public string? NotaVentana { get; set; }
     public string? EmpleadoNombre { get; set; }
+    public string? EmpleadoCodigo { get; set; }
     public bool EsJefe { get; set; }
     public bool EsVistaAdministrador { get; set; }
     public int RespuestasCount { get; set; }
     public int TotalDias { get; set; }
-    public string OrigenMenu { get; set; } = string.Empty; // "Cliente" o "Dependiente"
+    public string OrigenMenu { get; set; } = string.Empty; // "Empresa" o "Filial"
     public string? EmpresaNombre { get; set; }
     public string? SucursalNombre { get; set; }
     public string? SucursalEntregaNombre { get; set; }
+    public string? LocalizacionEntregaNombre { get; set; }
     public List<DiaEmpleadoVM> Dias { get; set; } = new();
     public decimal TotalEmpleado { get; set; }
     public decimal? TotalEmpresa { get; set; }
@@ -55,6 +58,11 @@ public class DiaEmpleadoVM
     public string? ImagenD { get; set; }
     public string? ImagenE { get; set; }
     public int OpcionesMaximas { get; set; } = 3;
+    public decimal? PrecioEmpleadoA { get; set; }
+    public decimal? PrecioEmpleadoB { get; set; }
+    public decimal? PrecioEmpleadoC { get; set; }
+    public decimal? PrecioEmpleadoD { get; set; }
+    public decimal? PrecioEmpleadoE { get; set; }
     public bool Editable { get; set; } = true;
     public Guid? AdicionalOpcionId { get; set; }
     [RegularExpression("[ABCDE]", ErrorMessage = "Seleccione A, B, C, D o E")]
@@ -67,3 +75,4 @@ public class AdicionalDisponibleVM
     public string Nombre { get; set; } = string.Empty;
     public decimal Precio { get; set; }
 }
+

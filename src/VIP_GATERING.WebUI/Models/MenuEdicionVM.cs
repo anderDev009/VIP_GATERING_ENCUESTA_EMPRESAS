@@ -17,8 +17,9 @@ public class MenuEdicionVM
     public Guid? EmpresaId { get; set; }
     public Guid? SucursalId { get; set; }
     public IEnumerable<(Guid id, string nombre)> Empresas { get; set; } = Array.Empty<(Guid, string)>();
-    public IEnumerable<(Guid id, string nombre)> Sucursales { get; set; } = Array.Empty<(Guid, string)>();
-    public string OrigenScope => SucursalId != null ? "Dependiente" : "Cliente";
+    public IEnumerable<(Guid id, string nombre, Guid empresaId)> Sucursales { get; set; } = Array.Empty<(Guid, string, Guid)>();
+    public IReadOnlyList<Horario> HorariosPermitidos { get; set; } = new List<Horario>();
+    public string OrigenScope => SucursalId != null ? "Filial" : "Empresa";
     public string? EmpresaNombre { get; set; }
     public string? SucursalNombre { get; set; }
     public bool PuedeCerrarManualmente => !EncuestaCerrada;
@@ -40,3 +41,4 @@ public class DiaEdicion
     public Guid? E { get; set; }
     public int OpcionesMaximas { get; set; } = 3;
 }
+

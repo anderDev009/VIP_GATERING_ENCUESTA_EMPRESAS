@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VIP_GATERING.Application.Services;
@@ -23,7 +23,7 @@ public class EmpleadoController : Controller
     public EmpleadoController(IMenuService menuService, AppDbContext db, ICurrentUserService current, IEncuestaCierreService cierre, ISubsidioService subsidios, IMenuEdicionService menuEdicion, IMenuConfiguracionService menuConfig, IFechaServicio fechas)
     { _menuService = menuService; _db = db; _current = current; _cierre = cierre; _subsidios = subsidios; _menuEdicion = menuEdicion; _menuConfig = menuConfig; _fechas = fechas; }
 
-    public async Task<IActionResult> MiSemana(string? semana, Guid? sucursalId)
+    public async Task<IActionResult> MiSemana(string? semana, Guid? localizacionId, Guid? sucursalId)
     {
         var empleadoId = _current.EmpleadoId;
         if (empleadoId == null) return RedirectToAction("Login", "Account");
@@ -32,7 +32,7 @@ public class EmpleadoController : Controller
         if (noHabilitado)
         {
             ViewBag.NoHabilitado = true;
-            TempData["Error"] = "Tu cuenta no esta habilitada para seleccionar opciones.";
+            TempData["Error"] = "Tu cuenta no esta habilitada para seleccionar platos.";
         }
 
         var empleadoDatos = await _db.Empleados
@@ -42,21 +42,16 @@ public class EmpleadoController : Controller
             {
                 e.Estado,
                 e.Nombre,
+                e.Codigo,
                 e.EsJefe,
                 e.EsSubsidiado,
+                e.SubsidioTipo,
+                e.SubsidioValor,
                 SucursalPrincipalId = e.SucursalId
             })
             .FirstAsync();
 
-        var sucursalesExtraIds = await _db.EmpleadosSucursales
-            .AsNoTracking()
-            .Where(es => es.EmpleadoId == empleadoId)
-            .Select(es => es.SucursalId)
-            .ToListAsync();
-        var sucursalesPermitidas = sucursalesExtraIds.ToHashSet();
-        sucursalesPermitidas.Add(empleadoDatos.SucursalPrincipalId);
-
-        // La "dependencia" del empleado es su sucursal principal: de ahA- sale el menA§ y las reglas de subsidio.
+        // La "dependencia" del empleado es su sucursal principal: de ahi sale el menu y las reglas de subsidio.
         var sucursalDependencia = await _db.Sucursales
             .AsNoTracking()
             .Include(s => s.Empresa)
@@ -76,25 +71,68 @@ public class EmpleadoController : Controller
             })
             .FirstAsync();
 
-        var sucursalEntregaId = sucursalId ?? empleadoDatos.SucursalPrincipalId;
+        var sucursalesEmpresaIds = await _db.Sucursales
+            .AsNoTracking()
+            .Where(s => s.EmpresaId == sucursalDependencia.EmpresaId)
+            .Select(s => s.Id)
+            .ToListAsync();
+        var sucursalesPermitidas = sucursalesEmpresaIds.ToHashSet();
+        var localizacionesAsignadasIds = await _db.EmpleadosLocalizaciones
+            .AsNoTracking()
+            .Where(el => el.EmpleadoId == empleadoId)
+            .Select(el => el.LocalizacionId)
+            .ToListAsync();
+        var tieneLocalizacionesAsignadas = localizacionesAsignadasIds.Count > 0;
+
+        var localizacionesRaw = await _db.Localizaciones
+            .AsNoTracking()
+            .Include(l => l.Sucursal)
+            .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == sucursalDependencia.EmpresaId)
+            .Select(l => new { l.Id, l.Nombre, l.SucursalId })
+            .ToListAsync();
+        if (tieneLocalizacionesAsignadas)
+            localizacionesRaw = localizacionesRaw.Where(l => localizacionesAsignadasIds.Contains(l.Id)).ToList();
+
+        var sucursalesEntregaMap = await _db.Sucursales
+            .AsNoTracking()
+            .Where(s => s.EmpresaId == sucursalDependencia.EmpresaId)
+            .Select(s => new { s.Id, s.Nombre })
+            .ToDictionaryAsync(s => s.Id, s => s.Nombre);
+
+        var localizacionesEntregaInfo = localizacionesRaw
+            .GroupBy(l => l.Nombre.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .Select(l => new
+            {
+                l.Id,
+                l.Nombre,
+                l.SucursalId,
+                SucursalNombre = sucursalesEntregaMap.TryGetValue(l.SucursalId, out var sucNombre) ? sucNombre : string.Empty,
+                Etiqueta = l.Nombre
+            })
+            .ToList();
+
+        var localizacionesEntregaDisponibles = localizacionesEntregaInfo
+            .OrderBy(l => l.Nombre)
+            .Select(l => new ValueTuple<Guid, string>(l.Id, l.Etiqueta))
+            .ToList();
+
+        Guid? localizacionEntregaId = localizacionId;
+        if (!localizacionEntregaId.HasValue || localizacionEntregaId.Value == Guid.Empty)
+        {
+            localizacionEntregaId = localizacionesEntregaInfo
+                .OrderBy(l => l.Nombre)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefault();
+        }
+        if (localizacionEntregaId.HasValue && !localizacionesEntregaInfo.Any(l => l.Id == localizacionEntregaId.Value))
+            localizacionEntregaId = localizacionesEntregaInfo.OrderBy(l => l.Nombre).Select(l => (Guid?)l.Id).FirstOrDefault();
+
+        var localizacionEntrega = localizacionesEntregaInfo.FirstOrDefault(l => l.Id == localizacionEntregaId);
+        var sucursalEntregaId = localizacionEntrega?.SucursalId ?? empleadoDatos.SucursalPrincipalId;
         if (!sucursalesPermitidas.Contains(sucursalEntregaId))
             return Forbid();
-
-        // La sucursal seleccionada solo define la entrega (no cambia el menA§).
-        var sucursalEntrega = await _db.Sucursales
-            .AsNoTracking()
-            .Where(s => s.Id == sucursalEntregaId && s.EmpresaId == sucursalDependencia.EmpresaId)
-            .Select(s => new { s.Id, s.Nombre })
-            .FirstOrDefaultAsync();
-        if (sucursalEntrega == null)
-            return Forbid();
-
-        var sucursalesEntregaDisponibles = await _db.Sucursales
-            .AsNoTracking()
-            .Where(s => sucursalesPermitidas.Contains(s.Id))
-            .OrderBy(s => s.Nombre)
-            .Select(s => new ValueTuple<Guid, string>(s.Id, s.Nombre))
-            .ToListAsync();
+        var sucursalEntregaNombre = localizacionEntrega?.SucursalNombre ?? sucursalDependencia.Nombre;
 
         var hoy = _fechas.Hoy();
         var (inicioActual, finActual) = _fechas.RangoSemanaActual();
@@ -124,44 +162,73 @@ public class EmpleadoController : Controller
                 BloqueadoPorEstado = noHabilitado,
                 MensajeBloqueo = "No hay menu configurado para la semana actual ni la siguiente.",
                 EmpleadoNombre = empleadoDatos.Nombre,
+                EmpleadoCodigo = empleadoDatos.Codigo,
                 EmpresaNombre = sucursalDependencia.EmpresaNombre,
                 SucursalNombre = sucursalDependencia.Nombre,
-                SucursalEntregaId = sucursalEntrega.Id,
-                SucursalEntregaNombre = sucursalEntrega.Nombre,
-                SucursalesEntregaDisponibles = sucursalesEntregaDisponibles
+                SucursalEntregaId = sucursalEntregaId,
+                SucursalEntregaNombre = sucursalEntregaNombre,
+                LocalizacionEntregaId = localizacionEntregaId,
+                LocalizacionEntregaNombre = localizacionEntrega?.Nombre,
+                LocalizacionesEntregaDisponibles = localizacionesEntregaDisponibles
             };
             return View(vmSinMenu);
         }
 
         var semanaSeleccionada = semanasDisponibles.First(s => s.Clave == semanaClave);
 
-        // Regla de negocio: si el empleado ya tiene al menos una selecciA3n para esta semana,
+        // Regla de negocio: si el empleado ya tiene al menos una seleccion para esta semana,
         // queda bloqueado a esa sucursal de entrega y no puede seleccionar en otra hasta borrar todo.
         var bloqueoSemana = await _db.RespuestasFormulario
             .AsNoTracking()
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
-            .Where(r => r.EmpleadoId == empleadoId && r.OpcionMenu!.Menu!.FechaInicio == semanaSeleccionada.Inicio && r.OpcionMenu.Menu!.FechaTermino == semanaSeleccionada.Fin)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+            .Where(r => r.EmpleadoId == empleadoId
+                && r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio == semanaSeleccionada.Inicio
+                && r.OpcionMenu.Menu.FechaTermino == semanaSeleccionada.Fin)
             .OrderBy(r => r.OpcionMenuId)
-            .Select(r => new { r.SucursalEntregaId, MenuId = r.OpcionMenu!.MenuId })
+            .Select(r => new { r.LocalizacionEntregaId, r.SucursalEntregaId, MenuId = r.OpcionMenu!.MenuId })
             .FirstOrDefaultAsync();
 
-        if (bloqueoSemana != null && bloqueoSemana.SucursalEntregaId != sucursalEntrega.Id)
+        if (bloqueoSemana != null)
         {
-            var sucursalBloqueadaNombre = await _db.Sucursales
-                .AsNoTracking()
-                .Where(s => s.Id == bloqueoSemana.SucursalEntregaId)
-                .Select(s => s.Nombre)
-                .FirstOrDefaultAsync();
-            TempData["Info"] = $"Ya tienes selecciones registradas para esta semana en {(string.IsNullOrWhiteSpace(sucursalBloqueadaNombre) ? "otra sucursal" : sucursalBloqueadaNombre)}. Borra todas tus selecciones para poder cambiar de sucursal.";
-            return RedirectToAction(nameof(MiSemana), new { semana = semanaClave, sucursalId = bloqueoSemana.SucursalEntregaId });
+            if (bloqueoSemana.LocalizacionEntregaId != null && bloqueoSemana.LocalizacionEntregaId.Value != Guid.Empty)
+            {
+                if (localizacionEntregaId != bloqueoSemana.LocalizacionEntregaId)
+                {
+                    var localizacionBloqueada = localizacionesEntregaInfo.FirstOrDefault(l => l.Id == bloqueoSemana.LocalizacionEntregaId.Value);
+                    var localizacionBloqueadaNombre = localizacionBloqueada?.Nombre ?? "otra localizacion";
+                    TempData["Info"] = $"Ya tienes selecciones registradas para esta semana en {localizacionBloqueadaNombre}. Borra todas tus selecciones para poder cambiar de localizacion.";
+                    return RedirectToAction(nameof(MiSemana), new { semana = semanaClave, localizacionId = bloqueoSemana.LocalizacionEntregaId });
+                }
+                localizacionEntregaId = bloqueoSemana.LocalizacionEntregaId;
+            }
+            else if (bloqueoSemana.SucursalEntregaId != Guid.Empty)
+            {
+                var localizacionBloqueada = localizacionesEntregaInfo.FirstOrDefault(l => l.SucursalId == bloqueoSemana.SucursalEntregaId);
+                if (localizacionBloqueada != null && localizacionEntregaId != localizacionBloqueada.Id)
+                {
+                    var filialNombreBloqueada = string.IsNullOrWhiteSpace(localizacionBloqueada.SucursalNombre) ? "otra filial" : localizacionBloqueada.SucursalNombre;
+                    TempData["Info"] = $"Ya tienes selecciones registradas para esta semana en {filialNombreBloqueada}. Borra todas tus selecciones para poder cambiar de localizacion.";
+                    return RedirectToAction(nameof(MiSemana), new { semana = semanaClave, localizacionId = localizacionBloqueada.Id });
+                }
+                if (localizacionBloqueada != null)
+                    localizacionEntregaId = localizacionBloqueada.Id;
+            }
         }
+
+        localizacionEntrega = localizacionesEntregaInfo.FirstOrDefault(l => l.Id == localizacionEntregaId);
+        sucursalEntregaId = localizacionEntrega?.SucursalId ?? empleadoDatos.SucursalPrincipalId;
+        if (!sucursalesPermitidas.Contains(sucursalEntregaId))
+            return Forbid();
+        sucursalEntregaNombre = localizacionEntrega?.SucursalNombre ?? sucursalDependencia.Nombre;
 
         var menu = semanaClave == "actual" ? menuActual : menuSiguiente;
         if (menu == null)
             menu = await _menuService.GetEffectiveMenuForSemanaAsync(semanaSeleccionada.Inicio, semanaSeleccionada.Fin, sucursalDependencia.EmpresaId, sucursalDependencia.Id);
 
-        // Si ya existen respuestas, usar el menA§ asociado a esas respuestas para evitar dobles selecciones
-        // en menA§s distintos durante la misma semana.
+        // Si ya existen respuestas, usar el menu asociado a esas respuestas para evitar dobles selecciones
+        // en menus distintos durante la misma semana.
         if (bloqueoSemana != null && menu.Id != bloqueoSemana.MenuId)
             menu = await _db.Menus.FirstAsync(m => m.Id == bloqueoSemana.MenuId);
 
@@ -190,7 +257,7 @@ public class EmpleadoController : Controller
             .Where(r => r.EmpleadoId == empleadoId && opcionIds.Contains(r.OpcionMenuId))
             .ToListAsync();
 
-        // Adicionales fijos del menú (se cobran 100%)
+        // Adicionales fijos del menu (se cobran 100%)
         var adicionales = await _db.MenusAdicionales
             .AsNoTracking()
             .Include(a => a.Opcion)
@@ -208,7 +275,7 @@ public class EmpleadoController : Controller
         var edicion = await _menuEdicion.CalcularVentanaAsync(menu, opciones, DateTime.UtcNow, esSemanaActual);
         var bloqueadoPorTiempo = encuestaCerrada && !edicion.TieneVentanaActiva;
         var bloqueado = bloqueadoPorTiempo || noHabilitado;
-        var mensajeBloqueo = bloqueado ? (edicion.MensajeBloqueo ?? $"La encuesta esta cerrada desde {fechaCierreAuto:dd/MM/yyyy}.") : null;
+        var mensajeBloqueo = bloqueado ? (edicion.MensajeBloqueo ?? $"El menu esta cerrado desde {fechaCierreAuto:dd/MM/yyyy}.") : null;
         var configVentana = await _menuConfig.ObtenerAsync();
         string? notaVentana = esSemanaActual
             ? $"Puedes modificar tu menu hasta las {TimeOnly.FromTimeSpan(configVentana.HoraLimiteEdicion):HH\\:mm} del dia anterior."
@@ -224,15 +291,32 @@ public class EmpleadoController : Controller
             .ToDictionary(g => g.Key, g => g.First());
         var adicionalesPrecio = adicionales.ToDictionary(a => a.Id, a => a.Precio);
 
+        decimal? CalcularPrecioEmpleado(Opcion? opcion)
+        {
+            if (opcion == null) return null;
+            var ctx = new SubsidioContext(
+                opcion.EsSubsidiado,
+                empleadoDatos.EsSubsidiado,
+                sucursalDependencia.EmpresaSubsidia,
+                sucursalDependencia.EmpresaTipo,
+                sucursalDependencia.EmpresaValor,
+                sucursalDependencia.SucursalSubsidia,
+                sucursalDependencia.SucursalTipo,
+                sucursalDependencia.SucursalValor,
+                empleadoDatos.SubsidioTipo,
+                empleadoDatos.SubsidioValor);
+            var basePrecio = opcion.Precio ?? opcion.Costo;
+            return _subsidios.CalcularPrecioEmpleado(basePrecio, ctx).PrecioEmpleado;
+        }
+
         var totalEmpleado = 0m;
         foreach (var resp in respuestas)
         {
             var om = opciones.FirstOrDefault(x => x.Id == resp.OpcionMenuId);
             var opcion = GetOpcionSeleccionada(om, resp.Seleccion);
-            if (opcion == null) continue;
-            var ctx = new SubsidioContext(opcion.EsSubsidiado, empleadoDatos.EsSubsidiado, sucursalDependencia.EmpresaSubsidia, sucursalDependencia.EmpresaTipo, sucursalDependencia.EmpresaValor, sucursalDependencia.SucursalSubsidia, sucursalDependencia.SucursalTipo, sucursalDependencia.SucursalValor);
-            var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
-            totalEmpleado += precio;
+            var precio = CalcularPrecioEmpleado(opcion);
+            if (precio != null)
+                totalEmpleado += precio.Value;
 
             if (resp.AdicionalOpcionId != null && adicionalesPrecio.TryGetValue(resp.AdicionalOpcionId.Value, out var precioAd))
                 totalEmpleado += precioAd;
@@ -243,9 +327,11 @@ public class EmpleadoController : Controller
         {
             EmpleadoId = empleadoId.Value,
             MenuId = menu.Id,
-            SucursalEntregaId = sucursalEntrega.Id,
-            SucursalEntregaNombre = sucursalEntrega.Nombre,
-            SucursalesEntregaDisponibles = sucursalesEntregaDisponibles,
+            SucursalEntregaId = sucursalEntregaId,
+            SucursalEntregaNombre = sucursalEntregaNombre,
+            LocalizacionEntregaId = localizacionEntregaId,
+            LocalizacionEntregaNombre = localizacionEntrega?.Nombre,
+            LocalizacionesEntregaDisponibles = localizacionesEntregaDisponibles,
             AdicionalesDisponibles = adicionales,
             SemanaClave = semanaClave,
             SemanasDisponibles = semanasDisponibles,
@@ -256,10 +342,11 @@ public class EmpleadoController : Controller
             MensajeBloqueo = mensajeBloqueo,
             NotaVentana = notaVentana,
             EmpleadoNombre = empleadoDatos.Nombre,
+            EmpleadoCodigo = empleadoDatos.Codigo,
             EsJefe = empleadoDatos.EsJefe,
             RespuestasCount = respuestas.Count,
             TotalDias = opciones.Count,
-            OrigenMenu = menu.SucursalId != null ? "Dependiente" : "Cliente",
+            OrigenMenu = menu.SucursalId != null ? "Filial" : "Empresa",
             EmpresaNombre = sucursalDependencia.EmpresaNombre,
             SucursalNombre = sucursalDependencia.Nombre,
             TotalEmpleado = totalEmpleado,
@@ -278,6 +365,11 @@ public class EmpleadoController : Controller
                 ImagenC = o.OpcionC?.ImagenUrl,
                 ImagenD = o.OpcionD?.ImagenUrl,
                 ImagenE = o.OpcionE?.ImagenUrl,
+                PrecioEmpleadoA = CalcularPrecioEmpleado(o.OpcionA),
+                PrecioEmpleadoB = CalcularPrecioEmpleado(o.OpcionB),
+                PrecioEmpleadoC = CalcularPrecioEmpleado(o.OpcionC),
+                PrecioEmpleadoD = CalcularPrecioEmpleado(o.OpcionD),
+                PrecioEmpleadoE = CalcularPrecioEmpleado(o.OpcionE),
                 OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas,
                 Seleccion = respuestasPorOpcion.TryGetValue(o.Id, out var resp) ? resp.Seleccion : null,
                 AdicionalOpcionId = respuestasPorOpcion.TryGetValue(o.Id, out var resp2) ? resp2.AdicionalOpcionId : null,
@@ -296,205 +388,212 @@ public class EmpleadoController : Controller
         var estadoPost = await _db.Empleados.Where(e => e.Id == empleadoId).Select(e => e.Estado).FirstAsync();
         if (estadoPost != EmpleadoEstado.Habilitado)
         {
-            TempData["Error"] = "Tu cuenta no esta habilitada para seleccionar opciones.";
+            TempData["Error"] = "Tu cuenta no esta habilitada para seleccionar platos.";
             return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
         }
 
         if (model.Dias == null || model.Dias.Count == 0)
         {
             TempData["Info"] = "No se recibieron cambios.";
-            return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, sucursalId = model.SucursalEntregaId });
+            return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = model.LocalizacionEntregaId });
+        }
+
+        var empleado = await _db.Empleados
+            .AsNoTracking()
+            .Where(e => e.Id == empleadoId)
+            .Select(e => new { e.SucursalId })
+            .FirstAsync();
+        var empresaId = await _db.Sucursales
+            .AsNoTracking()
+            .Where(s => s.Id == empleado.SucursalId)
+            .Select(s => s.EmpresaId)
+            .FirstAsync();
+        var sucursalesPermitidas = await _db.Sucursales
+            .AsNoTracking()
+            .Where(s => s.EmpresaId == empresaId)
+            .Select(s => s.Id)
+            .ToHashSetAsync();
+
+        Guid? localizacionEntregaId = model.LocalizacionEntregaId;
+        var localizacionesAsignadas = await _db.EmpleadosLocalizaciones
+            .AsNoTracking()
+            .Where(el => el.EmpleadoId == empleadoId)
+            .Select(el => el.LocalizacionId)
+            .ToListAsync();
+        if (!localizacionEntregaId.HasValue || localizacionEntregaId == Guid.Empty)
+        {
+            var baseQuery = _db.Localizaciones
+                .AsNoTracking()
+                .Include(l => l.Sucursal)
+                .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+            if (localizacionesAsignadas.Count > 0)
+                baseQuery = baseQuery.Where(l => localizacionesAsignadas.Contains(l.Id));
+            localizacionEntregaId = await baseQuery
+                .OrderBy(l => l.Nombre)
+                .Select(l => (Guid?)l.Id)
+                .FirstOrDefaultAsync();
+        }
+        Localizacion? localizacionEntrega = null;
+        if (localizacionEntregaId.HasValue && localizacionEntregaId.Value != Guid.Empty)
+        {
+            localizacionEntrega = await _db.Localizaciones
+                .AsNoTracking()
+                .Include(l => l.Sucursal)
+                .FirstOrDefaultAsync(l => l.Id == localizacionEntregaId.Value);
+            if (localizacionEntrega == null)
+            {
+                TempData["Error"] = "Localizacion de entrega no valida.";
+                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
+            }
+        }
+
+        var sucursalEntregaId = localizacionEntrega?.SucursalId ?? model.SucursalEntregaId;
+        if (sucursalEntregaId == Guid.Empty)
+            sucursalEntregaId = empleado.SucursalId;
+        if (!sucursalesPermitidas.Contains(sucursalEntregaId))
+        {
+            TempData["Error"] = "Filial de entrega no permitida.";
+            return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
+        }
+
+        if (localizacionesAsignadas.Count > 0)
+        {
+            if (localizacionEntregaId == null || localizacionEntregaId == Guid.Empty)
+            {
+                TempData["Error"] = "Selecciona una localizacion de entrega.";
+                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
+            }
+            if (!localizacionesAsignadas.Contains(localizacionEntregaId.Value))
+            {
+                TempData["Error"] = "Localizacion de entrega no permitida.";
+                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
+            }
+        }
+        if (localizacionEntrega != null && localizacionEntrega.Sucursal != null && localizacionEntrega.Sucursal.EmpresaId != empresaId)
+        {
+            TempData["Error"] = "Localizacion de entrega no pertenece a la empresa.";
+            return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
         }
 
         var menu = await _db.Menus.FirstAsync(m => m.Id == model.MenuId);
 
-        // Regla de negocio: si ya hay selecciones en una sucursal para esta semana, no permitir guardar en otra.
         var bloqueoSemana = await _db.RespuestasFormulario
             .AsNoTracking()
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
-            .Where(r => r.EmpleadoId == empleadoId && r.OpcionMenu!.Menu!.FechaInicio == menu.FechaInicio && r.OpcionMenu.Menu!.FechaTermino == menu.FechaTermino)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+            .Where(r => r.EmpleadoId == empleadoId
+                && r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio == menu.FechaInicio
+                && r.OpcionMenu.Menu.FechaTermino == menu.FechaTermino)
             .OrderBy(r => r.OpcionMenuId)
-            .Select(r => new { r.SucursalEntregaId, MenuId = r.OpcionMenu!.MenuId })
+            .Select(r => new { r.LocalizacionEntregaId, r.SucursalEntregaId, MenuId = r.OpcionMenu!.MenuId })
             .FirstOrDefaultAsync();
-        if (bloqueoSemana != null && (bloqueoSemana.SucursalEntregaId != model.SucursalEntregaId || bloqueoSemana.MenuId != model.MenuId))
+
+        if (bloqueoSemana != null)
         {
-            var sucursalBloqueadaNombre = await _db.Sucursales
-                .AsNoTracking()
-                .Where(s => s.Id == bloqueoSemana.SucursalEntregaId)
-                .Select(s => s.Nombre)
-                .FirstOrDefaultAsync();
-            TempData["Error"] = $"Ya tienes al menos una selecciA3n registrada para esta semana en {(string.IsNullOrWhiteSpace(sucursalBloqueadaNombre) ? "otra sucursal" : sucursalBloqueadaNombre)}. Borra todas tus selecciones antes de cambiar de sucursal.";
-            return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, sucursalId = bloqueoSemana.SucursalEntregaId });
+            if (bloqueoSemana.MenuId != menu.Id)
+            {
+                TempData["Error"] = "Ya tienes selecciones registradas para esta semana en otro menu. Borra todas tus selecciones antes de cambiar.";
+                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = bloqueoSemana.LocalizacionEntregaId });
+            }
+
+            if (bloqueoSemana.LocalizacionEntregaId != null && bloqueoSemana.LocalizacionEntregaId.Value != Guid.Empty)
+            {
+                if (localizacionEntregaId == null || localizacionEntregaId == Guid.Empty)
+                {
+                    localizacionEntregaId = bloqueoSemana.LocalizacionEntregaId;
+                }
+                else if (localizacionEntregaId != bloqueoSemana.LocalizacionEntregaId)
+                {
+                    TempData["Error"] = "Ya tienes selecciones registradas para esta semana en otra localizacion. Borra todas tus selecciones antes de cambiar.";
+                    return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = bloqueoSemana.LocalizacionEntregaId });
+                }
+            }
+            else if (bloqueoSemana.SucursalEntregaId != Guid.Empty && bloqueoSemana.SucursalEntregaId != sucursalEntregaId)
+            {
+                TempData["Error"] = "Ya tienes selecciones registradas para esta semana en otra filial. Borra todas tus selecciones antes de cambiar.";
+                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
+            }
         }
+
+        if (localizacionEntregaId.HasValue && (localizacionEntrega == null || localizacionEntrega.Id != localizacionEntregaId.Value))
+        {
+            localizacionEntrega = await _db.Localizaciones
+                .AsNoTracking()
+                .FirstOrDefaultAsync(l => l.Id == localizacionEntregaId.Value);
+            if (localizacionEntrega != null)
+                sucursalEntregaId = localizacionEntrega.SucursalId;
+        }
+
+        var opcionIds = model.Dias.Select(d => d.OpcionMenuId).Distinct().ToList();
+        var opciones = await _db.OpcionesMenu
+            .AsNoTracking()
+            .Where(o => opcionIds.Contains(o.Id))
+            .ToListAsync();
+
         var hoy = _fechas.Hoy();
         var esSemanaActual = hoy >= menu.FechaInicio && hoy <= menu.FechaTermino;
-
-        var opciones = await _db.OpcionesMenu
-            .Where(o => o.MenuId == menu.Id)
-            .ToListAsync();
         var edicion = await _menuEdicion.CalcularVentanaAsync(menu, opciones, DateTime.UtcNow, esSemanaActual);
         var encuestaCerrada = _cierre.EstaCerrada(menu);
         if ((encuestaCerrada && !edicion.TieneVentanaActiva) || edicion.Cerrado)
         {
-            TempData["Error"] = edicion.MensajeBloqueo ?? "La encuesta ya esta cerrada. Contacta a tu administrador para cambios.";
-            return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, sucursalId = model.SucursalEntregaId });
+            TempData["Error"] = edicion.MensajeBloqueo ?? "El menu ya esta cerrado. Contacta a tu administrador para cambios.";
+            return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = localizacionEntregaId });
         }
 
-        // Validar sucursal de entrega contra asignaciones del empleado
-        var emp = await _db.Empleados.AsNoTracking().FirstAsync(e => e.Id == empleadoId);
-        var asignadas = await _db.EmpleadosSucursales.AsNoTracking()
-            .Where(es => es.EmpleadoId == empleadoId)
-            .Select(es => es.SucursalId)
-            .ToListAsync();
-        var permitidas = asignadas.ToHashSet();
-        permitidas.Add(emp.SucursalId);
-        if (!permitidas.Contains(model.SucursalEntregaId))
-        {
-            TempData["Error"] = "Sucursal de entrega no permitida.";
-            return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
-        }
-
-        // Si el empleado tenía respuestas en otros menús de la misma semana, eliminarlas (evita doble pedido)
-        var otrosOpcionIds = await _db.OpcionesMenu
-            .Include(om => om.Menu)
-            .Where(om => om.Menu!.FechaInicio == menu.FechaInicio && om.Menu.FechaTermino == menu.FechaTermino && om.MenuId != menu.Id)
-            .Select(om => om.Id)
-            .ToListAsync();
-        if (otrosOpcionIds.Count > 0)
-        {
-            var otras = await _db.RespuestasFormulario
-                .Where(r => r.EmpleadoId == empleadoId && otrosOpcionIds.Contains(r.OpcionMenuId))
-                .ToListAsync();
-            if (otras.Count > 0)
-            {
-                _db.RespuestasFormulario.RemoveRange(otras);
-                await _db.SaveChangesAsync();
-            }
-        }
-
-        // Validar adicionales disponibles para este menú
-        var adicionalesPermitidos = await _db.MenusAdicionales
-            .AsNoTracking()
-            .Where(a => a.MenuId == menu.Id)
-            .Select(a => a.OpcionId)
-            .ToListAsync();
-        var setAdicionales = adicionalesPermitidos.ToHashSet();
-
-        var opcionIds = model.Dias.Select(d => d.OpcionMenuId).ToList();
         var respuestasActuales = await _db.RespuestasFormulario
             .Where(r => r.EmpleadoId == empleadoId && opcionIds.Contains(r.OpcionMenuId))
             .ToListAsync();
+        var respuestasMap = respuestasActuales.ToDictionary(r => r.OpcionMenuId, r => r);
 
-        bool removals = false;
-        bool fueraDeVentana = false;
         foreach (var d in model.Dias)
         {
-            var editable = edicion.EdicionPorOpcion.TryGetValue(d.OpcionMenuId, out var ed) ? ed : !encuestaCerrada;
-            if (!editable)
+            respuestasMap.TryGetValue(d.OpcionMenuId, out var actual);
+            var seleccion = d.Seleccion;
+            var adicional = d.AdicionalOpcionId;
+            var changed = actual == null
+                ? (seleccion != null || adicional != null)
+                : (actual.Seleccion != seleccion || actual.AdicionalOpcionId != adicional);
+
+            if (changed && edicion.EdicionPorOpcion.TryGetValue(d.OpcionMenuId, out var puede) && !puede)
             {
-                if (d.Seleccion is 'A' or 'B' or 'C' or 'D' or 'E') fueraDeVentana = true;
-                continue;
+                TempData["Error"] = "Fuera de horario para modificar este plato.";
+                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = localizacionEntregaId });
             }
+        }
+
+        var removals = false;
+        foreach (var d in model.Dias)
+        {
             if (d.Seleccion is not ('A' or 'B' or 'C' or 'D' or 'E'))
             {
-                var existente = respuestasActuales.FirstOrDefault(r => r.OpcionMenuId == d.OpcionMenuId);
-                if (existente != null)
+                if (respuestasMap.TryGetValue(d.OpcionMenuId, out var existente))
                 {
                     _db.RespuestasFormulario.Remove(existente);
                     removals = true;
                 }
             }
         }
-        if (removals) await _db.SaveChangesAsync();
+        if (removals)
+            await _db.SaveChangesAsync();
 
         foreach (var d in model.Dias)
         {
-            var editable = edicion.EdicionPorOpcion.TryGetValue(d.OpcionMenuId, out var ed) ? ed : !encuestaCerrada;
-            if (!editable)
-            {
-                if (d.Seleccion is 'A' or 'B' or 'C' or 'D' or 'E') fueraDeVentana = true;
-                continue;
-            }
             if (d.Seleccion is 'A' or 'B' or 'C' or 'D' or 'E')
             {
-                Guid? adicional = d.AdicionalOpcionId;
-                if (adicional != null && !setAdicionales.Contains(adicional.Value))
-                    adicional = null;
-
-                await _menuService.RegistrarSeleccionAsync(empleadoId.Value, d.OpcionMenuId, d.Seleccion.Value, model.SucursalEntregaId, adicional);
+                await _menuService.RegistrarSeleccionAsync(
+                    empleadoId.Value,
+                    d.OpcionMenuId,
+                    d.Seleccion.Value,
+                    sucursalEntregaId,
+                    localizacionEntregaId,
+                    d.AdicionalOpcionId);
             }
         }
 
-        if (fueraDeVentana)
-            TempData["Info"] = "Algunas selecciones no se guardaron por estar fuera de la ventana permitida.";
-        TempData["Success"] = "Selecciones guardadas.";
-        return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, sucursalId = model.SucursalEntregaId });
+        TempData["Success"] = "Menu actualizado.";
+        return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = localizacionEntregaId });
     }
-
-    // Acción legacy de guardado por día (permite override de cierres)
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Seleccionar(Guid opcionMenuId, string seleccion)
-    {
-        var empleadoId = _current.EmpleadoId;
-        if (empleadoId == null) return RedirectToAction("Login", "Account");
-        var estadoSel = await _db.Empleados.Where(e => e.Id == empleadoId).Select(e => e.Estado).FirstAsync();
-        if (estadoSel != EmpleadoEstado.Habilitado)
-        {
-            TempData["Error"] = "Tu cuenta no esta habilitada para seleccionar opciones.";
-            return RedirectToAction(nameof(MiSemana));
-        }
-        var opcionMenu = await _db.OpcionesMenu.FirstAsync(om => om.Id == opcionMenuId);
-        var menu = await _db.Menus.FirstAsync(m => m.Id == opcionMenu.MenuId);
-        var hoy = _fechas.Hoy();
-        var esSemanaActual = hoy >= menu.FechaInicio && hoy <= menu.FechaTermino;
-        var edicion = await _menuEdicion.CalcularVentanaAsync(menu, new[] { opcionMenu }, DateTime.UtcNow, esSemanaActual);
-        var encuestaCerrada = _cierre.EstaCerrada(menu);
-        var permitido = edicion.EdicionPorOpcion.TryGetValue(opcionMenuId, out var puede) ? puede : !encuestaCerrada;
-        if ((encuestaCerrada && !edicion.TieneVentanaActiva) || edicion.Cerrado || !permitido)
-        {
-            TempData["Error"] = edicion.MensajeBloqueo ?? "La encuesta ya esta cerrada. Contacta a tu administrador para cambios.";
-            return RedirectToAction(nameof(MiSemana), new { semana = esSemanaActual ? "actual" : "siguiente" });
-        }
-
-        // Regla: mientras haya al menos una respuesta en la semana, queda bloqueado a esa sucursal de entrega.
-        var sucursalPrincipalId = await _db.Empleados
-            .AsNoTracking()
-            .Where(e => e.Id == empleadoId)
-            .Select(e => e.SucursalId)
-            .FirstAsync();
-        var bloqueoSemana = await _db.RespuestasFormulario
-            .AsNoTracking()
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
-            .Where(r => r.EmpleadoId == empleadoId && r.OpcionMenu!.Menu!.FechaInicio == menu.FechaInicio && r.OpcionMenu.Menu!.FechaTermino == menu.FechaTermino)
-            .OrderBy(r => r.OpcionMenuId)
-            .Select(r => new { r.SucursalEntregaId, MenuId = r.OpcionMenu!.MenuId })
-            .FirstOrDefaultAsync();
-        if (bloqueoSemana != null && bloqueoSemana.MenuId != menu.Id)
-        {
-            TempData["Error"] = "Ya tienes selecciones registradas para esta semana en otro menA§. Borra todas tus selecciones antes de cambiar.";
-            return RedirectToAction(nameof(MiSemana), new { semana = esSemanaActual ? "actual" : "siguiente", sucursalId = bloqueoSemana.SucursalEntregaId });
-        }
-
-        var sucursalEntregaId = bloqueoSemana?.SucursalEntregaId ?? sucursalPrincipalId;
-        var sucursalesExtraIds = await _db.EmpleadosSucursales
-            .AsNoTracking()
-            .Where(es => es.EmpleadoId == empleadoId)
-            .Select(es => es.SucursalId)
-            .ToListAsync();
-        var permitidas = sucursalesExtraIds.ToHashSet();
-        permitidas.Add(sucursalPrincipalId);
-        if (!permitidas.Contains(sucursalEntregaId))
-        {
-            TempData["Error"] = "Sucursal de entrega no permitida.";
-            return RedirectToAction(nameof(MiSemana), new { semana = esSemanaActual ? "actual" : "siguiente" });
-        }
-
-        await _menuService.RegistrarSeleccionAsync(empleadoId.Value, opcionMenuId, seleccion.FirstOrDefault(), sucursalEntregaId, null);
-        TempData["Success"] = "Seleccion guardada.";
-        return RedirectToAction(nameof(MiSemana), new { semana = esSemanaActual ? "actual" : "siguiente", sucursalId = sucursalEntregaId });
-    }
-
     private static Opcion? GetOpcionSeleccionada(OpcionMenu? opcionMenu, char seleccion)
     {
         if (opcionMenu == null) return null;
@@ -510,3 +609,26 @@ public class EmpleadoController : Controller
         };
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

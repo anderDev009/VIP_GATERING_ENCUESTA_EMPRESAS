@@ -49,9 +49,11 @@ public class MenuCloneTests
         IRepository<Empleado> repoEmp = new EfRepository<Empleado>(ctx);
         IRepository<EmpleadoSucursal> repoEmpSuc = new EfRepository<EmpleadoSucursal>(ctx);
         IRepository<MenuAdicional> repoMenuAdi = new EfRepository<MenuAdicional>(ctx);
+        IRepository<Localizacion> repoLoc = new EfRepository<Localizacion>(ctx);
+        IRepository<EmpleadoLocalizacion> repoEmpLoc = new EfRepository<EmpleadoLocalizacion>(ctx);
         IUnitOfWork uow = new UnitOfWork(ctx);
         IFechaServicio fechas = new FechaServicio();
-        IMenuService menuSvc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, uow, fechas);
+        IMenuService menuSvc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, repoLoc, repoEmpLoc, uow, fechas);
         var cloneSvc = new MenuCloneService(menuSvc, repoMenu, repoOpcMenu, repoResp, uow);
 
         // Clonar a dos sucursales
@@ -76,5 +78,4 @@ public class MenuCloneTests
         result2.skipped.Should().Be(1);
     }
 }
-
 

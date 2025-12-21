@@ -9,7 +9,7 @@
     <div>
         <p class="text-sm text-slate-500">Bienvenido de nuevo</p>
         <h1>@nombre</h1>
-        <p class="text-slate-500 max-w-xl">Consulta el estado general de encuestas y accede rápidamente a los módulos clave para continuar con la operación diaria.</p>
+        <p class="text-slate-500 max-w-xl">Consulta el estado general de menus y accede rapidamente a los modulos clave para continuar con la operacion diaria.</p>
     </div>
     <div class="dashboard-metrics">
         <div class="dashboard-metric">
@@ -29,34 +29,35 @@
 
 <section class="dashboard-grid">
     <div class="dashboard-card">
-        <span class="text-xs uppercase text-slate-400">Operación</span>
+        <span class="text-xs uppercase text-slate-400">Operacion</span>
         <a asp-controller="Empleado" asp-action="MiSemana">Mi semana</a>
-        <p>Confirma selecciones y visualiza el menú asignado para cada empleado.</p>
+        <p>Confirma selecciones y visualiza el menu asignado para cada empleado.</p>
     </div>
     @if (esAdmin || esEmpresa)
     {
         <div class="dashboard-card">
             <span class="text-xs uppercase text-slate-400">Recursos</span>
             <a asp-controller="Empleados" asp-action="Index">Empleados</a>
-            <p>Gestiona usuarios, acceso a encuestas y creación de cuentas.</p>
+            <p>Gestiona usuarios, acceso a menus y creacion de cuentas.</p>
         </div>
         <div class="dashboard-card">
-            <span class="text-xs uppercase text-slate-400">Logística</span>
-            <a asp-controller="Sucursales" asp-action="Index">Dependientes</a>
-            <p>Actualiza la información de dependientes, horarios y reglas de subsidio por cliente.</p>
+            <span class="text-xs uppercase text-slate-400">Logistica</span>
+            <a asp-controller="Sucursales" asp-action="Index">Filiales</a>
+            <p>Actualiza la informacion de Filiales, horarios y reglas de subsidio por Empresa.</p>
         </div>
         <div class="dashboard-card">
-            <span class="text-xs uppercase text-slate-400">Análisis</span>
+            <span class="text-xs uppercase text-slate-400">Analisis</span>
             <a asp-controller="Reportes" asp-action="Selecciones">Reportes</a>
-            <p>Consulta selecciones, totales por empleado e ítems de la semana.</p>
+            <p>Consulta selecciones, totales por empleado e items de la semana.</p>
         </div>
     }
     else
     {
         <div class="dashboard-card">
             <span class="text-xs uppercase text-slate-400">Soporte</span>
-            <a asp-controller="Account" asp-action="ChangePassword">Actualizar contraseña</a>
+            <a asp-controller="Account" asp-action="ChangePassword">Actualizar contrasena</a>
             <p>Refuerza la seguridad de tu cuenta en segundos.</p>
         </div>
     }
 </section>
+

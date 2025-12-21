@@ -1,19 +1,19 @@
 @model VIP_GATERING.WebUI.Models.PagedResult<VIP_GATERING.Domain.Entities.Opcion>
 @{
-    ViewData["Title"] = "Opciones";
+    ViewData["Title"] = "Platos";
 }
-@section Breadcrumb{<div class="text-sm text-slate-500 mb-4">Inicio / Administración / Opciones</div>}
+@section Breadcrumb{<div class="text-sm text-slate-500 mb-4">Inicio / Administracion / Platos</div>}
 
 <div class="flex justify-between items-center mb-4">
-    <h1 class="text-2xl font-semibold">Opciones</h1>
+    <h1 class="text-2xl font-semibold">Platos</h1>
     @if (User.IsInRole("Admin"))
     {
-        <a asp-action="Create" class="btn-primary">Nueva opción</a>
+        <a asp-action="Create" class="btn-primary">Nuevo plato</a>
     }
  </div>
 
 <form method="get" class="card mb-4 flex items-end gap-2 max-w-xl">
-    <input type="text" name="q" value="@ViewBag.Q" placeholder="Buscar por nombre o descripción" class="border rounded p-2 grow"/>
+    <input type="text" name="q" value="@ViewBag.Q" placeholder="Buscar por nombre o descripcion" class="border rounded p-2 grow"/>
     <button class="btn-outline">Buscar</button>
     <a asp-action="Index" class="btn-outline">Limpiar</a>
 </form>
@@ -22,9 +22,9 @@
     <table class="min-w-full bg-white border rounded">
         <thead class="bg-slate-100">
             <tr>
-                <th class="text-left p-2">Código</th>
+                <th class="text-left p-2">Codigo</th>
                 <th class="text-left p-2">Nombre</th>
-                <th class="text-left p-2">Descripción</th>
+                <th class="text-left p-2">Descripcion</th>
                 @if (User.IsInRole("Monitor"))
                 {
                     <th class="text-left p-2">Precio</th>
@@ -58,7 +58,7 @@
                         <form asp-action="Delete" method="post" class="inline">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="id" value="@o.Id" />
-                            <button class="btn-outline text-red-600">Eliminar</button>
+                            <button class="btn-outline text-rose-500 border-rose-100 hover:border-rose-300">Eliminar</button>
                         </form>
                     }
                 </td>

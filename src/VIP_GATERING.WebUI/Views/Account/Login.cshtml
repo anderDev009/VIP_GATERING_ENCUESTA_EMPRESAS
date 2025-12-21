@@ -6,8 +6,8 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
         <div>
             <div style="font-size:11px;letter-spacing:0.25em;text-transform:uppercase;color:#94a3b8;">Acceso seguro</div>
-            <div style="font-size:24px;font-weight:700;color:#0f172a;line-height:1.1;margin-top:4px;">Iniciar sesión</div>
-            <div style="font-size:14px;color:#64748b;">Usa tu correo corporativo y contraseña.</div>
+            <div style="font-size:24px;font-weight:700;color:#0f172a;line-height:1.1;margin-top:4px;">Iniciar sesion</div>
+            <div style="font-size:14px;color:#64748b;">Usa tu usuario y contrasena.</div>
         </div>
         <span style="font-size:11px;font-weight:700;color:#0f172a;background:#e2f3ee;border:1px solid #b6e3d2;border-radius:12px;padding:6px 10px;">HTTPS activo</span>
     </div>
@@ -16,22 +16,22 @@
         <input type="hidden" asp-for="ReturnUrl" />
         <div asp-validation-summary="ModelOnly" class="text-red-600 text-sm mb-2"></div>
         <div style="margin-bottom:14px;">
-            <label asp-for="Email" style="display:block;font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px;">Correo</label>
-            <input asp-for="Email" type="email" style="width:100%;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:14px;color:#0f172a;" autocomplete="username" placeholder="tucorreo@empresa.com" />
-            <span asp-validation-for="Email" class="text-red-600 text-sm"></span>
+            <label asp-for="UserName" style="display:block;font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px;">Usuario</label>
+            <input asp-for="UserName" type="text" style="width:100%;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:14px;color:#0f172a;" autocomplete="username" placeholder="empresa_codigo" />
+            <span asp-validation-for="UserName" class="text-red-600 text-sm"></span>
         </div>
         <div style="margin-bottom:14px;">
-            <label asp-for="Password" style="display:block;font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px;">Contraseña</label>
+            <label asp-for="Password" style="display:block;font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px;">Contrasena</label>
             <div style="position:relative;">
-                <input asp-for="Password" type="password" style="width:100%;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:14px;color:#0f172a;padding-right:90px;" autocomplete="current-password" placeholder="••••••••" />
+                <input asp-for="Password" type="password" style="width:100%;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:14px;color:#0f172a;padding-right:90px;" autocomplete="current-password" placeholder="********************" />
                 <button type="button" data-toggle-password style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:none;font-size:12px;font-weight:700;color:#475569;cursor:pointer;">Mostrar</button>
             </div>
             <span asp-validation-for="Password" class="text-red-600 text-sm"></span>
         </div>
-        <div style="font-size:12px;color:#475569;margin-bottom:6px;">Contraseña mínima: 8 caracteres con mayúsculas, minúsculas, número y símbolo.</div>
+        <div style="font-size:12px;color:#475569;margin-bottom:6px;">Contrasena minima: 20 caracteres con mayusculas, minusculas, numero y simbolo.</div>
         <button class="btn-primary" style="width:100%;padding:14px 16px;font-size:16px;font-weight:700;border-radius:999px;">Entrar</button>
         <div style="font-size:13px;color:#475569;margin-top:12px;">
-            Usuarios de demo: admin@demo.local, empresa@demo.local, empleado@demo.local (contraseña: <code style="font-family:monospace;">Dev123$!</code>)
+            Formato de usuario: <strong>empresa_codigo</strong>. Contrasena inicial: el mismo usuario.
         </div>
     </form>
 </div>

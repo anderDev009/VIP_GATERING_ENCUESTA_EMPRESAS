@@ -80,7 +80,10 @@ public class SucursalesController : Controller
         IEnumerable<Guid> horarioIds;
         if (seleccion != null && seleccion.Length > 0)
         {
-            horarioIds = seleccion.Distinct().Select(Guid.Parse);
+            horarioIds = seleccion
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct()
+                .Select(value => Guid.Parse(value!));
         }
         else
         {
@@ -93,7 +96,7 @@ public class SucursalesController : Controller
         foreach (var hid in horarioIds)
             await _db.SucursalesHorarios.AddAsync(new SucursalHorario { SucursalId = model.Id, HorarioId = hid });
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Dependiente creado.";
+        TempData["Success"] = "Filial creado.";
         return RedirectToAction(nameof(Index), new { empresaId = model.EmpresaId });
     }
 
@@ -147,7 +150,7 @@ public class SucursalesController : Controller
             }
             await _db.SaveChangesAsync();
         }
-        TempData["Success"] = "Dependiente actualizado.";
+        TempData["Success"] = "Filial actualizado.";
         return RedirectToAction(nameof(Index), new { empresaId = model.EmpresaId });
     }
 
@@ -162,7 +165,7 @@ public class SucursalesController : Controller
             var empresaId = ent.EmpresaId;
             ent.Borrado = true;
             await _db.SaveChangesAsync();
-            TempData["Success"] = "Dependiente eliminado.";
+            TempData["Success"] = "Filial eliminado.";
             return RedirectToAction(nameof(Index), new { empresaId });
         }
         return RedirectToAction(nameof(Index));
@@ -207,3 +210,4 @@ public class SucursalesController : Controller
         }
     }
 }
+

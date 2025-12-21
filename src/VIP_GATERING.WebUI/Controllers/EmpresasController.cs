@@ -35,7 +35,7 @@ public class EmpresasController : Controller
         if (!ModelState.IsValid) return View(model);
         await _db.Empresas.AddAsync(model);
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Cliente creado.";
+        TempData["Success"] = "Empresa creada.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -59,7 +59,7 @@ public class EmpresasController : Controller
         ent.SubsidioTipo = model.SubsidioTipo;
         ent.SubsidioValor = model.SubsidioValor;
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Cliente actualizado.";
+        TempData["Success"] = "Empresa actualizada.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -70,10 +70,18 @@ public class EmpresasController : Controller
         var ent = await _db.Empresas.FindAsync(id);
         if (ent != null)
         {
+            var tieneSucursales = await _db.Sucursales.AnyAsync(s => s.EmpresaId == id);
+            var tieneMenus = await _db.Menus.AnyAsync(m => m.EmpresaId == id);
+            if (tieneSucursales || tieneMenus)
+            {
+                TempData["Error"] = "No se puede eliminar la empresa porque tiene filiales o menus asociados.";
+                return RedirectToAction(nameof(Index));
+            }
             _db.Empresas.Remove(ent);
             await _db.SaveChangesAsync();
-            TempData["Success"] = "Cliente eliminado.";
+            TempData["Success"] = "Empresa eliminada.";
         }
         return RedirectToAction(nameof(Index));
     }
 }
+

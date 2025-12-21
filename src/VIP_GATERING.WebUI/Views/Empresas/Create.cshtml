@@ -1,10 +1,10 @@
 @model VIP_GATERING.Domain.Entities.Empresa
 @{
-    ViewData["Title"] = "Nuevo cliente";
+    ViewData["Title"] = "Nueva Empresa";
 }
-<h1 class="text-2xl font-semibold mb-4">Nuevo cliente</h1>
+<h1 class="text-2xl font-semibold mb-4 max-w-lg mx-auto">Nueva Empresa</h1>
 
-<form asp-action="Create" method="post" class="space-y-4 card max-w-lg">
+<form asp-action="Create" method="post" class="space-y-4 card max-w-lg mx-auto">
     @Html.AntiForgeryToken()
     <div>
         <label class="block text-sm">Nombre</label>
@@ -40,3 +40,4 @@
         <a asp-action="Index" class="btn-outline">Cancelar</a>
     </div>
 </form>
+

@@ -1,8 +1,8 @@
 @model VIP_GATERING.WebUI.Models.MenuSemanaVM
 @{
-    ViewData["Title"] = "Armar menú semana siguiente";
+    ViewData["Title"] = "Armar menu semana siguiente";
 }
-<h1 class="text-2xl font-semibold mb-6">Armar menú (próxima semana)</h1>
+<h1 class="text-2xl font-semibold mb-6">Armar menu (proxima semana)</h1>
 
 <div class="space-y-4">
 @foreach (var d in Model.Dias)
@@ -13,9 +13,9 @@
             <input type="hidden" name="id" value="@d.Id" />
 
             <div>
-                <label class="text-sm text-slate-600">Opción A</label>
+                <label class="text-sm text-slate-600">Plato A</label>
                 <select name="a" class="w-full border rounded p-2">
-                    <option value="">-- Sin opción --</option>
+                    <option value="">-- Sin plato --</option>
                     @foreach (var o in Model.Opciones)
                     {
                         <option value="@o.Id">@o.Nombre</option>
@@ -24,9 +24,9 @@
             </div>
 
             <div>
-                <label class="text-sm text-slate-600">Opción B</label>
+                <label class="text-sm text-slate-600">Plato B</label>
                 <select name="b" class="w-full border rounded p-2">
-                    <option value="">-- Sin opción --</option>
+                    <option value="">-- Sin plato --</option>
                     @foreach (var o in Model.Opciones)
                     {
                         <option value="@o.Id">@o.Nombre</option>
@@ -35,9 +35,9 @@
             </div>
 
             <div>
-                <label class="text-sm text-slate-600">Opción C</label>
+                <label class="text-sm text-slate-600">Plato C</label>
                 <select name="c" class="w-full border rounded p-2">
-                    <option value="">-- Sin opción --</option>
+                    <option value="">-- Sin plato --</option>
                     @foreach (var o in Model.Opciones)
                     {
                         <option value="@o.Id">@o.Nombre</option>
@@ -46,7 +46,7 @@
             </div>
 
             <div>
-                <button class="px-3 py-2 bg-indigo-600 text-white rounded">Guardar</button>
+                <button class="btn-primary">Guardar</button>
             </div>
         </form>
     </div>

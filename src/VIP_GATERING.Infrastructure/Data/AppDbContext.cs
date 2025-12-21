@@ -13,9 +13,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<Sucursal> Sucursales => Set<Sucursal>();
     public DbSet<Empleado> Empleados => Set<Empleado>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
-    public DbSet<Rol> Roles => Set<Rol>();
+    public new DbSet<Rol> Roles => Set<Rol>();
     public DbSet<RolUsuario> RolesUsuario => Set<RolUsuario>();
     public DbSet<Opcion> Opciones => Set<Opcion>();
+    public DbSet<OpcionHorario> OpcionesHorarios => Set<OpcionHorario>();
     public DbSet<Menu> Menus => Set<Menu>();
     public DbSet<OpcionMenu> OpcionesMenu => Set<OpcionMenu>();
     public DbSet<Horario> Horarios => Set<Horario>();
@@ -24,6 +25,8 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<MenuConfiguracion> ConfiguracionesMenu => Set<MenuConfiguracion>();
     public DbSet<EmpleadoSucursal> EmpleadosSucursales => Set<EmpleadoSucursal>();
     public DbSet<MenuAdicional> MenusAdicionales => Set<MenuAdicional>();
+    public DbSet<Localizacion> Localizaciones => Set<Localizacion>();
+    public DbSet<EmpleadoLocalizacion> EmpleadosLocalizaciones => Set<EmpleadoLocalizacion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,6 +68,29 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .HasOne(es => es.Sucursal)
             .WithMany(s => s.EmpleadosAsignados)
             .HasForeignKey(es => es.SucursalId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Localizacion>()
+            .HasIndex(l => new { l.SucursalId, l.Nombre })
+            .IsUnique();
+        modelBuilder.Entity<Localizacion>()
+            .HasOne(l => l.Sucursal)
+            .WithMany(s => s.Localizaciones)
+            .HasForeignKey(l => l.SucursalId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<EmpleadoLocalizacion>()
+            .HasIndex(el => new { el.EmpleadoId, el.LocalizacionId })
+            .IsUnique();
+        modelBuilder.Entity<EmpleadoLocalizacion>()
+            .HasOne(el => el.Empleado)
+            .WithMany(e => e.LocalizacionesAsignadas)
+            .HasForeignKey(el => el.EmpleadoId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<EmpleadoLocalizacion>()
+            .HasOne(el => el.Localizacion)
+            .WithMany(l => l.EmpleadosAsignados)
+            .HasForeignKey(el => el.LocalizacionId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Legacy Usuario entity mapping (kept for backward compatibility in the domain layer)
@@ -152,6 +178,12 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<RespuestaFormulario>()
+            .HasOne(r => r.LocalizacionEntrega)
+            .WithMany()
+            .HasForeignKey(r => r.LocalizacionEntregaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<RespuestaFormulario>()
             .HasOne(r => r.AdicionalOpcion)
             .WithMany()
             .HasForeignKey(r => r.AdicionalOpcionId)
@@ -183,6 +215,20 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .HasOne(sh => sh.Horario)
             .WithMany()
             .HasForeignKey(sh => sh.HorarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<OpcionHorario>()
+            .HasIndex(oh => new { oh.OpcionId, oh.HorarioId })
+            .IsUnique();
+        modelBuilder.Entity<OpcionHorario>()
+            .HasOne(oh => oh.Opcion)
+            .WithMany(o => o.Horarios)
+            .HasForeignKey(oh => oh.OpcionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<OpcionHorario>()
+            .HasOne(oh => oh.Horario)
+            .WithMany(h => h.Opciones)
+            .HasForeignKey(oh => oh.HorarioId)
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<MenuConfiguracion>()

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VIP_GATERING.Application.Services;
@@ -11,7 +11,7 @@ using VIP_GATERING.WebUI.Services;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
-// Panel simple para armar menú semanal
+// Panel simple para armar menu semanal
 [Authorize(Roles = "Admin,Empresa")]
 public class MenuController : Controller
 {
@@ -24,9 +24,9 @@ public class MenuController : Controller
     public MenuController(AppDbContext db, IMenuService menuService, ILogger<MenuController> logger, IMenuCloneService cloneService, ICurrentUserService current, IEncuestaCierreService cierre)
     { _db = db; _menuService = menuService; _logger = logger; _cloneService = cloneService; _current = current; _cierre = cierre; }
 
-    // Clientes con buscador para administrar menús
+    // Sucursales con buscador para administrar menus
     [HttpGet]
-    public async Task<IActionResult> Clientes(string? q)
+    public async Task<IActionResult> Clientes(string? q, int page = 1, int pageSize = 10)
     {
         var query = _db.Empresas.AsQueryable();
         if (User.IsInRole("Empresa"))
@@ -40,8 +40,13 @@ public class MenuController : Controller
             var ql = q.ToLower();
             query = query.Where(e => e.Nombre.ToLower().Contains(ql) || (e.Rnc != null && e.Rnc.ToLower().Contains(ql)));
         }
+        if (page <= 0) page = 1;
+        if (pageSize <= 0) pageSize = 10;
+        var total = await query.CountAsync();
         var items = await query
             .OrderBy(e => e.Nombre)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(e => new MenuClientesVM.Item
             {
                 Id = e.Id,
@@ -50,11 +55,18 @@ public class MenuController : Controller
                 Sucursales = _db.Sucursales.Count(s => s.EmpresaId == e.Id)
             }).ToListAsync();
 
-        var vm = new MenuClientesVM { Q = q, Clientes = items };
-        return View(vm);
+        var vm = new MenuClientesVM
+        {
+            Q = q,
+            Sucursales = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = total
+        };
+        return View("Clientes", vm);
     }
 
-    // Listado de sucursales agrupadas por cliente (o filtradas por cliente)
+    // Listado de sucursales agrupadas por Sucursal (o filtradas por Sucursal)
     [HttpGet]
     public async Task<IActionResult> Sucursales(Guid? empresaId, string? q)
     {
@@ -83,7 +95,7 @@ public class MenuController : Controller
         return View(vm2);
     }
 
-    // GET: copiar menú del cliente a múltiples sucursales
+    // GET: copiar menu del cliente a multiples filiales
     [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> Copiar(Guid empresaId, DateTime? fecha)
@@ -103,7 +115,7 @@ public class MenuController : Controller
         return View((empresa, inicio, fin, sucs));
     }
 
-    // POST: copiar menú del cliente a sucursales seleccionadas
+    // POST: copiar menu del cliente a filiales seleccionadas
     [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -112,15 +124,15 @@ public class MenuController : Controller
         if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
         if (sucursalIds == null || sucursalIds.Count == 0)
         {
-            TempData["Info"] = "Debe seleccionar al menos una sucursal.";
+            TempData["Info"] = "Debe seleccionar al menos una filial.";
             return RedirectToAction(nameof(Copiar), new { empresaId, fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd") });
         }
         var (updated, skipped) = await _cloneService.CloneEmpresaMenuToSucursalesAsync(inicio, fin, empresaId, sucursalIds);
-        TempData["Success"] = $"Menú copiado. Actualizadas: {updated}. Omitidas por bloqueo: {skipped}.";
-        return RedirectToAction(nameof(Clientes));
+        TempData["Success"] = $"Menu copiado. Actualizadas: {updated}. Omitidas por bloqueo: {skipped}.";
+        return RedirectToAction(nameof(Sucursales));
     }
 
-    // GET: Administrar menú por rango (selección de semana)
+    // GET: Administrar menu por rango (seleccion de semana)
     [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> Administrar(DateTime? fecha, Guid? empresaId, Guid? sucursalId, string? alcance)
@@ -144,15 +156,51 @@ public class MenuController : Controller
 
         _logger.LogInformation("[GET Administrar] baseDate={Base}, lunes={Lunes}, rango={Inicio}-{Fin}", baseDate.ToString("yyyy-MM-dd"), lunes.ToString("yyyy-MM-dd"), inicio, fin);
 
-        // Cargar catálogos
+        // Cargar catÃ¡logos
         var empresas = await _db.Empresas.Select(e => new { e.Id, e.Nombre }).ToListAsync();
-        var sucursales = await _db.Sucursales.Select(s => new { s.Id, s.Nombre, s.EmpresaId }).ToListAsync();
+        Guid? empresaSel = empresaId;
+        if (empresaSel == null && sucursalId != null)
+        {
+            empresaSel = await _db.Sucursales
+                .Where(s => s.Id == sucursalId)
+                .Select(s => (Guid?)s.EmpresaId)
+                .FirstOrDefaultAsync();
+        }
+        empresaSel ??= empresas.FirstOrDefault()?.Id;
+        if (empresaSel != null && empresas.All(e => e.Id != empresaSel))
+            empresaSel = empresas.FirstOrDefault()?.Id;
 
-        Guid? empresaSel = empresaId ?? empresas.FirstOrDefault()?.Id;
+        var sucursalesAllQuery = _db.Sucursales.AsQueryable();
+        if (User.IsInRole("Empresa") && empresaSel != null)
+            sucursalesAllQuery = sucursalesAllQuery.Where(s => s.EmpresaId == empresaSel);
+        var sucursalesAll = await sucursalesAllQuery
+            .Select(s => new { s.Id, s.Nombre, s.EmpresaId })
+            .ToListAsync();
+        var sucursalesEmpresa = empresaSel != null
+            ? sucursalesAll.Where(s => s.EmpresaId == empresaSel).ToList()
+            : sucursalesAll;
+
         Guid? sucursalSel = sucursalId;
         if (!string.IsNullOrEmpty(alcance))
         {
             if (alcance.Equals("empresa", StringComparison.OrdinalIgnoreCase)) sucursalSel = null;
+        }
+        if (sucursalSel != null && !sucursalesEmpresa.Any(s => s.Id == sucursalSel))
+            sucursalSel = null;
+        if (sucursalSel != null)
+        {
+            var horariosCount = await _db.SucursalesHorarios
+                .Where(sh => sh.SucursalId == sucursalSel)
+                .Select(sh => sh.HorarioId)
+                .Distinct()
+                .CountAsync();
+            if (horariosCount == 0)
+            {
+                TempData["Error"] = "La filial seleccionada no tiene horarios configurados. Configura horarios en Filiales.";
+                if (User.IsInRole("Empresa"))
+                    return RedirectToAction(nameof(Sucursales), new { empresaId = empresaSel });
+                return RedirectToAction(nameof(Sucursales));
+            }
         }
 
         var menu = await _menuService.GetOrCreateMenuAsync(inicio, fin, empresaSel, sucursalSel);
@@ -171,13 +219,37 @@ public class MenuController : Controller
             .ThenBy(o => o.HorarioId)
             .ToListAsync();
         var diasVm = MapDias(diasDb, null);
-        var opciones = await _db.Opciones.OrderBy(o => o.Nombre).ToListAsync();
+        var opciones = await _db.Opciones.Include(o => o.Horarios).OrderBy(o => o.Nombre).ToListAsync();
+        var horariosActivos = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
+        var horarioIdsPermitidos = new HashSet<Guid>();
+        if (sucursalSel != null)
+        {
+            var ids = await _db.SucursalesHorarios
+                .Where(sh => sh.SucursalId == sucursalSel)
+                .Select(sh => sh.HorarioId)
+                .Distinct()
+                .ToListAsync();
+            horarioIdsPermitidos = ids.ToHashSet();
+        }
+        else if (empresaSel != null)
+        {
+            var ids = await _db.SucursalesHorarios
+                .Include(sh => sh.Sucursal)
+                .Where(sh => sh.Sucursal != null && sh.Sucursal.EmpresaId == empresaSel)
+                .Select(sh => sh.HorarioId)
+                .Distinct()
+                .ToListAsync();
+            horarioIdsPermitidos = ids.ToHashSet();
+        }
+        var horariosPermitidos = horariosActivos
+            .Where(h => horarioIdsPermitidos.Contains(h.Id))
+            .ToList();
         var adicionalesIds = await _db.MenusAdicionales
             .AsNoTracking()
             .Where(a => a.MenuId == menu.Id)
             .Select(a => a.OpcionId)
             .ToListAsync();
-        // Calcular empleados con encuesta completa (toda la semana)
+        // Calcular empleados con menÃº completo (toda la semana)
         var opcionIds = diasDb.Select(d => d.Id).ToList();
         var completos = await _db.RespuestasFormulario
             .Where(r => opcionIds.Contains(r.OpcionMenuId))
@@ -199,26 +271,84 @@ public class MenuController : Controller
             EmpresaId = empresaSel,
             SucursalId = sucursalSel,
             Empresas = empresas.Select(e => (e.Id, e.Nombre)),
-            Sucursales = sucursales.Select(s => (s.Id, s.Nombre)),
+            Sucursales = sucursalesAll.Select(s => (id: s.Id, nombre: s.Nombre, empresaId: s.EmpresaId)),
             EmpresaNombre = empresas.FirstOrDefault(e => e.Id == empresaSel)?.Nombre,
-            SucursalNombre = sucursales.FirstOrDefault(s => s.Id == sucursalSel)?.Nombre,
+            SucursalNombre = sucursalesAll.FirstOrDefault(s => s.Id == sucursalSel)?.Nombre,
             Dias = diasVm,
             PuedeEliminarEncuesta = sinRespuestas,
-            AdicionalesIds = adicionalesIds
+            AdicionalesIds = adicionalesIds,
+            HorariosPermitidos = horariosPermitidos
         };
         return View(vm);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> VistaPrevia(DateOnly inicio, DateOnly fin, Guid? empresaId, Guid? sucursalId)
+    {
+        if (User.IsInRole("Empresa") && empresaId == null)
+            empresaId = _current.EmpresaId;
+        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
+
+        var menu = await _menuService.GetOrCreateMenuAsync(inicio, fin, empresaId, sucursalId);
+        var opciones = await _db.OpcionesMenu
+            .Include(o => o.OpcionA)
+            .Include(o => o.OpcionB)
+            .Include(o => o.OpcionC)
+            .Include(o => o.OpcionD)
+            .Include(o => o.OpcionE)
+            .Include(o => o.Horario)
+            .Where(o => o.MenuId == menu.Id)
+            .OrderBy(o => o.DiaSemana)
+            .ThenBy(o => o.Horario != null ? o.Horario.Orden : int.MaxValue)
+            .ToListAsync();
+
+        var empresaLookupId = empresaId ?? menu.EmpresaId;
+        if (empresaLookupId == null && menu.SucursalId != null)
+            empresaLookupId = await _db.Sucursales.Where(s => s.Id == menu.SucursalId).Select(s => (Guid?)s.EmpresaId).FirstOrDefaultAsync();
+
+        var empresaNombre = empresaLookupId != null
+            ? await _db.Empresas.Where(e => e.Id == empresaLookupId).Select(e => e.Nombre).FirstOrDefaultAsync()
+            : null;
+
+        var sucursalLookupId = sucursalId ?? menu.SucursalId;
+        var sucursalNombre = sucursalLookupId != null
+            ? await _db.Sucursales.Where(s => s.Id == sucursalLookupId).Select(s => s.Nombre).FirstOrDefaultAsync()
+            : null;
+
+        var vm = new MenuPreviewVM
+        {
+            FechaInicio = inicio,
+            FechaTermino = fin,
+            EmpresaNombre = empresaNombre,
+            FilialNombre = sucursalNombre,
+            OrigenScope = sucursalLookupId != null ? "Filial" : "Empresa",
+            Dias = opciones.Select(o => new MenuPreviewDiaVM
+            {
+                DiaSemana = o.DiaSemana,
+                HorarioNombre = o.Horario?.Nombre ?? "General",
+                HorarioOrden = o.Horario?.Orden ?? int.MaxValue,
+                A = o.OpcionA?.Nombre,
+                B = o.OpcionB?.Nombre,
+                C = o.OpcionC?.Nombre,
+                D = o.OpcionD?.Nombre,
+                E = o.OpcionE?.Nombre,
+                OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas
+            }).ToList()
+        };
+
+        return View("VistaPrevia", vm);
     }
 
     [HttpGet]
     public async Task<IActionResult> CrearProxima()
     {
         var menu = await _menuService.GetOrCreateMenuSemanaSiguienteAsync();
-        TempData["Success"] = "Se aseguró el menú de la próxima semana.";
+        TempData["Success"] = "Se aseguro el menu de la proxima semana.";
         var fecha = menu.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd");
         return RedirectToAction(nameof(Administrar), new { fecha });
     }
 
-    // POST: Guardar todos los días en un solo envío
+    // POST: Guardar todos los dias en un solo envio
     [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -231,7 +361,7 @@ public class MenuController : Controller
         var menuDb = await _menuService.GetOrCreateMenuAsync(model.FechaInicio, model.FechaTermino, model.EmpresaId, model.SucursalId);
         if (_cierre.EstaCerrada(menuDb))
         {
-            TempData["Error"] = "La encuesta está cerrada. Reábrela para poder modificar el menú.";
+            TempData["Error"] = "El menu esta cerrado. Reabrelo para poder modificarlo.";
             var fechaBlock = model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd");
             return RedirectToAction(nameof(Administrar), new { fecha = fechaBlock, empresaId = model.EmpresaId, sucursalId = model.SucursalId });
         }
@@ -274,12 +404,12 @@ public class MenuController : Controller
                 _logger.LogInformation("[POST Guardar] idx={Idx} omId={Om} A={A} B={B} C={C} D={D} E={E} Max={Max}", i, omId, ga, gb, gc, gd, ge, max);
             }
             model.Dias = dias;
-            _logger.LogInformation("[POST Guardar] Días reconstruidos: {Dias}", model.Dias.Count);
+            _logger.LogInformation("[POST Guardar] DÃ­as reconstruidos: {Dias}", model.Dias.Count);
         }
         if (model.Dias == null || !model.Dias.Any())
         {
             TempData["Info"] = "No hay cambios para guardar.";
-            _logger.LogWarning("[POST Guardar] Sin días después de parseo. FormKeys={Count}", form?.Keys.Count ?? 0);
+            _logger.LogWarning("[POST Guardar] Sin dÃ­as despuÃ©s de parseo. FormKeys={Count}", form?.Keys.Count ?? 0);
             return RedirectToAction(nameof(Administrar), new { fecha = model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId = model.EmpresaId, sucursalId = model.SucursalId });
         }
 
@@ -291,7 +421,7 @@ public class MenuController : Controller
             .ThenBy(x => x.HorarioId)
             .ToListAsync();
 
-        // Si faltan OpcionMenuId, mapeamos por índice contra los días del menú del rango
+        // Si faltan OpcionMenuId, mapeamos por Ã­ndice contra los dÃ­as del menÃº del rango
         if (model.Dias.Any(d => d.OpcionMenuId == Guid.Empty))
         {
             if (diasDb.Count == model.Dias.Count)
@@ -301,11 +431,11 @@ public class MenuController : Controller
                     if (model.Dias[i].OpcionMenuId == Guid.Empty)
                         model.Dias[i].OpcionMenuId = diasDb[i].Id;
                 }
-                _logger.LogInformation("[POST Guardar] OpcionMenuId completados por índice.");
+                _logger.LogInformation("[POST Guardar] OpcionMenuId completados por Ã­ndice.");
             }
             else
             {
-                _logger.LogWarning("[POST Guardar] No coincide el conteo de días: modelo={ModelCount}, db={DbCount}", model.Dias.Count, diasDb.Count);
+                _logger.LogWarning("[POST Guardar] No coincide el conteo de dÃ­as: modelo={ModelCount}, db={DbCount}", model.Dias.Count, diasDb.Count);
             }
         }
 
@@ -326,7 +456,7 @@ public class MenuController : Controller
                 dia.OpcionIdD = max >= 4 ? d.D : null;
                 dia.OpcionIdE = max >= 5 ? d.E : null;
             }
-            // Actualizar adicionales fijos del menú (se cobran 100% al empleado)
+            // Actualizar adicionales fijos del menÃº (se cobran 100% al empleado)
             var nuevosIds = (model.AdicionalesIds ?? new List<Guid>())
                 .Where(x => x != Guid.Empty)
                 .Distinct()
@@ -339,15 +469,15 @@ public class MenuController : Controller
             if (toAdd.Count > 0) await _db.MenusAdicionales.AddRangeAsync(toAdd);
 
             await _db.SaveChangesAsync();
-            TempData["Success"] = "Menú actualizado correctamente.";
+            TempData["Success"] = "Menu actualizado correctamente.";
             _logger.LogInformation("[POST Guardar] Cambios guardados OK.");
         }
         catch (Exception ex)
         {
-            TempData["Error"] = "No se pudo guardar el menú: " + ex.Message;
+            TempData["Error"] = "No se pudo guardar el menu: " + ex.Message;
             _logger.LogError(ex, "[POST Guardar] Error al guardar.");
         }
-        // Determinar semana a partir del menú del primer día (redirección estable)
+        // Determinar semana a partir del menÃº del primer dÃ­a (redirecciÃ³n estable)
         var fecha = menuDb.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd");
         return RedirectToAction(nameof(Administrar), new { fecha, empresaId = model.EmpresaId, sucursalId = model.SucursalId });
     }
@@ -363,7 +493,7 @@ public class MenuController : Controller
         menu.FechaCierreManual = DateTime.UtcNow;
         menu.EncuestaReabiertaManualmente = false;
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Encuesta cerrada manualmente.";
+        TempData["Success"] = "Menu cerrado manualmente.";
         return RedirectToAction(nameof(Administrar), new { fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId, sucursalId });
     }
 
@@ -378,7 +508,7 @@ public class MenuController : Controller
         menu.FechaCierreManual = null;
         menu.EncuestaReabiertaManualmente = true;
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Encuesta reabierta.";
+        TempData["Success"] = "Menu reabierto.";
         return RedirectToAction(nameof(Administrar), new { fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId, sucursalId });
     }
 
@@ -399,7 +529,7 @@ public class MenuController : Controller
         var menu = await _menuService.FindMenuAsync(inicio, fin, empresaId, sucursalId);
         if (menu == null)
         {
-            TempData["Info"] = "No existe encuesta para ese rango.";
+            TempData["Info"] = "No existe menu para ese rango.";
             return RedirectToAction(nameof(Administrar), new { fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId, sucursalId });
         }
 
@@ -415,7 +545,7 @@ public class MenuController : Controller
         _db.OpcionesMenu.RemoveRange(opciones);
         _db.Menus.Remove(menu);
         await _db.SaveChangesAsync();
-        TempData["Success"] = "Encuesta eliminada (sin respuestas).";
+        TempData["Success"] = "Menu eliminado (sin respuestas).";
         return RedirectToAction(nameof(Administrar), new { fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId, sucursalId });
     }
 
@@ -452,3 +582,7 @@ public class MenuController : Controller
         return list;
     }
 }
+
+
+
+

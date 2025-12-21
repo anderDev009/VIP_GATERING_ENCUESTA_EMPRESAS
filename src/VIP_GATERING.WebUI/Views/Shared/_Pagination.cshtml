@@ -17,7 +17,7 @@
         {
             <span class="btn-outline" style="opacity:.5;pointer-events:none">Anterior</span>
         }
-        <span class="px-2 py-2">Página @Model.Page de @Model.TotalPages</span>
+        <span class="px-2 py-2">Pagina @Model.Page de @Model.TotalPages</span>
         @if (Model.Page < Model.TotalPages)
         {
             <a class="btn-outline" href="@($"{sep}page={Model.Page+1}&pageSize={Model.PageSize}")">Siguiente</a>

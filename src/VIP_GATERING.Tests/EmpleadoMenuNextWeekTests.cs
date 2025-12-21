@@ -38,9 +38,11 @@ public class EmpleadoMenuNextWeekTests
         IRepository<Empleado> repoEmp = new EfRepository<Empleado>(ctx);
         IRepository<EmpleadoSucursal> repoEmpSuc = new EfRepository<EmpleadoSucursal>(ctx);
         IRepository<MenuAdicional> repoMenuAdi = new EfRepository<MenuAdicional>(ctx);
+        IRepository<Localizacion> repoLoc = new EfRepository<Localizacion>(ctx);
+        IRepository<EmpleadoLocalizacion> repoEmpLoc = new EfRepository<EmpleadoLocalizacion>(ctx);
         IUnitOfWork uow = new UnitOfWork(ctx);
         IFechaServicio fechas = new FechaServicio();
-        IMenuService menuSvc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, uow, fechas);
+        IMenuService menuSvc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, repoLoc, repoEmpLoc, uow, fechas);
 
         var (inicio, fin) = fechas.RangoSemanaSiguiente();
         var menu = await menuSvc.GetOrCreateMenuAsync(inicio, fin, empresa.Id, suc.Id);
@@ -48,6 +50,5 @@ public class EmpleadoMenuNextWeekTests
         dias.Count.Should().Be(10);
     }
 }
-
 
 

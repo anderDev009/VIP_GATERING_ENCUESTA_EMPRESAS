@@ -1,230 +1,338 @@
-﻿@model VIP_GATERING.WebUI.Models.SemanaEmpleadoVM
+@model VIP_GATERING.WebUI.Models.SemanaEmpleadoVM
 @{
     ViewData["Title"] = "Mi semana";
     var noHabilitado = (bool?)ViewBag.NoHabilitado ?? false;
     var tituloSemana = Model.SemanaClave == "actual" ? "Menu semana actual" : "Menu semana proxima";
+    var empresaNombre = string.IsNullOrWhiteSpace(Model.EmpresaNombre) ? "Empresa asignada" : Model.EmpresaNombre;
+    var filialNombre = string.IsNullOrWhiteSpace(Model.SucursalNombre) ? "Filial asignada" : Model.SucursalNombre;
+
+    var origenEtiqueta = string.IsNullOrWhiteSpace(Model.OrigenMenu) ? "General" : Model.OrigenMenu;
+    var localizacionEtiqueta = string.IsNullOrWhiteSpace(Model.LocalizacionEntregaNombre)
+        ? "Sin localizacion"
+        : Model.LocalizacionEntregaNombre;
+    var letrasOpciones = new[] { "A", "B", "C", "D", "E" };
+    var diasConIndice = Model.Dias.Select((d, idx) => new { Dia = d, Index = idx }).ToList();
+    var grupos = diasConIndice.GroupBy(x => string.IsNullOrWhiteSpace(x.Dia.HorarioNombre) ? "General" : x.Dia.HorarioNombre!).ToList();
+    var grupoInicial = grupos.FirstOrDefault();
+    var progressTotal = grupoInicial?.Count() ?? 0;
+    var progressSelected = grupoInicial?.Count(x => x.Dia.Seleccion != null) ?? 0;
 }
 
-@if (Model.SemanasDisponibles != null && Model.SemanasDisponibles.Any())
-{
-    <form method="get" asp-action="MiSemana" class="mb-3 flex flex-wrap gap-3 items-center bg-white border rounded-xl shadow-sm p-3">
-        <div class="text-sm text-slate-600">Ver semana:</div>
-        <select name="semana" class="border rounded-lg px-3 py-2 text-sm" onchange="this.form.submit()">
-            @foreach (var s in Model.SemanasDisponibles)
-            {
-                @if (s.Clave == Model.SemanaClave)
-                {
-                    <option value="@s.Clave" selected>@s.Etiqueta</option>
-                }
-                else
-                {
-                    <option value="@s.Clave">@s.Etiqueta</option>
-                }
-            }
-        </select>
-        @if (Model.SucursalesEntregaDisponibles != null && Model.SucursalesEntregaDisponibles.Count > 0)
+<section class="page-panel space-y-4">
+    <div class="meta-row">
+        <span class="meta-pill meta-pill--accent">VIP</span>
+        <span class="meta-pill">Empresa: @empresaNombre</span>
+        <span class="meta-pill meta-pill--ghost">Filial: @filialNombre</span>
+        <span class="meta-pill">Localizacion: @localizacionEtiqueta</span>
+        @if (!string.IsNullOrWhiteSpace(Model.EmpleadoCodigo))
         {
-            <div class="text-sm text-slate-600 ml-4">Enviar a:</div>
-            <select name="sucursalId" class="border rounded-lg px-3 py-2 text-sm" onchange="this.form.submit()">
-                @foreach (var s in Model.SucursalesEntregaDisponibles)
-                {
-                    if (s.id == Model.SucursalEntregaId)
-                    {
-                        <option value="@s.id" selected>@s.nombre</option>
-                    }
-                    else
-                    {
-                        <option value="@s.id">@s.nombre</option>
-                    }
-                }
-            </select>
+            <span class="meta-pill meta-pill--ghost">Codigo empleado: @Model.EmpleadoCodigo</span>
         }
-        <noscript>
-            <button class="btn-primary px-3 py-2 rounded-lg">Cambiar</button>
-        </noscript>
-    </form>
-}
+    </div>
 
-<div class="bg-white border rounded-xl shadow-sm p-4 mb-4 flex flex-wrap gap-3 items-center">
-    <div class="flex items-center gap-2">
-        <span class="w-3 h-3 bg-rose-500 rounded-full shadow-inner"></span>
-        <div>
-            <div class="text-xs uppercase tracking-wide text-slate-500">@tituloSemana</div>
-            <div class="text-lg font-semibold text-slate-800">Lunes @Model.FechaInicio.ToString("dd") - Viernes @Model.FechaTermino.ToString("dd 'de' MMMM yyyy")</div>
+    <div class="week-banner">
+        <div class="week-banner__main">
+            <span class="week-dot" aria-hidden="true"></span>
+            <div>
+                <p class="week-banner__eyebrow">MEN&Uacute; DE LA SEMANA</p>
+                <p class="week-banner__title">Lunes @Model.FechaInicio.ToString("dd") - Viernes @Model.FechaTermino.ToString("dd 'de' MMMM yyyy")</p>
+                @if (!string.IsNullOrWhiteSpace(Model.NotaVentana))
+                {
+                    <p class="week-banner__subtitle">@Model.NotaVentana</p>
+                }
+            </div>
         </div>
+        <span class="week-banner__badge">@tituloSemana</span>
     </div>
-    <div class="flex flex-wrap gap-2 text-sm text-slate-700 ml-auto">
-        <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Cliente: @Model.EmpresaNombre</span>
-        @if (!string.IsNullOrWhiteSpace(Model.SucursalEntregaNombre))
-        {
-            <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Entrega: @Model.SucursalEntregaNombre</span>
-        }
-        @if (Model.OrigenMenu == "Dependiente")
-        {
-            <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Dependiente: @Model.SucursalNombre</span>
-        }
-        <span class="px-3 py-1 rounded-full border text-slate-700 bg-slate-50">Origen: @Model.OrigenMenu</span>
-    </div>
-</div>
+
+    @if (Model.SemanasDisponibles != null && Model.SemanasDisponibles.Any())
+    {
+        <form method="get" asp-action="MiSemana" class="control-panel">
+            <div class="control-field">
+                <label>Ver semana</label>
+                <div class="control-input">
+                    <select name="semana" onchange="this.form.submit()">
+                        @foreach (var s in Model.SemanasDisponibles)
+                        {
+                            if (s.Clave == Model.SemanaClave)
+                            {
+                                <option value="@s.Clave" selected>@s.Etiqueta</option>
+                            }
+                            else
+                            {
+                                <option value="@s.Clave">@s.Etiqueta</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </div>
+            @if (Model.LocalizacionesEntregaDisponibles != null && Model.LocalizacionesEntregaDisponibles.Count > 0)
+            {
+                <div class="control-field">
+                    <label>Localizaci&oacute;n</label>
+                    <div class="control-input">
+                        <select name="localizacionId" onchange="this.form.submit()">
+                            @foreach (var s in Model.LocalizacionesEntregaDisponibles)
+                            {
+                                if (s.id == Model.LocalizacionEntregaId)
+                                {
+                                    <option value="@s.id" selected>@s.nombre</option>
+                                }
+                                else
+                                {
+                                    <option value="@s.id">@s.nombre</option>
+                                }
+                            }
+                        }
+                    </select>
+                </div>
+                <p class="control-hint">La localizaci&oacute;n se guarda para toda la semana.</p>
+            </div>
+            }
+            <noscript>
+                <button class="btn-primary btn-sm">Cambiar</button>
+            </noscript>
+        </form>
+    }
+</section>
 
 @if (noHabilitado)
 {
-    <div class="p-3 rounded bg-yellow-50 border border-yellow-200 text-yellow-800 mb-4">
-        Tu cuenta no esta habilitada para seleccionar opciones. Si crees que es un error, contacta a tu administrador.
+    <div class="alert alert-warning mb-4">
+        Tu cuenta no esta habilitada para seleccionar platos. Si crees que es un error, contacta a tu administrador.
     </div>
 }
 else if (Model.Bloqueado)
 {
-    <div class="p-3 rounded bg-yellow-50 border border-yellow-200 text-yellow-800 mb-4">
+    <div class="alert alert-locked mb-4">
         @(string.IsNullOrWhiteSpace(Model.MensajeBloqueo) ? "Ya registraste tu menu de esta semana. No se puede modificar." : Model.MensajeBloqueo)
     </div>
 }
 
-<div class="mb-4 bg-white border rounded-xl shadow-sm p-4">
-    <div class="flex flex-wrap justify-between items-center gap-3 text-sm text-slate-700">
-        <div class="font-medium">Progreso</div>
-        <div class="px-3 py-1 rounded-full border bg-slate-50">@Model.RespuestasCount/@Model.TotalDias dias</div>
+<section class="page-panel space-y-3 mb-5">
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Progreso</p>
+            <p class="panel-title" id="progress-text">@progressSelected/@progressTotal platos escogidos</p>
+        </div>
+        <span class="chip chip--success" id="summary-total-chip">Total a pagar: @Model.TotalEmpleado.ToString("C")</span>
     </div>
-    <div class="h-2 rounded-full bg-slate-200 mt-2">
-        @{ var pct = Model.TotalDias == 0 ? 0 : (int)(100.0 * Model.RespuestasCount / Model.TotalDias); }
-        <div style="width:@pct%" class="h-2 rounded-full bg-emerald-600 transition-all"></div>
+    <div class="progress-track">
+        @{ var pct = progressTotal == 0 ? 0 : (int)(100.0 * progressSelected / progressTotal); }
+        <div style="width:@pct%" class="progress-bar"></div>
     </div>
     @if (!Model.Bloqueado && !noHabilitado)
     {
-        <div class="text-xs text-slate-500 mt-1">Sigue completando tus dias pendientes.</div>
+        <div class="panel-subtitle">Sigue completando tus dias pendientes.</div>
     }
-    @if (!string.IsNullOrWhiteSpace(Model.NotaVentana))
-    {
-        <div class="text-xs text-slate-500 mt-1">@Model.NotaVentana</div>
-    }
-    <div class="mt-3 text-sm text-slate-700">
-        Total a pagar por tus selecciones: <span class="font-semibold text-emerald-700">@Model.TotalEmpleado.ToString("C")</span>
-    </div>
-</div>
+</section>
 
-<form asp-action="GuardarSemana" method="post" class="space-y-4">
+<form asp-action="GuardarSemana" method="post" class="page-panel space-y-5" id="form-menu" data-localizacion="@Model.LocalizacionEntregaNombre">
     @Html.AntiForgeryToken()
     <input type="hidden" name="MenuId" value="@Model.MenuId" />
     <input type="hidden" name="SemanaClave" value="@Model.SemanaClave" />
     <input type="hidden" name="SucursalEntregaId" value="@Model.SucursalEntregaId" />
-    <div class="flex flex-wrap items-center gap-3 mb-2">
-        <div class="text-sm text-slate-600">Selecciona tu opcion por dia y horario.</div>
-        <div class="ml-auto flex gap-2">
-            <button type="button" id="clear-all" class="px-4 py-2 border rounded-full text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100" @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>Borrar todo</button>
-            <button class="px-4 py-2 bg-emerald-600 text-white rounded-full shadow-sm hover:bg-emerald-700" @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>Guardar seleccion</button>
+    <input type="hidden" name="LocalizacionEntregaId" value="@Model.LocalizacionEntregaId" />
+
+    <div class="panel-header">
+        <div>
+            <p class="eyebrow">Selecciona tus platos</p>
+            <p class="panel-subtitle">Formato en tabla para comparar de un vistazo.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" id="clear-all" class="btn-soft @((Model.Bloqueado || noHabilitado) ? "opacity-60 cursor-not-allowed" : "")" @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>Borrar todo</button>
+            <button class="btn-primary" @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>Guardar seleccion</button>
         </div>
     </div>
-    @{
-        var diasConIndice = Model.Dias.Select((d, idx) => new { Dia = d, Index = idx }).ToList();
-        var grupos = diasConIndice.GroupBy(x => string.IsNullOrWhiteSpace(x.Dia.HorarioNombre) ? "General" : x.Dia.HorarioNombre!).ToList();
-    }
-    <div class="mb-4 overflow-x-auto">
-        <div class="flex gap-2" id="tabs-horario">
+
+    <div class="tab-switch">
+        <div class="tab-switch__label">Horarios</div>
+        <div class="tab-switch__group" id="tabs-horario">
             @for (var gi = 0; gi < grupos.Count; gi++)
             {
                 var g = grupos[gi];
                 var tabId = $"tab-{gi}";
-                <button type="button" class="px-3 py-1.5 border rounded-full text-sm bg-white hover:bg-slate-100" data-tab-target="@tabId">@g.Key</button>
+                <button type="button" class="tab-pill" data-tab-target="@tabId">@g.Key</button>
             }
         </div>
     </div>
+
     @for (var gi = 0; gi < grupos.Count; gi++)
     {
         var g = grupos[gi];
         var tabId = $"tab-{gi}";
-        <div id="@tabId" style="display:@(gi == 0 ? "block" : "none")" class="space-y-3" data-tab-panel>
-            @foreach (var item in g)
-            {
-                var d = item.Dia;
-                var i = item.Index;
-                var opcionesDia = new[]
-                {
-                    new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA },
-                    new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB },
-                    new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC },
-                    new { Clave = "D", Nombre = d.D, Imagen = d.ImagenD },
-                    new { Clave = "E", Nombre = d.E, Imagen = d.ImagenE }
-                }.Take(d.OpcionesMaximas <= 0 ? 3 : d.OpcionesMaximas).ToList();
-                <div class="bg-white border rounded-xl shadow-sm overflow-hidden">
-                    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-50 border-b">
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm font-semibold text-slate-800">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana)</span>
-                            <span class="text-xs px-2 py-0.5 rounded-full border bg-white text-slate-600">@d.HorarioNombre</span>
-                        </div>
-                        <button type="button"
-                                class="px-3 py-1 text-sm border rounded-full text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100 clear-day"
-                                data-day="@i"
-                                @((Model.Bloqueado || noHabilitado || !d.Editable) ? "disabled" : "")>
-                            Borrar seleccion
-                        </button>
-                    </div>
-                    <div class="p-4">
-                        @if (!opcionesDia.Any(o => !string.IsNullOrWhiteSpace(o.Nombre)))
+        var maxOpciones = g.Max(x => x.Dia.OpcionesMaximas <= 0 ? 3 : x.Dia.OpcionesMaximas);
+        <div id="@tabId" class="tab-panel @(gi == 0 ? "is-active" : "") space-y-3" data-tab-panel>
+            <table class="menu-table">
+                <thead>
+                    <tr>
+                        <th>D&iacute;a</th>
+                        @for (var col = 0; col < maxOpciones; col++)
                         {
-                            <div class="text-slate-500">Aun no hay opciones definidas para este dia.</div>
+                            <th>Plato @letrasOpciones[col]</th>
                         }
-                        else
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in g)
+                    {
+                        var d = item.Dia;
+                        var i = item.Index;
+                        var opcionesDia = new[]
                         {
-                            @if (!d.Editable)
+                            new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA, Precio = d.PrecioEmpleadoA },
+                            new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB, Precio = d.PrecioEmpleadoB },
+                            new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC, Precio = d.PrecioEmpleadoC },
+                            new { Clave = "D", Nombre = d.D, Imagen = d.ImagenD, Precio = d.PrecioEmpleadoD },
+                            new { Clave = "E", Nombre = d.E, Imagen = d.ImagenE, Precio = d.PrecioEmpleadoE }
+                        }.Take(d.OpcionesMaximas <= 0 ? 3 : d.OpcionesMaximas).ToList();
+                        <tr>
+                            <td class="menu-daycell">
+                                <div class="menu-day-title">
+                                    <span>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana)</span>
+                                    <span class="menu-day-meta">
+                                        <span class="icon-dot icon-dot--teal"></span>
+                                        @d.HorarioNombre
+                                    </span>
+                                </div>
+                                <div class="menu-day-actions">
+                                    <button type="button"
+                                            class="btn-soft btn-soft--danger clear-day @((Model.Bloqueado || noHabilitado || !d.Editable) ? "opacity-60 cursor-not-allowed" : "")"
+                                            data-day="@i"
+                                            @((Model.Bloqueado || noHabilitado || !d.Editable) ? "disabled" : "")>
+                                        Borrar seleccion
+                                    </button>
+                                    <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
+                                </div>
+                            </td>
+                            @for (var col = 0; col < maxOpciones; col++)
                             {
-                                <div class="text-xs text-rose-600 mb-2">Cambios cerrados para este dia.</div>
-                            }
-                            <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
-                            <div class="grid lg:grid-cols-5 md:grid-cols-3 sm:grid-cols-2 gap-3">
-                                @foreach (var opc in opcionesDia)
-                                {
-                                    var seleccionada = d.Seleccion == opc.Clave[0];
-                                    <label class="border rounded-xl p-3 flex gap-3 items-start transition @((seleccionada) ? "border-emerald-500 bg-emerald-50 shadow-sm" : "border-slate-200 hover:border-slate-300")">
+                                var opc = col < opcionesDia.Count ? opcionesDia[col] : null;
+                                var seleccionada = opc != null && d.Seleccion == opc.Clave[0];
+                                var disabled = Model.Bloqueado || noHabilitado || !d.Editable || opc == null || string.IsNullOrWhiteSpace(opc.Nombre);
+                                <td class="menu-option-cell">
+                                    @if (opc == null || string.IsNullOrWhiteSpace(opc.Nombre))
+                                    {
+                                        <div class="menu-option-empty">Sin definir</div>
+                                    }
+                                    else
+                                    {
+                                        <label class="option-card @((seleccionada) ? "option-card--active" : "") @((disabled) ? "option-card--disabled" : "")">
                                             <input type="radio"
-                                               name="Dias[@i].Seleccion"
-                                               value="@opc.Clave"
-                                               class="mt-1 h-5 w-5 text-emerald-600 focus:ring-emerald-500"
-                                               @(seleccionada ? "checked" : "")
-                                               @((Model.Bloqueado || noHabilitado || !d.Editable) ? "disabled" : "") />
-                                        <div class="flex items-center gap-3 w-full">
+                                                   name="Dias[@i].Seleccion"
+                                                   value="@opc.Clave"
+                                                   class="option-card__input"
+                                                   data-price="@(opc.Precio?.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) ?? "0")"
+                                                   @(seleccionada ? "checked" : "")
+                                                   @((disabled) ? "disabled" : "") />
+                                            <div class="option-card__content">
+                                                <div class="option-card__header">
+                                                    <span class="chip chip--muted">Plato @opc.Clave</span>
+                                                    <span class="chip chip--success selected-chip @(seleccionada ? "" : "hidden")">Seleccionado</span>
+                                                    @if (!seleccionada && !d.Editable)
+                                                    {
+                                                        <span class="chip chip--soft">Cerrado</span>
+                                                    }
+                                                </div>
+                                                <div class="option-card__title">@opc.Nombre</div>
+                                                <div class="option-card__meta">@d.HorarioNombre</div>
+                                            </div>
                                             @if (!string.IsNullOrWhiteSpace(opc.Imagen))
                                             {
-                                                <img src="@opc.Imagen" alt="Opcion @opc.Clave de @d.HorarioNombre" class="w-20 h-20 object-cover rounded-md border" />
+                                                <div class="option-card__thumb">
+                                                    <img src="@opc.Imagen" alt="Plato @opc.Clave de @d.HorarioNombre" />
+                                                </div>
                                             }
-                                            <div class="space-y-1">
-                                                <div class="text-xs uppercase tracking-wide text-slate-500">Opcion @opc.Clave</div>
-                                                <div class="font-medium text-slate-800">@(!string.IsNullOrWhiteSpace(opc.Nombre) ? opc.Nombre : "Sin definir")</div>
-                                                <div class="text-xs text-slate-500">@d.HorarioNombre</div>
-                                            </div>
-                                        </div>
-                                    </label>
-                                }
-                            </div>
-                            @if (Model.AdicionalesDisponibles != null && Model.AdicionalesDisponibles.Count > 0)
-                            {
-                                <div class="mt-4">
-                                    <label class="block text-xs uppercase tracking-wide text-slate-500 mb-1">Adicional (se cobra 100%)</label>
-                                    <select name="Dias[@i].AdicionalOpcionId" class="w-full border rounded-lg px-3 py-2 text-sm" @((Model.Bloqueado || noHabilitado || !d.Editable) ? "disabled" : "")>
-                                        <option value="">-- Sin adicional --</option>
-                                        @foreach (var a in Model.AdicionalesDisponibles)
-                                        {
-                                            if (d.AdicionalOpcionId != null && d.AdicionalOpcionId.Value == a.Id)
-                                            {
-                                                <option value="@a.Id" selected>@a.Nombre (@a.Precio.ToString("C"))</option>
-                                            }
-                                            else
-                                            {
-                                                <option value="@a.Id">@a.Nombre (@a.Precio.ToString("C"))</option>
-                                            }
-                                        }
-                                    </select>
-                                </div>
+                                        </label>
+                                    }
+                                </td>
                             }
+                        </tr>
+                        @if (Model.AdicionalesDisponibles != null && Model.AdicionalesDisponibles.Count > 0)
+                        {
+                            <tr>
+                                <td class="menu-daycell"></td>
+                                <td colspan="@maxOpciones" class="menu-option-cell">
+                                    <div class="addon-field">
+                                        <label>Adicional (se cobra 100%)</label>
+                                        <select name="Dias[@i].AdicionalOpcionId" class="w-full"
+                                                @((Model.Bloqueado || noHabilitado || !d.Editable) ? "disabled" : "")>
+                                            <option value="" data-price="0">-- Sin adicional --</option>
+                                            @foreach (var a in Model.AdicionalesDisponibles)
+                                            {
+                                                var price = a.Precio.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+                                                if (d.AdicionalOpcionId != null && d.AdicionalOpcionId.Value == a.Id)
+                                                {
+                                                    <option value="@a.Id" data-price="@price" selected>@a.Nombre (@a.Precio.ToString("C"))</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@a.Id" data-price="@price">@a.Nombre (@a.Precio.ToString("C"))</option>
+                                                }
+                                            }
+                                        </select>
+                                    </div>
+                                </td>
+                            </tr>
                         }
-                    </div>
-                </div>
-            }
+                    }
+                </tbody>
+            </table>
         </div>
     }
+
+    <div class="summary-grid">
+        <div class="summary-card">
+            <p class="eyebrow">Platos seleccionados</p>
+            <p class="summary-value" id="summary-dias">@Model.RespuestasCount</p>
+            <p class="summary-hint">de @Model.TotalDias dias</p>
+        </div>
+        <div class="summary-card summary-card--accent">
+            <p class="eyebrow">Total empleado</p>
+            <p class="summary-value" id="summary-total-empleado">@Model.TotalEmpleado.ToString("C")</p>
+            <p class="summary-hint">Principal + opcionales</p>
+        </div>
+        <div class="summary-card">
+            <p class="eyebrow">Adicionales 100%</p>
+            <p class="summary-value" id="summary-adicionales">@((0m).ToString("C"))</p>
+            <p class="summary-hint">Solo cargos de empleado</p>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button class="btn-primary btn-lg" @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>Grabar seleccion</button>
+    </div>
 </form>
 
 <script>
     (() => {
+        const updateDaySelection = (dayIndex) => {
+            if (dayIndex === null || dayIndex === undefined) return;
+            const radios = document.querySelectorAll(`input[name="Dias[${dayIndex}].Seleccion"]`);
+            radios.forEach(r => {
+                const card = r.closest('.option-card');
+                if (!card) return;
+                const selectedChip = card.querySelector('.selected-chip');
+                const isChecked = r.checked;
+                card.classList.toggle('option-card--active', isChecked);
+                if (selectedChip) selectedChip.classList.toggle('hidden', !isChecked);
+            });
+        };
+
+        const handleRadioChange = (radio) => {
+            const name = radio.getAttribute('name') || '';
+            const match = name.match(/Dias\[(\d+)\]/);
+            if (!match) return;
+            const dayIndex = match[1];
+            const radios = document.querySelectorAll(`input[name="${name}"]`);
+            radios.forEach(r => r.checked = (r === radio));
+            updateDaySelection(dayIndex);
+        };
+
+        document.querySelectorAll('input[type="radio"][name*="Dias"]').forEach(radio => {
+            radio.addEventListener('change', () => handleRadioChange(radio));
+        });
+
         const clearButtons = document.querySelectorAll('.clear-day');
         clearButtons.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -234,27 +342,135 @@ else if (Model.Bloqueado)
                 radios.forEach(r => r.checked = false);
                 const adicional = document.querySelector(`select[name="Dias[${dayIndex}].AdicionalOpcionId"]`);
                 if (adicional) adicional.value = '';
+                updateDaySelection(dayIndex);
+                recomputeTotals();
             });
         });
         const clearAll = document.getElementById('clear-all');
         if (clearAll) {
             clearAll.addEventListener('click', () => {
                 document.querySelectorAll('input[type="radio"][name*="Dias"]').forEach(r => r.checked = false);
-                document.querySelectorAll('select[name*=\"Dias\"][name$=\".AdicionalOpcionId\"]').forEach(s => s.value = '');
+                document.querySelectorAll('select[name*="Dias"][name$=".AdicionalOpcionId"]').forEach(s => s.value = '');
+                const dayNames = new Set();
+                document.querySelectorAll('input[type="radio"][name*="Dias"]').forEach(r => {
+                    const match = (r.getAttribute('name') || '').match(/Dias\[(\d+)\]/);
+                    if (match) dayNames.add(match[1]);
+                });
+                dayNames.forEach(idx => updateDaySelection(idx));
+                recomputeTotals();
             });
         }
-        const tabButtons = document.querySelectorAll('[data-tab-target]');
+        const progressText = document.getElementById('progress-text');
+        const progressBar = document.querySelector('.progress-bar');
+        const updateProgress = () => {
+            if (!progressText || !progressBar) return;
+            const activePanel = document.querySelector('[data-tab-panel].is-active') || document.querySelector('[data-tab-panel]');
+            if (!activePanel) return;
+            const dayIndices = new Set();
+            activePanel.querySelectorAll('input[type="radio"][name*="Dias"]').forEach(r => {
+                const match = (r.getAttribute('name') || '').match(/Dias\[(\d+)\]/);
+                if (match) dayIndices.add(match[1]);
+            });
+            let selectedCount = 0;
+            dayIndices.forEach(idx => {
+                const selected = activePanel.querySelector(`input[name="Dias[${idx}].Seleccion"]:checked`);
+                if (selected) selectedCount += 1;
+            });
+            const totalDays = dayIndices.size;
+            progressText.textContent = `${selectedCount}/${totalDays} platos escogidos`;
+            const pct = totalDays === 0 ? 0 : Math.round((selectedCount / totalDays) * 100);
+            progressBar.style.width = `${pct}%`;
+        };
+
+        const recomputeTotals = () => {
+            let diasSeleccionados = 0;
+            let totalPrincipal = 0;
+            let totalAdicional = 0;
+
+            const dayIndices = new Set();
+            document.querySelectorAll('input[type="radio"][name*="Dias"]').forEach(r => {
+                const match = (r.getAttribute('name') || '').match(/Dias\[(\d+)\]/);
+                if (match) dayIndices.add(match[1]);
+            });
+
+            dayIndices.forEach(idx => {
+                const selected = document.querySelector(`input[name="Dias[${idx}].Seleccion"]:checked`);
+                if (selected) {
+                    diasSeleccionados += 1;
+                    const price = parseFloat(selected.getAttribute('data-price') || '0') || 0;
+                    totalPrincipal += price;
+                }
+                const adicional = document.querySelector(`select[name="Dias[${idx}].AdicionalOpcionId"] option:checked`);
+                if (adicional) {
+                    const priceAd = parseFloat(adicional.getAttribute('data-price') || '0') || 0;
+                    totalAdicional += priceAd;
+                }
+            });
+
+            const fmt = (v) => v.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' });
+            const diasNode = document.getElementById('summary-dias');
+            const empNode = document.getElementById('summary-total-empleado');
+            const adNode = document.getElementById('summary-adicionales');
+            const chipNode = document.getElementById('summary-total-chip');
+            if (diasNode) diasNode.textContent = diasSeleccionados.toString();
+            if (empNode) empNode.textContent = fmt(totalPrincipal + totalAdicional);
+            if (adNode) adNode.textContent = fmt(totalAdicional);
+            if (chipNode) chipNode.textContent = `Total a pagar: ${fmt(totalPrincipal + totalAdicional)}`;
+            updateProgress();
+        };
+
+        const tabButtons = document.querySelectorAll('.tab-pill');
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetId = btn.getAttribute('data-tab-target');
                 if (!targetId) return;
-                document.querySelectorAll('[data-tab-panel]').forEach(p => p.style.display = 'none');
+                document.querySelectorAll('[data-tab-panel]').forEach(p => p.classList.remove('is-active'));
                 const target = document.getElementById(targetId);
-                if (target) target.style.display = 'block';
-                tabButtons.forEach(b => b.classList.remove('bg-slate-200'));
-                btn.classList.add('bg-slate-200');
+                if (target) target.classList.add('is-active');
+                tabButtons.forEach(b => b.classList.remove('is-active'));
+                btn.classList.add('is-active');
+                updateProgress();
             });
         });
-        if (tabButtons.length > 0) tabButtons[0].classList.add('bg-slate-200');
+        if (tabButtons.length > 0) tabButtons[0].classList.add('is-active');
+
+        // Inicializa el estado visual segun seleccion inicial
+        const initialDays = new Set();
+        document.querySelectorAll('input[type="radio"][name*="Dias"]').forEach(r => {
+            const match = (r.getAttribute('name') || '').match(/Dias\[(\d+)\]/);
+            if (match) initialDays.add(match[1]);
+        });
+        initialDays.forEach(idx => updateDaySelection(idx));
+
+        // Eventos para totales en tiempo real
+        document.querySelectorAll('input[type="radio"][name*="Dias"]').forEach(r => {
+            r.addEventListener('change', recomputeTotals);
+        });
+        document.querySelectorAll('select[name*="Dias"][name$=".AdicionalOpcionId"]').forEach(s => {
+            s.addEventListener('change', recomputeTotals);
+        });
+        recomputeTotals();
+
+        const form = document.getElementById('form-menu');
+        if (form) {
+            form.addEventListener('submit', (event) => {
+                if (form.dataset.confirmed === '1') return;
+                event.preventDefault();
+                const seleccionadas = document.querySelectorAll('input[type="radio"][name*="Dias"]:checked').length;
+                const loc = (form.dataset.localizacion || '').trim();
+                const locLabel = loc ? `Localizacion: ${loc}` : 'Localizacion: sin asignar';
+                const mensaje = `Estas por guardar tu menu.\\nPlatos seleccionados: ${seleccionadas}\\n${locLabel}\\nDeseas continuar?`;
+                if (window.confirm(mensaje)) {
+                    form.dataset.confirmed = '1';
+                    form.submit();
+                }
+            });
+        }
     })();
 </script>
+
+
+
+
+
+

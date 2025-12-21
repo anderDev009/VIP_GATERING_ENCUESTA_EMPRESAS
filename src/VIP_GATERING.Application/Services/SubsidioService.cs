@@ -10,7 +10,9 @@ public record SubsidioContext(
     decimal EmpresaSubsidioValor,
     bool? SucursalSubsidia,
     SubsidioTipo? SucursalSubsidioTipo,
-    decimal? SucursalSubsidioValor);
+    decimal? SucursalSubsidioValor,
+    SubsidioTipo? EmpleadoSubsidioTipo,
+    decimal? EmpleadoSubsidioValor);
 
 public record SubsidioResultado(decimal PrecioEmpleado, decimal SubsidioAplicado);
 
@@ -28,12 +30,13 @@ public class SubsidioService : ISubsidioService
         if (!context.OpcionSubsidiada || !context.EmpleadoSubsidiado)
             return new SubsidioResultado(basePrecio, 0m);
 
-        var subsidia = context.SucursalSubsidia ?? context.EmpresaSubsidia;
+        var tieneOverrideEmpleado = context.EmpleadoSubsidioTipo != null || context.EmpleadoSubsidioValor != null;
+        var subsidia = tieneOverrideEmpleado ? true : (context.SucursalSubsidia ?? context.EmpresaSubsidia);
         if (!subsidia)
             return new SubsidioResultado(basePrecio, 0m);
 
-        var tipo = context.SucursalSubsidioTipo ?? context.EmpresaSubsidioTipo;
-        var valor = context.SucursalSubsidioValor ?? context.EmpresaSubsidioValor;
+        var tipo = context.EmpleadoSubsidioTipo ?? context.SucursalSubsidioTipo ?? context.EmpresaSubsidioTipo;
+        var valor = context.EmpleadoSubsidioValor ?? context.SucursalSubsidioValor ?? context.EmpresaSubsidioValor;
         if (valor <= 0)
             return new SubsidioResultado(basePrecio, 0m);
 

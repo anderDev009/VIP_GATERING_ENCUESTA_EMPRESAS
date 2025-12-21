@@ -1,9 +1,9 @@
 @model (VIP_GATERING.Domain.Entities.Empresa empresa, DateOnly inicio, DateOnly fin, List<(System.Guid id, string nombre)> sucursales)
 @{
-    ViewData["Title"] = "Copiar menú a dependientes";
+    ViewData["Title"] = "Copiar menu a Filiales";
 }
-<h1 class="text-2xl font-semibold mb-4">Copiar menú a dependientes</h1>
-<div class="mb-3 text-slate-600">Cliente: <strong>@Model.empresa.Nombre</strong> — Semana: @Model.inicio.ToString("yyyy-MM-dd") a @Model.fin.ToString("yyyy-MM-dd")</div>
+<h1 class="text-2xl font-semibold mb-4">Copiar menu a Filiales</h1>
+<div class="mb-3 text-slate-600">Empresa: <strong>@Model.empresa.Nombre</strong> - Semana: @Model.inicio.ToString("yyyy-MM-dd") a @Model.fin.ToString("yyyy-MM-dd")</div>
 
 <form asp-action="Copiar" method="post" class="space-y-4">
     @Html.AntiForgeryToken()
@@ -12,7 +12,7 @@
     <input type="hidden" name="fin" value="@Model.fin.ToString("yyyy-MM-dd")" />
 
     <div>
-        <label class="block text-sm text-slate-600 mb-2">Dependientes destino</label>
+        <label class="block text-sm text-slate-600 mb-2">Filiales destino</label>
         <label class="inline-flex items-center gap-2 mb-2">
             <input type="checkbox" id="chk-all" onchange="toggleAll(this)" />
             <span>Seleccionar todo</span>
@@ -30,8 +30,8 @@
     </div>
 
     <div>
-        <button class="px-4 py-2 bg-indigo-600 text-white rounded">Copiar desde menú del cliente</button>
-        <a asp-action="Clientes" class="px-3 py-2 border rounded">Volver</a>
+        <button class="btn-primary">Copiar desde menu de la Empresa</button>
+        <a asp-action="Sucursales" class="btn-outline">Volver</a>
     </div>
 </form>
 
@@ -40,3 +40,4 @@
         document.querySelectorAll('.chk-item').forEach(c=>c.checked = src.checked);
     }
 </script>
+

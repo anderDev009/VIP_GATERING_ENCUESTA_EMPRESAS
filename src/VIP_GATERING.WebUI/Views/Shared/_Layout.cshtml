@@ -18,7 +18,6 @@
         <header class="app-header">
             <div>
                 <a asp-controller="Home" asp-action="Index" class="app-logo">VIP GATERING</a>
-                <p class="app-tagline">Encuestas y experiencias premium</p>
             </div>
             <nav class="app-nav">
                 <a asp-controller="Empleado" asp-action="MiSemana" class="btn-primary">Mi semana</a>
@@ -35,12 +34,17 @@
                             <span class="nav-dropdown__chevron" aria-hidden="true">&#9662;</span>
                         </button>
                         <div class="nav-dropdown__menu">
-                            <a asp-controller="Empleados" asp-action="Index" class="nav-dropdown__item">Empleados</a>
-                            <a asp-controller="Sucursales" asp-action="Index" class="nav-dropdown__item">Dependientes</a>
                             @if (User.IsInRole("Admin"))
                             {
-                                <a asp-controller="Menu" asp-action="Sucursales" class="nav-dropdown__item">Men&uacute;</a>
-                                <a asp-controller="Admin" asp-action="Index" class="nav-dropdown__item">Panel administrador</a>
+                                <a asp-controller="Empresas" asp-action="Index" class="nav-dropdown__item">Empresa</a>
+                            }
+                            <a asp-controller="Sucursales" asp-action="Index" class="nav-dropdown__item">Filial</a>
+                            <a asp-controller="Localizaciones" asp-action="Index" class="nav-dropdown__item">Localizaciones</a>
+                            <a asp-controller="Empleados" asp-action="Index" class="nav-dropdown__item">Empleado</a>
+                            <a asp-controller="Menu" asp-action="Sucursales" class="nav-dropdown__item">Menu</a>
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <a asp-controller="Opciones" asp-action="Index" class="nav-dropdown__item">Platos</a>
                                 <a asp-controller="Security" asp-action="Index" class="nav-dropdown__item">Seguridad</a>
                             }
                         </div>
@@ -68,7 +72,7 @@
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                     <a asp-controller="Account" asp-action="ChangePassword" class="btn-outline inline-flex items-center gap-2">
-                        Cambiar contrase&ntilde;a
+                        Cambiar contrasena
                         @if (User.HasClaim("must_change_password", "1"))
                         {
                             <span class="badge-warning">Requerido</span>
@@ -90,10 +94,11 @@
         </main>
 
         <footer class="app-footer">
-            &copy; @DateTime.Now.Year VIP GATERING &mdash; Dise&ntilde;ado para experiencias memorables
+            &copy; @DateTime.Now.Year VIP GATERING
         </footer>
     </div>
 
     @RenderSection("Scripts", required: false)
 </body>
 </html>
+

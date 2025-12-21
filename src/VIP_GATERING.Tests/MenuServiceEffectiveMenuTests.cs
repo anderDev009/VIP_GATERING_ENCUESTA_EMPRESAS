@@ -38,9 +38,11 @@ public class MenuServiceEffectiveMenuTests
         IRepository<Empleado> repoEmp = new EfRepository<Empleado>(ctx);
         IRepository<EmpleadoSucursal> repoEmpSuc = new EfRepository<EmpleadoSucursal>(ctx);
         IRepository<MenuAdicional> repoMenuAdi = new EfRepository<MenuAdicional>(ctx);
+        IRepository<Localizacion> repoLoc = new EfRepository<Localizacion>(ctx);
+        IRepository<EmpleadoLocalizacion> repoEmpLoc = new EfRepository<EmpleadoLocalizacion>(ctx);
         IUnitOfWork uow = new UnitOfWork(ctx);
         var fechas = new FechaServicio();
-        var svc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, uow, fechas);
+        var svc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, repoLoc, repoEmpLoc, uow, fechas);
 
         var (inicio, fin) = fechas.RangoSemanaSiguiente();
         // Crear menú empresa con opciones
@@ -58,6 +60,5 @@ public class MenuServiceEffectiveMenuTests
         effective.Id.Should().Be(mEmp.Id);
     }
 }
-
 
 

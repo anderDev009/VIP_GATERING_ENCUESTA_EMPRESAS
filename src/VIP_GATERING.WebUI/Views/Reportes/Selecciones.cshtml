@@ -21,7 +21,7 @@
         </div>
     }
     <div class="md:col-span-2">
-        <label class="text-xs uppercase tracking-widest text-slate-400">Dependiente</label>
+        <label class="text-xs uppercase tracking-widest text-slate-400">Filial</label>
         <select name="sucursalId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
             <option value="">Todas</option>
             @foreach (var s in Model.Sucursales)
@@ -49,11 +49,11 @@
  </form>
 <script>history.scrollRestoration = 'manual';</script>
 
-<h2 class="font-semibold mb-2">Subtotales por dependiente</h2>
+<h2 class="font-semibold mb-2">Subtotales por Filial</h2>
 <table class="mb-6">
     <thead>
     <tr>
-        <th>Dependiente</th>
+        <th>Filial</th>
         <th class="text-right">Selecciones</th>
         <th class="text-right">Costo</th>
         @if (isAdmin)
@@ -97,7 +97,7 @@
     <thead>
     <tr>
         <th>Empleado</th>
-        <th>Dependiente</th>
+        <th>Filial</th>
         <th class="text-right">Selecciones</th>
         <th class="text-right">Costo</th>
         @if (isAdmin)
@@ -136,3 +136,4 @@
     </tr>
     </tfoot>
 </table>
+

@@ -1,4 +1,4 @@
-namespace VIP_GATERING.Domain.Entities;
+﻿namespace VIP_GATERING.Domain.Entities;
 
 public class RespuestaFormulario
 {
@@ -10,9 +10,13 @@ public class RespuestaFormulario
     public Guid OpcionMenuId { get; set; }
     public OpcionMenu? OpcionMenu { get; set; }
 
-    // Sucursal a la que se enviará la comida (puede diferir de la sucursal principal del empleado)
+    // Sucursal a la que se enviar la comida (puede diferir de la sucursal principal del empleado)
     public Guid SucursalEntregaId { get; set; }
     public Sucursal? SucursalEntrega { get; set; }
+
+    // Localizacion dentro de la filial para entrega (opcional)
+    public Guid? LocalizacionEntregaId { get; set; }
+    public Localizacion? LocalizacionEntrega { get; set; }
 
     // Adicional fijo (se cobra 100% al empleado)
     public Guid? AdicionalOpcionId { get; set; }
@@ -21,3 +25,5 @@ public class RespuestaFormulario
     // Seleccion: 'A', 'B', 'C', 'D' o 'E'
     public char Seleccion { get; set; }
 }
+
+

@@ -3,14 +3,19 @@
     ViewData["Title"] = "Nuevo empleado";
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
     var sucursales = (IEnumerable<VIP_GATERING.Domain.Entities.Sucursal>)ViewBag.Sucursales;
-    var sucursalesAsignadasIds = (IEnumerable<Guid>)(ViewBag.SucursalesAsignadasIds ?? new List<Guid>());
+    var localizaciones = (IEnumerable<VIP_GATERING.Domain.Entities.Localizacion>)(ViewBag.Localizaciones ?? new List<VIP_GATERING.Domain.Entities.Localizacion>());
+    var localizacionesAsignadasIds = (IEnumerable<Guid>)(ViewBag.LocalizacionesAsignadasIds ?? new List<Guid>());
+    var empresaLookup = empresas.ToDictionary(e => e.Id, e => e.Nombre);
+    var usaPersonalizado = Model.SubsidioTipo != null || Model.SubsidioValor != null;
+    var subsidioTipo = Model.SubsidioTipo ?? VIP_GATERING.Domain.Entities.SubsidioTipo.Porcentaje;
+    var subsidioValor = Model.SubsidioValor ?? 75m;
 }
-<h1 class="text-2xl font-semibold mb-4">Nuevo empleado</h1>
+<h1 class="text-2xl font-semibold mb-4 max-w-lg mx-auto">Nuevo empleado</h1>
 
-<form asp-action="Create" method="post" class="space-y-4 card max-w-lg">
+<form asp-action="Create" method="post" class="space-y-4 card max-w-lg mx-auto">
     @Html.AntiForgeryToken()
     <div>
-        <label class="block text-sm">Cliente</label>
+        <label class="block text-sm">Empresa</label>
         <select class="w-full border rounded p-2" id="selEmpresa">
             @foreach (var e in empresas)
             {
@@ -19,7 +24,7 @@
         </select>
     </div>
     <div>
-        <label class="block text-sm">Dependiente</label>
+        <label class="block text-sm">Filial</label>
         <select asp-for="SucursalId" class="w-full border rounded p-2" id="selSucursal">
             @foreach (var s in sucursales)
             {
@@ -28,15 +33,17 @@
         </select>
     </div>
     <div>
-        <label class="block text-sm">Dependientes adicionales (opcional)</label>
-        <select name="sucursalesAsignadas" multiple size="6" class="w-full border rounded p-2" id="selSucursalesAsignadas">
-            @foreach (var s in sucursales)
+        <label class="block text-sm">Localizaciones de entrega (opcional)</label>
+        <select name="localizacionesAsignadas" multiple class="w-full" id="selLocalizacionesAsignadas">
+            @foreach (var l in localizaciones)
             {
-                var selected = sucursalesAsignadasIds.Contains(s.Id);
-                <option value="@s.Id" data-empresa="@s.EmpresaId" selected="@(selected ? "selected" : null)">@s.Nombre</option>
+                var selected = localizacionesAsignadasIds.Contains(l.Id);
+                var empNombre = l.Sucursal != null && empresaLookup.TryGetValue(l.Sucursal.EmpresaId, out var empName) ? empName : string.Empty;
+                var etiqueta = string.IsNullOrWhiteSpace(empNombre) ? l.Nombre : $"{empNombre} - {l.Nombre}";
+                <option value="@l.Id" data-sucursal="@l.SucursalId" data-empresa="@(l.Sucursal?.EmpresaId)" selected="@(selected ? "selected" : null)">@etiqueta</option>
             }
         </select>
-        <div class="text-xs text-slate-500 mt-1">Si el empleado trabaja en más de una sucursal, selecciónalas aquí.</div>
+        <div class="text-xs text-slate-500 mt-1">Si el empleado tiene localizaciones asignadas, solo podra elegir entre ellas.</div>
     </div>
     <div>
         <label class="block text-sm">Estado</label>
@@ -47,7 +54,7 @@
         </select>
     </div>
     <div>
-        <label class="block text-sm">Código</label>
+        <label class="block text-sm">Codigo</label>
         <input asp-for="Codigo" class="w-full border rounded p-2" />
     </div>
     <div>
@@ -58,47 +65,135 @@
         <input asp-for="EsSubsidiado" type="checkbox" class="border rounded" id="chkSubsidio" />
         <label for="chkSubsidio" class="text-sm">Empleado subsidiado</label>
     </div>
-    <div class="text-xs text-slate-500 -mt-2">Si está desmarcado, el empleado paga el monto completo según el menú.</div>
+    <div class="text-xs text-slate-500 -mt-2">Si esta desmarcado, el empleado paga el monto completo segun el menu.</div>
+    <div class="mt-3">
+        <label class="block text-sm font-semibold">Subsidio del empleado</label>
+        <div class="flex flex-wrap gap-3 mt-1">
+            <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="subsidioEmpleadoScope" value="inherit" @(usaPersonalizado ? "" : "checked") />
+                Usar regla de Empresa/Filial
+            </label>
+            <label class="flex items-center gap-2 text-sm">
+                <input type="radio" name="subsidioEmpleadoScope" value="custom" @(usaPersonalizado ? "checked" : "") />
+                Personalizado
+            </label>
+        </div>
+    </div>
+    <div id="subsidio-empleado-custom" class="grid md:grid-cols-3 gap-3 @(usaPersonalizado ? "" : "hidden")">
+        <div>
+            <label class="block text-sm">Tipo de subsidio</label>
+            <select name="CustomEmpleadoSubsidioTipo" class="w-full border rounded p-2">
+                <option value="0" selected="@(subsidioTipo == VIP_GATERING.Domain.Entities.SubsidioTipo.Porcentaje ? "selected" : null)">Porcentaje</option>
+                <option value="1" selected="@(subsidioTipo == VIP_GATERING.Domain.Entities.SubsidioTipo.MontoFijo ? "selected" : null)">Monto fijo</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm">Valor del subsidio</label>
+            <input name="CustomEmpleadoSubsidioValor" type="number" min="0" step="0.01" value="@subsidioValor" class="w-full border rounded p-2" />
+        </div>
+    </div>
+    <div class="text-xs text-slate-500 -mt-1">Si seleccionas personalizado, se aplica este subsidio al empleado aunque la Empresa tenga otro.</div>
     <div class="flex gap-2">
         <button class="btn-primary">Guardar</button>
         <a asp-action="Index" class="btn-outline">Cancelar</a>
     </div>
 </form>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" />
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
-    (function(){
+    (() => {
         const emp = document.getElementById('selEmpresa');
         const suc = document.getElementById('selSucursal');
-        const sucMulti = document.getElementById('selSucursalesAsignadas');
-        function filter(){
+        const locMulti = document.getElementById('selLocalizacionesAsignadas');
+        if (!emp || !suc) return;
+
+        const allLocOptions = locMulti ? Array.from(locMulti.options).map(opt => ({
+            value: opt.value,
+            text: opt.text,
+            empresa: opt.dataset.empresa || '',
+            sucursal: opt.dataset.sucursal || ''
+        })) : [];
+
+        let locSelect = null;
+
+        const refreshSucursales = () => {
             const v = emp.value;
-            for(const opt of suc.options){
-                if(!opt.value) continue;
+            for (const opt of suc.options) {
+                if (!opt.value) continue;
                 const show = !opt.dataset.empresa || opt.dataset.empresa === v;
                 opt.style.display = show ? '' : 'none';
             }
-            if (sucMulti) {
-                for (const opt of sucMulti.options) {
-                    if (!opt.value) continue;
-                    const show = !opt.dataset.empresa || opt.dataset.empresa === v;
-                    opt.style.display = show ? '' : 'none';
-                    if (!show) opt.selected = false;
-                }
+            const current = suc.options[suc.selectedIndex];
+            if (current && current.style.display === 'none') {
+                const firstVisible = Array.from(suc.options).find(o => o.value && o.style.display !== 'none');
+                if (firstVisible) suc.value = firstVisible.value;
             }
-            syncMultiDisable();
-        }
-        function syncMultiDisable(){
-            if (!sucMulti) return;
-            const primary = suc.value;
-            for (const opt of sucMulti.options) {
-                if (opt.value === primary) {
-                    opt.disabled = true;
-                    opt.selected = false;
-                } else {
-                    opt.disabled = false;
-                }
+        };
+
+        const rebuildLocalizaciones = () => {
+            if (!locMulti) return;
+            const empresaId = emp.value;
+            const selectedValues = locSelect ? locSelect.items.slice() : Array.from(locMulti.options).filter(o => o.selected).map(o => o.value);
+
+            if (locSelect) {
+                locSelect.destroy();
+                locSelect = null;
             }
-        }
-        emp.addEventListener('change', filter); filter();
-        suc.addEventListener('change', syncMultiDisable); syncMultiDisable();
+            locMulti.innerHTML = '';
+            allLocOptions.forEach(opt => {
+                if (empresaId && opt.empresa && opt.empresa !== empresaId) return;
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.text;
+                option.dataset.empresa = opt.empresa;
+                option.dataset.sucursal = opt.sucursal;
+                if (selectedValues.includes(opt.value)) option.selected = true;
+                locMulti.appendChild(option);
+            });
+
+            if (typeof TomSelect === 'undefined') return;
+            locSelect = new TomSelect(locMulti, {
+                plugins: ['remove_button'],
+                maxItems: null,
+                persist: false,
+                create: false,
+                placeholder: 'Selecciona localizaciones...',
+                render: {
+                    option: (data, escape) => `<div class="ts-option-inner">${escape(data.text)}</div>`,
+                    item: (data, escape) => `<div class="ts-item-inner">${escape(data.text)}</div>`
+                }
+            });
+        };
+
+        const refreshAll = () => {
+            refreshSucursales();
+            rebuildLocalizaciones();
+        };
+
+        emp.addEventListener('change', refreshAll);
+        suc.addEventListener('change', () => {
+            const current = suc.options[suc.selectedIndex];
+            if (current && current.dataset.empresa && emp.value !== current.dataset.empresa) {
+                emp.value = current.dataset.empresa;
+            }
+            refreshAll();
+        });
+        refreshAll();
+    })();
+</script>
+
+
+<script>
+    (() => {
+        const radios = document.querySelectorAll('input[name="subsidioEmpleadoScope"]');
+        const custom = document.getElementById('subsidio-empleado-custom');
+        if (!radios.length || !custom) return;
+        const sync = () => {
+            const val = document.querySelector('input[name="subsidioEmpleadoScope"]:checked');
+            const isCustom = val && val.value === 'custom';
+            custom.classList.toggle('hidden', !isCustom);
+        };
+        radios.forEach(r => r.addEventListener('change', sync));
+        sync();
     })();
 </script>

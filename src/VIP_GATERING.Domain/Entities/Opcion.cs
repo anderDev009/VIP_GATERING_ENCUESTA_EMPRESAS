@@ -12,4 +12,5 @@ public class Opcion
     public bool LlevaItbis { get; set; }
     public string? ImagenUrl { get; set; }
     public bool Borrado { get; set; } = false;
+    public ICollection<OpcionHorario> Horarios { get; set; } = new List<OpcionHorario>();
 }

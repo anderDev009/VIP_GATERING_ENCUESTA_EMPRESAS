@@ -2,9 +2,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using VIP_GATERING.Application.Services;
 using VIP_GATERING.Domain.Entities;
 using VIP_GATERING.Infrastructure.Data;
@@ -30,7 +34,7 @@ public class EmpleadosController : Controller
 
     public async Task<IActionResult> Index(Guid? empresaId, Guid? sucursalId, string? q, int page = 1, int pageSize = 10)
     {
-        var query = _db.Empleados.Include(e => e.Sucursal)!.ThenInclude(s => s!.Empresa).Where(e => !e.Borrado).AsQueryable();
+        var query = _db.Empleados.Include(e => e.Sucursal).ThenInclude(s => s!.Empresa).Where(e => !e.Borrado).AsQueryable();
         // If Empresa role, limit to current Empresa
         if (User.IsInRole("Empresa"))
         {
@@ -39,7 +43,7 @@ public class EmpleadosController : Controller
                 query = query.Where(e => e.Sucursal!.EmpresaId == currentEmpresaId);
         }
         if (empresaId != null) query = query.Where(e => e.Sucursal!.EmpresaId == empresaId);
-        if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId || e.SucursalesAsignadas.Any(a => a.SucursalId == sucursalId));
+        if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId);
         if (!string.IsNullOrWhiteSpace(q))
         {
             var ql = q.ToLower();
@@ -49,7 +53,7 @@ public class EmpleadosController : Controller
         ViewBag.Sucursales = await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
         ViewBag.EmpresaId = empresaId; ViewBag.SucursalId = sucursalId; ViewBag.Q = q;
         var paged = await query.OrderBy(e => e.Nombre).ToPagedResultAsync(page, pageSize);
-        // Usuario por empleado en página
+        // Usuario por empleado en pagina
         var ids = paged.Items.Select(i => i.Id).ToList();
         var usuarios = await _db.Set<ApplicationUser>()
             .Where(u => u.EmpleadoId != null && ids.Contains(u.EmpleadoId.Value))
@@ -71,29 +75,46 @@ public class EmpleadosController : Controller
         }
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
-        ViewBag.SucursalesAsignadasIds = new List<Guid>();
+        var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
+        if (User.IsInRole("Empresa"))
+        {
+            var empresaId = _currentUser.EmpresaId;
+            if (empresaId != null)
+                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+        }
+        var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
+        ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
+        ViewBag.LocalizacionesAsignadasIds = new List<Guid>();
         return View(new Empleado());
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Empleado model, [FromForm] List<Guid> sucursalesAsignadas)
+    public async Task<IActionResult> Create(Empleado model, [FromForm] List<Guid> localizacionesAsignadas)
     {
-        if (!ModelState.IsValid)
+        ApplySubsidioEmpleadoFromForm(model);
+        async Task<IActionResult> ReturnInvalidAsync()
         {
             var empresas = _db.Empresas.AsQueryable();
             var sucursales = _db.Sucursales.AsQueryable();
+            var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
             if (User.IsInRole("Empresa"))
             {
                 var empresaId = _currentUser.EmpresaId;
                 empresas = empresas.Where(e => e.Id == empresaId);
                 sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
+                if (empresaId != null)
+                    localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
             }
             ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
-            ViewBag.SucursalesAsignadasIds = sucursalesAsignadas ?? new List<Guid>();
+            var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
+            ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList, localizacionesAsignadas);
+            ViewBag.LocalizacionesAsignadasIds = localizacionesAsignadas ?? new List<Guid>();
             return View(model);
         }
+        if (!ModelState.IsValid)
+            return await ReturnInvalidAsync();
         // Seguridad: Empresa solo puede crear en sus sucursales
         if (User.IsInRole("Empresa"))
         {
@@ -102,30 +123,35 @@ public class EmpleadosController : Controller
             if (empresaId == null || sucEmpresaId != empresaId) return Forbid();
         }
 
-        var extras = (sucursalesAsignadas ?? new List<Guid>())
-            .Where(x => x != Guid.Empty && x != model.SucursalId)
+        var localizacionIds = (localizacionesAsignadas ?? new List<Guid>())
+            .Where(x => x != Guid.Empty)
             .Distinct()
             .ToList();
-        if (extras.Count > 0)
+        if (localizacionIds.Count > 0)
         {
-            var empresaPrimaria = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
-            var empresasExtra = await _db.Sucursales.Where(s => extras.Contains(s.Id)).Select(s => s.EmpresaId).Distinct().ToListAsync();
-            if (empresasExtra.Any(e => e != empresaPrimaria))
+            var empresaPrimaria = await _db.Sucursales
+                .Where(s => s.Id == model.SucursalId)
+                .Select(s => s.EmpresaId)
+                .FirstOrDefaultAsync();
+            var locs = await _db.Localizaciones
+                .AsNoTracking()
+                .Include(l => l.Sucursal)
+                .Where(l => localizacionIds.Contains(l.Id))
+                .Select(l => new { l.Id, EmpresaId = l.Sucursal != null ? l.Sucursal.EmpresaId : Guid.Empty })
+                .ToListAsync();
+            if (locs.Count != localizacionIds.Count || locs.Any(l => l.EmpresaId != empresaPrimaria))
             {
-                TempData["Error"] = "Todas las sucursales asignadas deben pertenecer al mismo cliente.";
-                return RedirectToAction(nameof(Create));
+                ModelState.AddModelError(string.Empty, "Las localizaciones asignadas deben pertenecer a la empresa del empleado.");
+                return await ReturnInvalidAsync();
             }
-            if (User.IsInRole("Empresa") && _currentUser.EmpresaId != null && empresaPrimaria != _currentUser.EmpresaId)
-                return Forbid();
         }
 
         await _db.Empleados.AddAsync(model);
         await _db.SaveChangesAsync();
-
-        if (extras.Count > 0)
+        if (localizacionIds.Count > 0)
         {
-            var rows = extras.Select(sid => new EmpleadoSucursal { EmpleadoId = model.Id, SucursalId = sid }).ToList();
-            await _db.EmpleadosSucursales.AddRangeAsync(rows);
+            var rows = localizacionIds.Select(lid => new EmpleadoLocalizacion { EmpleadoId = model.Id, LocalizacionId = lid }).ToList();
+            await _db.EmpleadosLocalizaciones.AddRangeAsync(rows);
             await _db.SaveChangesAsync();
         }
         TempData["Success"] = "Empleado creado.";
@@ -134,7 +160,9 @@ public class EmpleadosController : Controller
 
     public async Task<IActionResult> Edit(Guid id)
     {
-        var ent = await _db.Empleados.Include(e => e.Sucursal).FirstOrDefaultAsync(e => e.Id == id);
+        var ent = await _db.Empleados
+            .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
+            .FirstOrDefaultAsync(e => e.Id == id);
         if (ent == null) return NotFound();
         if (User.IsInRole("Empresa"))
         {
@@ -152,32 +180,51 @@ public class EmpleadosController : Controller
         }
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
-        ViewBag.SucursalesAsignadasIds = await _db.EmpleadosSucursales.Where(es => es.EmpleadoId == ent.Id).Select(es => es.SucursalId).ToListAsync();
+        var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
+        if (User.IsInRole("Empresa"))
+        {
+            var empresaId = _currentUser.EmpresaId;
+            if (empresaId != null)
+                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+        }
+        var localizacionesAsignadasIds = await _db.EmpleadosLocalizaciones.Where(el => el.EmpleadoId == ent.Id).Select(el => el.LocalizacionId).ToListAsync();
+        var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
+        ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList, localizacionesAsignadasIds);
+        ViewBag.LocalizacionesAsignadasIds = localizacionesAsignadasIds;
         var user = await _db.Set<ApplicationUser>().FirstOrDefaultAsync(u => u.EmpleadoId == ent.Id);
         ViewBag.UsuarioExiste = user != null;
-        ViewBag.UsuarioEmail = user?.Email;
+        ViewBag.UsuarioNombre = user?.UserName;
+        ViewBag.UsuarioSugerido = BuildUserName(ent.Sucursal?.Empresa?.Nombre ?? "Empresa", ent.Codigo, ent.Id);
         return View(ent);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Empleado model, [FromForm] List<Guid> sucursalesAsignadas)
+    public async Task<IActionResult> Edit(Guid id, Empleado model, [FromForm] List<Guid> localizacionesAsignadas)
     {
-        if (!ModelState.IsValid)
+        ApplySubsidioEmpleadoFromForm(model);
+        async Task<IActionResult> ReturnInvalidAsync()
         {
             var empresas = _db.Empresas.AsQueryable();
             var sucursales = _db.Sucursales.AsQueryable();
+            var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
             if (User.IsInRole("Empresa"))
             {
                 var empresaId = _currentUser.EmpresaId;
                 empresas = empresas.Where(e => e.Id == empresaId);
                 sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
+                if (empresaId != null)
+                    localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
             }
             ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
-            ViewBag.SucursalesAsignadasIds = sucursalesAsignadas ?? new List<Guid>();
+            var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
+            ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList, localizacionesAsignadas);
+            ViewBag.LocalizacionesAsignadasIds = localizacionesAsignadas ?? new List<Guid>();
             return View(model);
         }
+        if (!ModelState.IsValid)
+            return await ReturnInvalidAsync();
         var ent = await _db.Empleados.FindAsync(id);
         if (ent == null) return NotFound();
         if (User.IsInRole("Empresa"))
@@ -191,29 +238,41 @@ public class EmpleadosController : Controller
         ent.SucursalId = model.SucursalId;
         ent.Estado = model.Estado;
         ent.EsSubsidiado = model.EsSubsidiado;
+        ent.SubsidioTipo = model.SubsidioTipo;
+        ent.SubsidioValor = model.SubsidioValor;
 
-        var extras = (sucursalesAsignadas ?? new List<Guid>())
-            .Where(x => x != Guid.Empty && x != ent.SucursalId)
+        var localizacionIds = (localizacionesAsignadas ?? new List<Guid>())
+            .Where(x => x != Guid.Empty)
             .Distinct()
             .ToList();
-        if (extras.Count > 0)
+        if (localizacionIds.Count > 0)
         {
-            var empresaPrimaria = await _db.Sucursales.Where(s => s.Id == ent.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
-            var empresasExtra = await _db.Sucursales.Where(s => extras.Contains(s.Id)).Select(s => s.EmpresaId).Distinct().ToListAsync();
-            if (empresasExtra.Any(e => e != empresaPrimaria))
+            var empresaPrimaria = await _db.Sucursales
+                .Where(s => s.Id == ent.SucursalId)
+                .Select(s => s.EmpresaId)
+                .FirstOrDefaultAsync();
+            var locs = await _db.Localizaciones
+                .AsNoTracking()
+                .Include(l => l.Sucursal)
+                .Where(l => localizacionIds.Contains(l.Id))
+                .Select(l => new { l.Id, EmpresaId = l.Sucursal != null ? l.Sucursal.EmpresaId : Guid.Empty })
+                .ToListAsync();
+            if (locs.Count != localizacionIds.Count || locs.Any(l => l.EmpresaId != empresaPrimaria))
             {
-                TempData["Error"] = "Todas las sucursales asignadas deben pertenecer al mismo cliente.";
-                return RedirectToAction(nameof(Edit), new { id });
+                ModelState.AddModelError(string.Empty, "Las localizaciones asignadas deben pertenecer a la empresa del empleado.");
+                return await ReturnInvalidAsync();
             }
         }
-
         var actuales = await _db.EmpleadosSucursales.Where(es => es.EmpleadoId == ent.Id).ToListAsync();
-        var actualesSet = actuales.Select(a => a.SucursalId).ToHashSet();
-        var nuevosSet = extras.ToHashSet();
-        var toRemove = actuales.Where(a => !nuevosSet.Contains(a.SucursalId)).ToList();
-        if (toRemove.Count > 0) _db.EmpleadosSucursales.RemoveRange(toRemove);
-        var toAdd = nuevosSet.Except(actualesSet).Select(sid => new EmpleadoSucursal { EmpleadoId = ent.Id, SucursalId = sid }).ToList();
-        if (toAdd.Count > 0) await _db.EmpleadosSucursales.AddRangeAsync(toAdd);
+        if (actuales.Count > 0) _db.EmpleadosSucursales.RemoveRange(actuales);
+
+        var actualesLoc = await _db.EmpleadosLocalizaciones.Where(el => el.EmpleadoId == ent.Id).ToListAsync();
+        var actualesLocSet = actualesLoc.Select(a => a.LocalizacionId).ToHashSet();
+        var nuevosLocSet = localizacionIds.ToHashSet();
+        var toRemoveLoc = actualesLoc.Where(a => !nuevosLocSet.Contains(a.LocalizacionId)).ToList();
+        if (toRemoveLoc.Count > 0) _db.EmpleadosLocalizaciones.RemoveRange(toRemoveLoc);
+        var toAddLoc = nuevosLocSet.Except(actualesLocSet).Select(lid => new EmpleadoLocalizacion { EmpleadoId = ent.Id, LocalizacionId = lid }).ToList();
+        if (toAddLoc.Count > 0) await _db.EmpleadosLocalizaciones.AddRangeAsync(toAddLoc);
 
         await _db.SaveChangesAsync();
         TempData["Success"] = "Empleado actualizado.";
@@ -243,7 +302,28 @@ public class EmpleadosController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // Atajo: simular sesión del usuario del empleado y abrir "Mi semana"
+    private static List<Localizacion> DistinctLocalizaciones(List<Localizacion> localizaciones, IEnumerable<Guid>? seleccionadas = null)
+    {
+        if (localizaciones.Count == 0) return localizaciones;
+        var selected = seleccionadas != null ? new HashSet<Guid>(seleccionadas) : new HashSet<Guid>();
+        var grupos = localizaciones
+            .GroupBy(l => new
+            {
+                EmpresaId = l.Sucursal?.EmpresaId ?? Guid.Empty,
+                Nombre = l.Nombre.Trim().ToUpperInvariant()
+            })
+            .ToList();
+
+        var resultado = new List<Localizacion>();
+        foreach (var g in grupos)
+        {
+            var elegido = g.FirstOrDefault(l => selected.Contains(l.Id)) ?? g.First();
+            resultado.Add(elegido);
+        }
+        return resultado;
+    }
+
+    // Atajo: simular sesion del usuario del empleado y abrir "Mi semana"
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> VerSemana(Guid id)
@@ -253,7 +333,7 @@ public class EmpleadosController : Controller
         return RedirectToAction("MiSemana", "Empleado");
     }
 
-    // Vista de semana para Admin/Empresa (solo lectura) de un empleado específico
+    // Vista de semana para Admin/Empresa (solo lectura) de un empleado especifico
     [HttpGet]
     public async Task<IActionResult> Semana(Guid id)
     {
@@ -261,7 +341,7 @@ public class EmpleadosController : Controller
         if (User.IsInRole("Empresa"))
         {
             var empresaId = _currentUser.EmpresaId;
-            var empEmpresaId = await _db.Empleados.Include(e => e.Sucursal)!.Where(e => e.Id == id)
+            var empEmpresaId = await _db.Empleados.Include(e => e.Sucursal).Where(e => e.Id == id)
                 .Select(e => e.Sucursal!.EmpresaId).FirstOrDefaultAsync();
             if (empresaId == null || empEmpresaId != empresaId) return Forbid();
         }
@@ -279,7 +359,7 @@ public class EmpleadosController : Controller
         if (modelo == null) return NotFound();
         if (!modelo.EsJefe)
         {
-            TempData["Error"] = "El empleado no está marcado como jefe.";
+            TempData["Error"] = "El empleado no esta marcado como jefe.";
             return RedirectToAction(nameof(Semana), new { id });
         }
         return View("EditarSemana", modelo);
@@ -294,7 +374,7 @@ public class EmpleadosController : Controller
         if (empleado == null) return NotFound();
         if (!empleado.EsJefe)
         {
-            TempData["Error"] = "El empleado no está marcado como jefe.";
+            TempData["Error"] = "El empleado no esta marcado como jefe.";
             return RedirectToAction(nameof(Semana), new { id = empleadoId });
         }
 
@@ -323,13 +403,16 @@ public class EmpleadosController : Controller
         }
         if (removals) await _db.SaveChangesAsync();
 
-        var sucursalesAsignadas = await _db.EmpleadosSucursales
+        var empresaId = await _db.Sucursales
             .AsNoTracking()
-            .Where(es => es.EmpleadoId == empleadoId)
-            .Select(es => es.SucursalId)
-            .ToListAsync();
-        var sucursalesPermitidas = sucursalesAsignadas.ToHashSet();
-        sucursalesPermitidas.Add(empleado.SucursalId);
+            .Where(s => s.Id == empleado.SucursalId)
+            .Select(s => s.EmpresaId)
+            .FirstAsync();
+        var sucursalesPermitidas = await _db.Sucursales
+            .AsNoTracking()
+            .Where(s => s.EmpresaId == empresaId)
+            .Select(s => s.Id)
+            .ToHashSetAsync();
 
         var menuIds = await _db.OpcionesMenu
             .AsNoTracking()
@@ -358,11 +441,12 @@ public class EmpleadosController : Controller
                 if (!sucursalesPermitidas.Contains(sucursalEntregaId))
                     sucursalEntregaId = empleado.SucursalId;
 
+                var localizacionEntregaId = existente?.LocalizacionEntregaId;
                 Guid? adicionalOpcionId = existente?.AdicionalOpcionId;
                 if (adicionalOpcionId != null && !setAdicionales.Contains(adicionalOpcionId.Value))
                     adicionalOpcionId = null;
 
-                await _menuService.RegistrarSeleccionAsync(empleadoId, d.OpcionMenuId, d.Seleccion.Value, sucursalEntregaId, adicionalOpcionId);
+                await _menuService.RegistrarSeleccionAsync(empleadoId, d.OpcionMenuId, d.Seleccion.Value, sucursalEntregaId, localizacionEntregaId, adicionalOpcionId);
             }
         }
 
@@ -373,40 +457,35 @@ public class EmpleadosController : Controller
     // Crear usuario de Identity para un empleado (solo Admin o Empresa dentro de su empresa)
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CrearUsuario(Guid id, string email)
+    public async Task<IActionResult> CrearUsuario(Guid id)
     {
-        var empleado = await _db.Empleados.Include(e => e.Sucursal).FirstOrDefaultAsync(e => e.Id == id);
+        var empleado = await _db.Empleados
+            .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
+            .FirstOrDefaultAsync(e => e.Id == id);
         if (empleado == null) return NotFound();
         if (User.IsInRole("Empresa"))
         {
             var empresaId = _currentUser.EmpresaId;
             if (empresaId == null || empleado.Sucursal!.EmpresaId != empresaId) return Forbid();
         }
-        if (string.IsNullOrWhiteSpace(email))
+
+        var empresaNombre = empleado.Sucursal?.Empresa?.Nombre ?? "Empresa";
+        var userName = BuildUserName(empresaNombre, empleado.Codigo, empleado.Id);
+        var existingByUserName = await _userManager.FindByNameAsync(userName);
+        if (existingByUserName != null)
         {
-            TempData["Error"] = "El correo es requerido.";
+            TempData["Error"] = "Ya existe un usuario con ese nombre. Ajusta el codigo o la empresa.";
             return RedirectToAction(nameof(Edit), new { id });
         }
-        var emailAttr = new EmailAddressAttribute();
-        if (!emailAttr.IsValid(email))
-        {
-            TempData["Error"] = "Formato de correo inválido.";
-            return RedirectToAction(nameof(Edit), new { id });
-        }
-        var existingByEmail = await _userManager.FindByEmailAsync(email);
-        if (existingByEmail != null)
-        {
-            TempData["Error"] = "Ya existe un usuario con ese correo.";
-            return RedirectToAction(nameof(Edit), new { id });
-        }
+
         var exists = await _db.Set<ApplicationUser>().AnyAsync(u => u.EmpleadoId == id);
         if (!exists)
         {
-            var tempPassword = IdentityDefaults.GetDefaultPassword();
+            var tempPassword = userName;
             var user = new ApplicationUser
             {
-                UserName = email,
-                Email = email,
+                UserName = userName,
+                Email = null,
                 EmailConfirmed = true,
                 EmpleadoId = empleado.Id,
                 EmpresaId = empleado.Sucursal!.EmpresaId
@@ -416,7 +495,7 @@ public class EmpleadosController : Controller
             {
                 await _userManager.AddToRoleAsync(user, "Empleado");
                 await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("must_change_password", "1"));
-                TempData["Success"] = "Usuario creado con contraseña temporal segura. Se pedirá cambio al iniciar sesión.";
+                TempData["Success"] = "Usuario creado. La contrasena inicial es el mismo usuario y se pedira cambio al iniciar sesion.";
             }
             else
             {
@@ -430,7 +509,7 @@ public class EmpleadosController : Controller
         return RedirectToAction(nameof(Edit), new { id });
     }
 
-    // Reset de contraseña (Admin o Empresa sobre su empleado)
+    // Reset de contrasena (Admin o Empresa sobre su empleado)
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ResetPassword(Guid id, string newPassword, string confirmPassword)
@@ -444,12 +523,12 @@ public class EmpleadosController : Controller
         }
         if (string.IsNullOrWhiteSpace(newPassword))
         {
-            TempData["Error"] = "La nueva contraseña es requerida.";
+            TempData["Error"] = "La nueva contrasena es requerida.";
             return RedirectToAction(nameof(Edit), new { id });
         }
         if (newPassword != confirmPassword)
         {
-            TempData["Error"] = "La confirmación no coincide.";
+            TempData["Error"] = "La confirmacion no coincide.";
             return RedirectToAction(nameof(Edit), new { id });
         }
         var user = await _db.Set<ApplicationUser>().FirstOrDefaultAsync(u => u.EmpleadoId == id);
@@ -480,26 +559,50 @@ public class EmpleadosController : Controller
             TempData["Error"] = string.Join("; ", add.Errors.Select(e => e.Description));
             return RedirectToAction(nameof(Edit), new { id });
         }
-        // Marcar para cambio en primer inicio (vía claim)
+        // Marcar para cambio en primer inicio (via claim)
         var claims = await _userManager.GetClaimsAsync(user);
         var mc = claims.FirstOrDefault(c => c.Type == "must_change_password");
         if (mc == null)
             await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("must_change_password", "1"));
         await _userManager.UpdateAsync(user);
-        TempData["Success"] = "Contraseña reiniciada. Se pedirá cambio al iniciar sesión.";
+        TempData["Success"] = "Contrasena reiniciada. Se pedira cambio al iniciar sesion.";
         return RedirectToAction(nameof(Edit), new { id });
     }
 
-    // Validación remota: email disponible (para creación de usuario)
-    [AcceptVerbs("Get", "Post")]
-    public async Task<IActionResult> CheckEmailAvailable(string email)
+    // Validacion remota: email disponible (para creacion de usuario)
+
+    private void ApplySubsidioEmpleadoFromForm(Empleado target)
     {
-        if (string.IsNullOrWhiteSpace(email)) return Json("El correo es requerido.");
-        var emailAttr = new System.ComponentModel.DataAnnotations.EmailAddressAttribute();
-        if (!emailAttr.IsValid(email)) return Json("Formato de correo inválido.");
-        var exists = await _userManager.FindByEmailAsync(email);
-        if (exists != null) return Json("Ya existe un usuario con ese correo.");
-        return Json(true);
+        var scope = Request.Form["subsidioEmpleadoScope"].FirstOrDefault();
+        if (!string.Equals(scope, "custom", StringComparison.OrdinalIgnoreCase))
+        {
+            target.SubsidioTipo = null;
+            target.SubsidioValor = null;
+            return;
+        }
+
+        if (Enum.TryParse<SubsidioTipo>(Request.Form["CustomEmpleadoSubsidioTipo"].FirstOrDefault(), out var tipo))
+        {
+            target.SubsidioTipo = tipo;
+        }
+        else
+        {
+            ModelState.AddModelError("SubsidioTipo", "Selecciona el tipo de subsidio.");
+        }
+
+        var valorStr = Request.Form["CustomEmpleadoSubsidioValor"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(valorStr) && decimal.TryParse(valorStr, NumberStyles.Number, CultureInfo.InvariantCulture, out var valorInv))
+        {
+            target.SubsidioValor = valorInv;
+        }
+        else if (!string.IsNullOrWhiteSpace(valorStr) && decimal.TryParse(valorStr, NumberStyles.Number, CultureInfo.CurrentCulture, out var valorCult))
+        {
+            target.SubsidioValor = valorCult;
+        }
+        else
+        {
+            ModelState.AddModelError("SubsidioValor", "Valor de subsidio invalido.");
+        }
     }
 
     private async Task<string?> ValidatePasswordAsync(ApplicationUser user, string newPassword)
@@ -513,21 +616,82 @@ public class EmpleadosController : Controller
         return allErrors.Count > 0 ? string.Join("; ", allErrors.Select(e => e.Description)) : null;
     }
 
+
+    private static string BuildUserName(string empresaNombre, string? empleadoCodigo, Guid empleadoId)
+    {
+        var empresa = ToTitleToken(empresaNombre);
+        var codigo = ToToken(empleadoCodigo);
+        if (string.IsNullOrWhiteSpace(codigo))
+            codigo = empleadoId.ToString("N").Substring(0, 6).ToUpperInvariant();
+
+        var baseUser = $"{empresa}_{codigo}";
+        return EnsurePasswordCompliance(baseUser);
+    }
+
+    private static string ToTitleToken(string value)
+    {
+        var cleaned = RemoveDiacritics(value ?? string.Empty);
+        var parts = Regex.Split(cleaned, "[^A-Za-z0-9]+");
+        var sb = new StringBuilder();
+        foreach (var part in parts)
+        {
+            if (string.IsNullOrWhiteSpace(part)) continue;
+            sb.Append(char.ToUpperInvariant(part[0]));
+            if (part.Length > 1) sb.Append(part.Substring(1).ToLowerInvariant());
+        }
+        return sb.Length == 0 ? "Filial" : sb.ToString();
+    }
+
+    private static string ToToken(string? value)
+    {
+        var cleaned = RemoveDiacritics(value ?? string.Empty);
+        var chars = cleaned.Where(char.IsLetterOrDigit).ToArray();
+        return new string(chars).ToUpperInvariant();
+    }
+
+    private static string RemoveDiacritics(string value)
+    {
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder();
+        foreach (var ch in normalized)
+        {
+            var cat = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (cat != UnicodeCategory.NonSpacingMark)
+                sb.Append(ch);
+        }
+        return sb.ToString().Normalize(NormalizationForm.FormC);
+    }
+
+    private static string EnsurePasswordCompliance(string value)
+    {
+        var result = value;
+        if (!result.Any(char.IsLower)) result += "a";
+        if (!result.Any(char.IsUpper)) result += "A";
+        if (!result.Any(char.IsDigit)) result += "1";
+        if (!result.Any(ch => !char.IsLetterOrDigit(ch))) result += "_";
+        if (result.Length < 20) result += new string('0', 20 - result.Length);
+        return result;
+    }
+
+
     private async Task<SemanaEmpleadoVM?> ConstruirSemanaEmpleadoAsync(Guid empleadoId, bool paraAdministrador)
     {
         var info = await _db.Empleados
-            .Include(e => e.Sucursal)!.ThenInclude(s => s!.Empresa)
+            .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
             .Where(e => e.Id == empleadoId)
             .Select(e => new
             {
                 e.Id,
                 e.Nombre,
+                e.Codigo,
                 e.EsJefe,
                 e.SucursalId,
                 SucursalNombre = e.Sucursal!.Nombre,
                 EmpresaId = e.Sucursal!.EmpresaId,
                 EmpresaNombre = e.Sucursal!.Empresa!.Nombre,
                 e.EsSubsidiado,
+                EmpleadoSubsidioTipo = e.SubsidioTipo,
+                EmpleadoSubsidioValor = e.SubsidioValor,
                 SucursalSubsidia = e.Sucursal!.SubsidiaEmpleados,
                 SucursalTipo = e.Sucursal!.SubsidioTipo,
                 SucursalValor = e.Sucursal!.SubsidioValor,
@@ -541,10 +705,14 @@ public class EmpleadosController : Controller
         var fechas = new FechaServicio();
         var (inicio, fin) = fechas.RangoSemanaSiguiente();
 
-        // Si el empleado ya tiene respuestas para la semana, inferir el menA§ y la sucursal de entrega desde esas respuestas
+        // Si el empleado ya tiene respuestas para la semana, inferir el menu y la sucursal de entrega desde esas respuestas
         var respuestaSemana = await _db.RespuestasFormulario
-            .Include(r => r.OpcionMenu)!.ThenInclude(om => om.Menu)
-            .Where(r => r.EmpleadoId == empleadoId && r.OpcionMenu!.Menu!.FechaInicio == inicio && r.OpcionMenu.Menu!.FechaTermino == fin)
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+            .Where(r => r.EmpleadoId == empleadoId
+                && r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio == inicio
+                && r.OpcionMenu.Menu.FechaTermino == fin)
             .FirstOrDefaultAsync();
 
         var menu = respuestaSemana?.OpcionMenu?.Menu
@@ -585,9 +753,10 @@ public class EmpleadosController : Controller
         foreach (var r in respuestas)
         {
             var om = opciones.FirstOrDefault(o => o.Id == r.OpcionMenuId);
+            if (om == null) continue;
             var opcion = GetOpcionSeleccionada(om, r.Seleccion);
             if (opcion == null) continue;
-            var ctx = new SubsidioContext(opcion.EsSubsidiado, info.EsSubsidiado, info.EmpresaSubsidia, info.EmpresaTipo, info.EmpresaValor, info.SucursalSubsidia, info.SucursalTipo, info.SucursalValor);
+            var ctx = new SubsidioContext(opcion.EsSubsidiado, info.EsSubsidiado, info.EmpresaSubsidia, info.EmpresaTipo, info.EmpresaValor, info.SucursalSubsidia, info.SucursalTipo, info.SucursalValor, info.EmpleadoSubsidioTipo, info.EmpleadoSubsidioValor);
             var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
             totalEmpleado += precio;
             totalEmpresa += opcion.Costo;
@@ -604,15 +773,16 @@ public class EmpleadosController : Controller
         {
             EmpleadoId = info.Id,
             EmpleadoNombre = info.Nombre,
+            EmpleadoCodigo = info.Codigo,
             MenuId = menu.Id,
             FechaInicio = menu.FechaInicio,
             FechaTermino = menu.FechaTermino,
             SucursalEntregaId = sucursalEntregaId,
             Bloqueado = encuestaCerrada,
-            MensajeBloqueo = encuestaCerrada ? $"La encuesta está cerrada desde {fechaCierreAuto:dd/MM/yyyy}." : null,
+            MensajeBloqueo = encuestaCerrada ? $"El menu esta cerrado desde {fechaCierreAuto:dd/MM/yyyy}." : null,
             RespuestasCount = respuestas.Count,
             TotalDias = opciones.Count,
-            OrigenMenu = menu.SucursalId != null ? "Dependiente" : "Cliente",
+            OrigenMenu = menu.SucursalId != null ? "Filial" : "Empresa",
             EmpresaNombre = info.EmpresaNombre,
             SucursalNombre = info.SucursalNombre,
             SucursalEntregaNombre = sucursalEntrega?.Nombre ?? info.SucursalNombre,
@@ -656,3 +826,4 @@ public class EmpleadosController : Controller
         };
     }
 }
+

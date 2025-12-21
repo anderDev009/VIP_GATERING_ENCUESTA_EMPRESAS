@@ -1,4 +1,4 @@
-using VIP_GATERING.Domain.Entities;
+﻿using VIP_GATERING.Domain.Entities;
 
 namespace VIP_GATERING.Application.Services;
 
@@ -35,10 +35,10 @@ public class MenuEdicionService : IMenuEdicionService
 
         var cerradoManual = menu.EncuestaCerradaManualmente && !menu.EncuestaReabiertaManualmente;
         if (cerradoManual)
-            return new MenuEdicionResultado(dict, false, true, "La encuesta está cerrada manualmente.", null);
+            return new MenuEdicionResultado(dict, false, true, "El menu esta cerrado manualmente.", null);
 
         if (semanaConcluida && esSemanaActual)
-            return new MenuEdicionResultado(dict, false, true, "La semana ya concluyó.", null);
+            return new MenuEdicionResultado(dict, false, true, "La semana ya concluyo.", null);
 
         if (menu.EncuestaReabiertaManualmente)
         {
@@ -52,14 +52,14 @@ public class MenuEdicionService : IMenuEdicionService
         if (!esSemanaActual)
         {
             if (cerradaPorFecha)
-                return new MenuEdicionResultado(dict, false, true, "La encuesta está cerrada para esta semana.", null);
+                return new MenuEdicionResultado(dict, false, true, "El menu esta cerrado para esta semana.", null);
 
             foreach (var k in dict.Keys) dict[k] = true;
             return new MenuEdicionResultado(dict, true, false, null, null);
         }
 
         if (!config.PermitirEdicionSemanaActual)
-            return new MenuEdicionResultado(dict, false, true, "La edición de la semana actual está deshabilitada.", null);
+            return new MenuEdicionResultado(dict, false, true, "La edicion de la semana actual esta deshabilitada.", null);
 
         var diasAnticipo = Math.Clamp(config.DiasAnticipoSemanaActual, 0, 7);
         var horaLimite = TimeOnly.FromTimeSpan(config.HoraLimiteEdicion);
@@ -82,3 +82,6 @@ public class MenuEdicionService : IMenuEdicionService
         return new MenuEdicionResultado(dict, tieneVentana, cerrado, mensaje, proximoLimite);
     }
 }
+
+
+

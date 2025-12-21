@@ -1,14 +1,14 @@
 @model VIP_GATERING.WebUI.Controllers.MenuClientesVM
 @{
-    ViewData["Title"] = "Clientes";
+    ViewData["Title"] = "Empresas";
 }
-<h1 class="text-2xl font-semibold mb-4">Clientes</h1>
+<h1 class="text-2xl font-semibold mb-4">Empresas</h1>
 
 <form method="get" class="mb-4 flex flex-wrap items-end gap-2">
     <input type="text" name="q" value="@Model.Q" placeholder="Buscar por nombre o RNC" class="border rounded p-2 grow min-w-[260px]" />
     <button class="btn-outline">Buscar</button>
     <a asp-action="Clientes" class="btn-outline">Limpiar</a>
-    <a asp-controller="Menu" asp-action="Sucursales" class="btn-outline">Ver dependientes (agrupados)</a>
+    <a asp-controller="Menu" asp-action="Sucursales" class="btn-outline">Ver Filiales (agrupados)</a>
 </form>
 
 <div class="overflow-x-auto">
@@ -17,24 +17,32 @@
             <tr>
                 <th class="text-left p-2">Nombre</th>
                 <th class="text-left p-2">RNC</th>
-                <th class="text-left p-2">Dependientes</th>
+                <th class="text-left p-2">Filiales</th>
                 <th class="p-2">Acciones</th>
             </tr>
         </thead>
         <tbody>
-        @foreach (var c in Model.Clientes)
+        @foreach (var c in Model.Sucursales)
         {
             <tr class="border-t">
                 <td class="p-2">@c.Nombre</td>
                 <td class="p-2">@c.Rnc</td>
                 <td class="p-2">@c.Sucursales</td>
                 <td class="p-2 space-x-2 text-right">
-                    <a href="@Url.Action("Administrar","Menu", new { empresaId = c.Id, alcance = "empresa" })" class="px-2 py-1 border rounded">Menú del cliente</a>
-                    <a href="@Url.Action("Sucursales","Menu", new { empresaId = c.Id })" class="px-2 py-1 border rounded">Dependientes</a>
-                    <a href="@Url.Action("Copiar","Menu", new { empresaId = c.Id })" class="px-2 py-1 border rounded">Copiar a dependientes</a>
+                    <a href="@Url.Action("Administrar","Menu", new { empresaId = c.Id, alcance = "empresa" })" class="btn-outline">Menu de la Empresa</a>
+                    <a href="@Url.Action("Sucursales","Menu", new { empresaId = c.Id })" class="btn-outline">Filiales</a>
+                    <a href="@Url.Action("Copiar","Menu", new { empresaId = c.Id })" class="btn-outline">Copiar a Filiales</a>
                 </td>
             </tr>
         }
         </tbody>
     </table>
 </div>
+
+@await Html.PartialAsync("_Pagination", new VIP_GATERING.WebUI.Models.PagedResult<object> {
+    Items = Model.Sucursales.Cast<object>().ToList(),
+    Page = Model.Page,
+    PageSize = Model.PageSize,
+    TotalItems = Model.TotalItems
+})
+

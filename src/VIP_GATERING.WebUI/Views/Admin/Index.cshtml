@@ -1,17 +1,17 @@
 @{
     ViewData["Title"] = "Administrar";
 }
-<h1 class="text-2xl font-semibold mb-6">Administración</h1>
+<h1 class="text-2xl font-semibold mb-6">Administracion</h1>
 
 <div class="grid md:grid-cols-2 gap-4">
     <a asp-controller="Menu" asp-action="Clientes" class="block p-4 border rounded bg-white hover:shadow">
-        <div class="font-medium">Cambiar menú</div>
-        <div class="text-sm text-slate-500">Buscar cliente y administrar menús (cliente o dependiente).</div>
+        <div class="font-medium">Cambiar menu</div>
+        <div class="text-sm text-slate-500">Buscar Empresa y administrar menus (Empresa o Filial).</div>
     </a>
 
     <a asp-controller="Menu" asp-action="CrearProxima" class="block p-4 border rounded bg-white hover:shadow">
-        <div class="font-medium">Crear/asegurar menú de la próxima semana</div>
-        <div class="text-sm text-slate-500">Genera la semana si aún no existe.</div>
+        <div class="font-medium">Crear/asegurar menu de la proxima semana</div>
+        <div class="text-sm text-slate-500">Genera la semana si aun no existe.</div>
     </a>
 
 
@@ -21,19 +21,23 @@
     </a>
 
     <a asp-controller="Opciones" asp-action="Index" class="block p-4 border rounded bg-white hover:shadow">
-        <div class="font-medium">Mantenimiento de opciones</div>
-        <div class="text-sm text-slate-500">Crear, editar y eliminar opciones.</div>
+        <div class="font-medium">Mantenimiento de platos</div>
+        <div class="text-sm text-slate-500">Crear, editar y eliminar platos.</div>
     </a>
 </div>
 
 <div class="mt-6 grid md:grid-cols-2 gap-4">
     <a asp-controller="Empresas" asp-action="Index" class="block p-4 border rounded bg-white hover:shadow">
-        <div class="font-medium">Clientes</div>
-        <div class="text-sm text-slate-500">Crear y administrar clientes.</div>
+        <div class="font-medium">Empresas</div>
+        <div class="text-sm text-slate-500">Crear y administrar Empresas.</div>
     </a>
     <a asp-controller="Sucursales" asp-action="Index" class="block p-4 border rounded bg-white hover:shadow">
-        <div class="font-medium">Dependientes</div>
-        <div class="text-sm text-slate-500">Crear y administrar dependientes.</div>
+        <div class="font-medium">Filiales</div>
+        <div class="text-sm text-slate-500">Crear y administrar Filiales.</div>
+    </a>
+    <a asp-controller="Localizaciones" asp-action="Index" class="block p-4 border rounded bg-white hover:shadow">
+        <div class="font-medium">Localizaciones</div>
+        <div class="text-sm text-slate-500">Crear y administrar localizaciones de entrega.</div>
     </a>
     <a asp-controller="Empleados" asp-action="Index" class="block p-4 border rounded bg-white hover:shadow">
         <div class="font-medium">Empleados</div>
@@ -42,5 +46,8 @@
 </div>
 
 <div class="mt-6">
-    <a asp-controller="Menu" asp-action="Sucursales" class="underline">Administrar por dependiente (agrupado por cliente)</a>
+    <a asp-controller="Menu" asp-action="Sucursales" class="underline">Administrar por Filial (agrupado por Empresa)</a>
 </div>
+
+
+

@@ -17,4 +17,6 @@ public class Sucursal
 
     // Empleados asignados a esta sucursal como adicional
     public ICollection<EmpleadoSucursal> EmpleadosAsignados { get; set; } = new List<EmpleadoSucursal>();
+
+    public ICollection<Localizacion> Localizaciones { get; set; } = new List<Localizacion>();
 }

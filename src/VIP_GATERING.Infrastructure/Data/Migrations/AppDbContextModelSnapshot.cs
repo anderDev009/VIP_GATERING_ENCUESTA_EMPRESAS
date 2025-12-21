@@ -143,6 +143,12 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("SubsidioTipo")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("SubsidioValor")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("SucursalId")
                         .HasColumnType("TEXT");
 
@@ -151,6 +157,28 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.HasIndex("SucursalId");
 
                     b.ToTable("Empleados");
+                });
+
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.EmpleadoLocalizacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("EmpleadoId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("LocalizacionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocalizacionId");
+
+                    b.HasIndex("EmpleadoId", "LocalizacionId")
+                        .IsUnique();
+
+                    b.ToTable("EmpleadosLocalizaciones");
                 });
 
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.EmpleadoSucursal", b =>
@@ -167,10 +195,10 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SucursalId");
+
                     b.HasIndex("EmpleadoId", "SucursalId")
                         .IsUnique();
-
-                    b.HasIndex("SucursalId");
 
                     b.ToTable("EmpleadosSucursales");
                 });
@@ -232,6 +260,27 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.ToTable("Horarios");
                 });
 
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.Localizacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SucursalId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SucursalId", "Nombre")
+                        .IsUnique();
+
+                    b.ToTable("Localizaciones");
+                });
+
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.Menu", b =>
                 {
                     b.Property<Guid>("Id")
@@ -282,10 +331,10 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OpcionId");
+
                     b.HasIndex("MenuId", "OpcionId")
                         .IsUnique();
-
-                    b.HasIndex("OpcionId");
 
                     b.ToTable("MenusAdicionales");
                 });
@@ -365,6 +414,28 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.ToTable("Opciones");
                 });
 
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.OpcionHorario", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("HorarioId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("OpcionId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HorarioId");
+
+                    b.HasIndex("OpcionId", "HorarioId")
+                        .IsUnique();
+
+                    b.ToTable("OpcionesHorarios");
+                });
+
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.OpcionMenu", b =>
                 {
                     b.Property<Guid>("Id")
@@ -429,6 +500,9 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.Property<Guid>("EmpleadoId")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("LocalizacionEntregaId")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid>("OpcionMenuId")
                         .HasColumnType("TEXT");
 
@@ -443,6 +517,8 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.HasIndex("AdicionalOpcionId");
 
                     b.HasIndex("EmpleadoId");
+
+                    b.HasIndex("LocalizacionEntregaId");
 
                     b.HasIndex("OpcionMenuId");
 
@@ -733,6 +809,25 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.Navigation("Sucursal");
                 });
 
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.EmpleadoLocalizacion", b =>
+                {
+                    b.HasOne("VIP_GATERING.Domain.Entities.Empleado", "Empleado")
+                        .WithMany("LocalizacionesAsignadas")
+                        .HasForeignKey("EmpleadoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("VIP_GATERING.Domain.Entities.Localizacion", "Localizacion")
+                        .WithMany("EmpleadosAsignados")
+                        .HasForeignKey("LocalizacionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empleado");
+
+                    b.Navigation("Localizacion");
+                });
+
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.EmpleadoSucursal", b =>
                 {
                     b.HasOne("VIP_GATERING.Domain.Entities.Empleado", "Empleado")
@@ -748,6 +843,17 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Empleado");
+
+                    b.Navigation("Sucursal");
+                });
+
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.Localizacion", b =>
+                {
+                    b.HasOne("VIP_GATERING.Domain.Entities.Sucursal", "Sucursal")
+                        .WithMany("Localizaciones")
+                        .HasForeignKey("SucursalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Sucursal");
                 });
@@ -784,6 +890,25 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Menu");
+
+                    b.Navigation("Opcion");
+                });
+
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.OpcionHorario", b =>
+                {
+                    b.HasOne("VIP_GATERING.Domain.Entities.Horario", "Horario")
+                        .WithMany("Opciones")
+                        .HasForeignKey("HorarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("VIP_GATERING.Domain.Entities.Opcion", "Opcion")
+                        .WithMany("Horarios")
+                        .HasForeignKey("OpcionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Horario");
 
                     b.Navigation("Opcion");
                 });
@@ -854,6 +979,11 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("VIP_GATERING.Domain.Entities.Localizacion", "LocalizacionEntrega")
+                        .WithMany()
+                        .HasForeignKey("LocalizacionEntregaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("VIP_GATERING.Domain.Entities.OpcionMenu", "OpcionMenu")
                         .WithMany("Respuestas")
                         .HasForeignKey("OpcionMenuId")
@@ -869,6 +999,8 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.Navigation("AdicionalOpcion");
 
                     b.Navigation("Empleado");
+
+                    b.Navigation("LocalizacionEntrega");
 
                     b.Navigation("OpcionMenu");
 
@@ -937,6 +1069,8 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.Empleado", b =>
                 {
+                    b.Navigation("LocalizacionesAsignadas");
+
                     b.Navigation("SucursalesAsignadas");
 
                     b.Navigation("Usuario");
@@ -947,11 +1081,26 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.Navigation("Sucursales");
                 });
 
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.Horario", b =>
+                {
+                    b.Navigation("Opciones");
+                });
+
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.Localizacion", b =>
+                {
+                    b.Navigation("EmpleadosAsignados");
+                });
+
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.Menu", b =>
                 {
                     b.Navigation("Adicionales");
 
                     b.Navigation("OpcionesPorDia");
+                });
+
+            modelBuilder.Entity("VIP_GATERING.Domain.Entities.Opcion", b =>
+                {
+                    b.Navigation("Horarios");
                 });
 
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.OpcionMenu", b =>
@@ -966,9 +1115,11 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.Sucursal", b =>
                 {
+                    b.Navigation("Empleados");
+
                     b.Navigation("EmpleadosAsignados");
 
-                    b.Navigation("Empleados");
+                    b.Navigation("Localizaciones");
                 });
 
             modelBuilder.Entity("VIP_GATERING.Domain.Entities.Usuario", b =>

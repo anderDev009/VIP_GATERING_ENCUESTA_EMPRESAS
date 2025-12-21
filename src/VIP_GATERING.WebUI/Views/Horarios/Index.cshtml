@@ -23,12 +23,12 @@
             <tr class="border-t">
                 <td class="p-2">@h.Nombre</td>
                 <td class="p-2">@h.Orden</td>
-                <td class="p-2">@(h.Activo?"Sí":"No")</td>
+                <td class="p-2">@(h.Activo?"Si":"No")</td>
                 <td class="p-2 text-right space-x-2">
                     <a asp-action="Edit" asp-route-id="@h.Id" class="btn-outline">Editar</a>
                     <form asp-action="Delete" method="post" class="inline">
                         <input type="hidden" name="id" value="@h.Id" />
-                        <button class="btn-outline text-red-600">Eliminar</button>
+                        <button class="btn-outline text-rose-500 border-rose-100 hover:border-rose-300">Eliminar</button>
                     </form>
                 </td>
             </tr>
@@ -36,4 +36,3 @@
         </tbody>
     </table>
 </div>
-
