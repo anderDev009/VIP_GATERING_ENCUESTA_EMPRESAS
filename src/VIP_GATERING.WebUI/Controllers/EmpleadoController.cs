@@ -71,12 +71,8 @@ public class EmpleadoController : Controller
             })
             .FirstAsync();
 
-        var sucursalesEmpresaIds = await _db.Sucursales
-            .AsNoTracking()
-            .Where(s => s.EmpresaId == sucursalDependencia.EmpresaId)
-            .Select(s => s.Id)
-            .ToListAsync();
-        var sucursalesPermitidas = sucursalesEmpresaIds.ToHashSet();
+        var sucursalPrincipalId = sucursalDependencia.Id;
+        var sucursalesPermitidas = new HashSet<Guid> { sucursalPrincipalId };
         var localizacionesAsignadasIds = await _db.EmpleadosLocalizaciones
             .AsNoTracking()
             .Where(el => el.EmpleadoId == empleadoId)
@@ -86,18 +82,16 @@ public class EmpleadoController : Controller
 
         var localizacionesRaw = await _db.Localizaciones
             .AsNoTracking()
-            .Include(l => l.Sucursal)
-            .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == sucursalDependencia.EmpresaId)
+            .Where(l => l.SucursalId == sucursalPrincipalId)
             .Select(l => new { l.Id, l.Nombre, l.SucursalId })
             .ToListAsync();
         if (tieneLocalizacionesAsignadas)
             localizacionesRaw = localizacionesRaw.Where(l => localizacionesAsignadasIds.Contains(l.Id)).ToList();
 
-        var sucursalesEntregaMap = await _db.Sucursales
-            .AsNoTracking()
-            .Where(s => s.EmpresaId == sucursalDependencia.EmpresaId)
-            .Select(s => new { s.Id, s.Nombre })
-            .ToDictionaryAsync(s => s.Id, s => s.Nombre);
+        var sucursalesEntregaMap = new Dictionary<Guid, string>
+        {
+            [sucursalPrincipalId] = sucursalDependencia.Nombre
+        };
 
         var localizacionesEntregaInfo = localizacionesRaw
             .GroupBy(l => l.Nombre.Trim(), StringComparer.OrdinalIgnoreCase)
@@ -403,17 +397,8 @@ public class EmpleadoController : Controller
             .Where(e => e.Id == empleadoId)
             .Select(e => new { e.SucursalId })
             .FirstAsync();
-        var empresaId = await _db.Sucursales
-            .AsNoTracking()
-            .Where(s => s.Id == empleado.SucursalId)
-            .Select(s => s.EmpresaId)
-            .FirstAsync();
-        var sucursalesPermitidas = await _db.Sucursales
-            .AsNoTracking()
-            .Where(s => s.EmpresaId == empresaId)
-            .Select(s => s.Id)
-            .ToListAsync();
-        var sucursalesPermitidasSet = sucursalesPermitidas.ToHashSet();
+        var sucursalPrincipalIdPost = empleado.SucursalId;
+        var sucursalesPermitidasSet = new HashSet<Guid> { sucursalPrincipalIdPost };
 
         Guid? localizacionEntregaId = model.LocalizacionEntregaId;
         var localizacionesAsignadas = await _db.EmpleadosLocalizaciones
@@ -425,8 +410,7 @@ public class EmpleadoController : Controller
         {
             var baseQuery = _db.Localizaciones
                 .AsNoTracking()
-                .Include(l => l.Sucursal)
-                .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+                .Where(l => l.SucursalId == sucursalPrincipalIdPost);
             if (localizacionesAsignadas.Count > 0)
                 baseQuery = baseQuery.Where(l => localizacionesAsignadas.Contains(l.Id));
             localizacionEntregaId = await baseQuery
@@ -470,9 +454,9 @@ public class EmpleadoController : Controller
                 return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
             }
         }
-        if (localizacionEntrega != null && localizacionEntrega.Sucursal != null && localizacionEntrega.Sucursal.EmpresaId != empresaId)
+        if (localizacionEntrega != null && localizacionEntrega.SucursalId != sucursalPrincipalIdPost)
         {
-            TempData["Error"] = "Localizacion de entrega no pertenece a la empresa.";
+            TempData["Error"] = "Localizacion de entrega no pertenece a la filial.";
             return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
         }
 

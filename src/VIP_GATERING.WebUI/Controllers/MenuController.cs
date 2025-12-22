@@ -319,6 +319,8 @@ public class MenuController : Controller
         {
             FechaInicio = inicio,
             FechaTermino = fin,
+            EmpresaId = empresaLookupId,
+            SucursalId = sucursalLookupId,
             EmpresaNombre = empresaNombre,
             FilialNombre = sucursalNombre,
             OrigenScope = sucursalLookupId != null ? "Filial" : "Empresa",

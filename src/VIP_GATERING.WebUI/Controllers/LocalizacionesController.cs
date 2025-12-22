@@ -74,6 +74,10 @@ public class LocalizacionesController : Controller
     {
         if (string.IsNullOrWhiteSpace(model.Nombre))
             ModelState.AddModelError("Nombre", "Nombre requerido.");
+        if (string.IsNullOrWhiteSpace(model.Direccion))
+            ModelState.AddModelError("Direccion", "Direccion requerida.");
+        if (string.IsNullOrWhiteSpace(model.IndicacionesEntrega))
+            ModelState.AddModelError("IndicacionesEntrega", "Indicaciones de entrega requeridas.");
 
         if (!ModelState.IsValid)
             return await ReturnInvalidAsync(model);
@@ -118,6 +122,10 @@ public class LocalizacionesController : Controller
 
         if (string.IsNullOrWhiteSpace(model.Nombre))
             ModelState.AddModelError("Nombre", "Nombre requerido.");
+        if (string.IsNullOrWhiteSpace(model.Direccion))
+            ModelState.AddModelError("Direccion", "Direccion requerida.");
+        if (string.IsNullOrWhiteSpace(model.IndicacionesEntrega))
+            ModelState.AddModelError("IndicacionesEntrega", "Indicaciones de entrega requeridas.");
 
         if (!ModelState.IsValid)
         {
@@ -143,6 +151,8 @@ public class LocalizacionesController : Controller
 
         ent.Nombre = model.Nombre;
         ent.SucursalId = model.SucursalId;
+        ent.Direccion = model.Direccion;
+        ent.IndicacionesEntrega = model.IndicacionesEntrega;
         await _db.SaveChangesAsync();
         TempData["Success"] = "Localizacion actualizada.";
         return RedirectToAction(nameof(Index), new { empresaId = sucursalEmpresaId });

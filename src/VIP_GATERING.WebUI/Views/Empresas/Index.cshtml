@@ -20,6 +20,9 @@
             <tr>
                 <th class="text-left p-2">Nombre</th>
                 <th class="text-left p-2">RNC</th>
+                <th class="text-left p-2">Contacto</th>
+                <th class="text-left p-2">Teléfono</th>
+                <th class="text-left p-2">Dirección</th>
                 <th class="p-2">Acciones</th>
             </tr>
         </thead>
@@ -29,6 +32,9 @@
             <tr class="border-t">
                 <td class="p-2">@e.Nombre</td>
                 <td class="p-2">@e.Rnc</td>
+                <td class="p-2">@e.ContactoNombre</td>
+                <td class="p-2">@e.ContactoTelefono</td>
+                <td class="p-2">@e.Direccion</td>
                 <td class="p-2 text-right space-x-2">
                     <a asp-action="Edit" asp-route-id="@e.Id" class="btn-outline">Editar</a>
                     <form asp-action="Delete" method="post" class="inline">

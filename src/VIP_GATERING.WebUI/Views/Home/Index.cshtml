@@ -3,7 +3,10 @@
     var nombre = User.Identity?.IsAuthenticated == true ? User.Identity.Name : "Invitado";
     var esAdmin = User.IsInRole("Admin");
     var esEmpresa = User.IsInRole("Empresa");
-    var reportesActivos = esAdmin ? "1" : (esEmpresa ? "0" : "1");
+    var hoy = DateTime.Today;
+    var diff = ((int)hoy.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+    var lunes = hoy.AddDays(-diff);
+    var viernes = lunes.AddDays(4);
 }
 
 <section class="dashboard-hero">
@@ -11,20 +14,18 @@
         <p class="text-sm text-slate-500">Bienvenido de nuevo</p>
         <h1>@nombre</h1>
         <p class="text-slate-500 max-w-xl">Consulta el estado general de menus y accede rapidamente a los modulos clave para continuar con la operacion diaria.</p>
+        <div class="mt-4 flex flex-wrap gap-3">
+            <a asp-controller="Empleado" asp-action="MiSemana" class="btn-primary">Mi semana</a>
+            @if (esAdmin || esEmpresa)
+            {
+                <a asp-controller="Menu" asp-action="Administrar" class="btn-outline">Administrar menus</a>
+            }
+        </div>
     </div>
-    <div class="dashboard-metrics">
-        <div class="dashboard-metric">
-            <p class="label">Semana actual</p>
-            <p class="value">@DateTime.Now.ToString("dd MMM")</p>
-        </div>
-        <div class="dashboard-metric">
-            <p class="label">Reportes activos</p>
-            <p class="value">@reportesActivos</p>
-        </div>
-        <div class="dashboard-metric">
-            <p class="label">Atajos</p>
-            <p class="value">@(User.Identity?.IsAuthenticated == true ? "Listo" : "Iniciar")</p>
-        </div>
+    <div class="dashboard-metric">
+        <p class="label">Semana actual</p>
+        <p class="value">@($"{lunes:dd MMM} - {viernes:dd MMM}")</p>
+        <p class="text-xs text-slate-400">@lunes.ToString("dd MMM yyyy") - @viernes.ToString("dd MMM yyyy")</p>
     </div>
 </section>
 

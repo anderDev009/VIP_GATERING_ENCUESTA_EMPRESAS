@@ -62,16 +62,29 @@ public static class SeedData
                         Nombre = item.Empresa.Trim(),
                         SubsidiaEmpleados = true,
                         SubsidioTipo = SubsidioTipo.Porcentaje,
-                        SubsidioValor = item.SubsidioEmpresaPct ?? 75m
+                        SubsidioValor = item.SubsidioEmpresaPct ?? 75m,
+                        ContactoNombre = $"{item.Empresa.Trim()} - Contacto principal",
+                        ContactoTelefono = "000-000-0000",
+                        Direccion = $"Oficina central de {item.Empresa.Trim()}"
                     };
                     db.Empresas.Add(empresa);
                     await db.SaveChangesAsync();
                 }
-                else if (item.SubsidioEmpresaPct.HasValue && empresa.SubsidioValor <= 0)
+                else
                 {
-                    empresa.SubsidiaEmpleados = true;
-                    empresa.SubsidioTipo = SubsidioTipo.Porcentaje;
-                    empresa.SubsidioValor = item.SubsidioEmpresaPct.Value;
+                    if (string.IsNullOrWhiteSpace(empresa.ContactoNombre))
+                        empresa.ContactoNombre = $"{empresa.Nombre} - Contacto principal";
+                    if (string.IsNullOrWhiteSpace(empresa.ContactoTelefono))
+                        empresa.ContactoTelefono = "000-000-0000";
+                    if (string.IsNullOrWhiteSpace(empresa.Direccion))
+                        empresa.Direccion = $"Oficina central de {empresa.Nombre}";
+
+                    if (item.SubsidioEmpresaPct.HasValue && empresa.SubsidioValor <= 0)
+                    {
+                        empresa.SubsidiaEmpleados = true;
+                        empresa.SubsidioTipo = SubsidioTipo.Porcentaje;
+                        empresa.SubsidioValor = item.SubsidioEmpresaPct.Value;
+                    }
                 }
 
                 var suc = await db.Sucursales.FirstOrDefaultAsync(s => s.Nombre == item.Filial && s.EmpresaId == empresa.Id);
@@ -111,7 +124,12 @@ public static class SeedData
                 var sucursalesPorEmpresa = await db.Sucursales
                     .AsNoTracking()
                     .GroupBy(s => s.EmpresaId)
-                    .Select(g => new { EmpresaId = g.Key, SucursalId = g.Select(s => s.Id).FirstOrDefault() })
+                    .Select(g => new
+                    {
+                        EmpresaId = g.Key,
+                        SucursalId = g.Select(s => s.Id).FirstOrDefault(),
+                        SucursalNombre = g.Select(s => s.Nombre).FirstOrDefault()
+                    })
                     .ToListAsync();
                 var existentes = await db.Localizaciones
                     .AsNoTracking()
@@ -128,7 +146,14 @@ public static class SeedData
                     {
                         var key = $"{suc.SucursalId:N}|{nombre}";
                         if (existentesSet.Contains(key)) continue;
-                        db.Localizaciones.Add(new Localizacion { Nombre = nombre, SucursalId = suc.SucursalId });
+                        var sucursalNombre = string.IsNullOrWhiteSpace(suc.SucursalNombre) ? "filial" : suc.SucursalNombre;
+                        db.Localizaciones.Add(new Localizacion
+                        {
+                            Nombre = nombre,
+                            SucursalId = suc.SucursalId,
+                            Direccion = $"Dirección de {sucursalNombre}",
+                            IndicacionesEntrega = $"Entrega en {nombre}"
+                        });
                         existentesSet.Add(key);
                     }
                 }

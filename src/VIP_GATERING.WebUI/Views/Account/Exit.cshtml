@@ -1,0 +1,18 @@
+@{
+    ViewData["Title"] = "Salir";
+}
+
+<section class="page-panel max-w-xl mx-auto space-y-5 text-center">
+    <div class="space-y-3">
+        <div class="inline-flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 rounded-full mx-auto bg-white">
+            <span class="text-[0.8rem] font-bold tracking-[0.3em] text-slate-500">VIP</span>
+            <span class="text-sm uppercase text-slate-500">GATERING</span>
+        </div>
+        <h1 class="text-3xl font-semibold text-slate-900">Hasta pronto</h1>
+        <p class="text-slate-500">La sesión se cerró. Cuando estés listo, vuelve al punto inicial para ingresar nuevamente.</p>
+    </div>
+    <div class="flex flex-wrap justify-center gap-3">
+        <a asp-action="Login" class="btn-primary">Entrar</a>
+        <a asp-controller="Home" asp-action="Index" class="btn-outline">Ir al panel</a>
+    </div>
+</section>

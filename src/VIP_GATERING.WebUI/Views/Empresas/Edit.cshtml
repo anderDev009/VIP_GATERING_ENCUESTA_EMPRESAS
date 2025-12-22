@@ -15,6 +15,21 @@
         <label class="block text-sm">RNC</label>
         <input asp-for="Rnc" class="w-full border rounded p-2" />
     </div>
+    <div>
+        <label class="block text-sm">Persona de contacto</label>
+        <input asp-for="ContactoNombre" class="w-full border rounded p-2" />
+        <span asp-validation-for="ContactoNombre" class="text-rose-600 text-xs"></span>
+    </div>
+    <div>
+        <label class="block text-sm">Teléfono de contacto</label>
+        <input asp-for="ContactoTelefono" class="w-full border rounded p-2" />
+        <span asp-validation-for="ContactoTelefono" class="text-rose-600 text-xs"></span>
+    </div>
+    <div>
+        <label class="block text-sm">Dirección</label>
+        <textarea asp-for="Direccion" rows="2" class="w-full border rounded p-2"></textarea>
+        <span asp-validation-for="Direccion" class="text-rose-600 text-xs"></span>
+    </div>
     <div class="grid md:grid-cols-2 gap-4">
         <div>
             <label class="block text-sm">Subsidio activo</label>

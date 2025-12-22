@@ -31,6 +31,16 @@
             }
         </select>
     </div>
+    <div>
+        <label class="block text-sm">Dirección</label>
+        <input asp-for="Direccion" class="w-full border rounded p-2" />
+        <span asp-validation-for="Direccion" class="text-rose-600 text-xs"></span>
+    </div>
+    <div>
+        <label class="block text-sm">Notas de entrega</label>
+        <textarea asp-for="IndicacionesEntrega" rows="3" class="w-full border rounded p-2"></textarea>
+        <span asp-validation-for="IndicacionesEntrega" class="text-rose-600 text-xs"></span>
+    </div>
     <div class="flex gap-2">
         <button class="btn-primary">Guardar</button>
         <a asp-action="Index" class="btn-outline">Cancelar</a>

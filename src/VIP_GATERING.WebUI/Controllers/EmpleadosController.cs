@@ -48,12 +48,46 @@ public class EmpleadosController : Controller
         }
         if (empresaId != null) query = query.Where(e => e.Sucursal!.EmpresaId == empresaId);
         if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId);
-        if (localizacionId != null)
-            query = query.Where(e => e.LocalizacionesAsignadas.Any(l => l.LocalizacionId == localizacionId));
         if (!string.IsNullOrWhiteSpace(q))
         {
             var ql = q.ToLower();
             query = query.Where(e => e.Nombre.ToLower().Contains(ql) || (e.Codigo != null && e.Codigo.ToLower().Contains(ql)));
+        }
+        var localizacionFiltro = localizacionId != null
+            ? await _db.Localizaciones
+                .AsNoTracking()
+                .Include(l => l.Sucursal)
+                .FirstOrDefaultAsync(l => l.Id == localizacionId.Value)
+            : null;
+        if (localizacionId != null)
+        {
+            if (localizacionFiltro == null)
+            {
+                query = query.Where(e => false);
+            }
+            else if (sucursalId != null)
+            {
+                query = query.Where(e => e.LocalizacionesAsignadas.Any(l => l.LocalizacionId == localizacionId));
+            }
+            else
+            {
+                var nombreFiltro = localizacionFiltro.Nombre.Trim();
+                var empresaFiltro = empresaId ?? localizacionFiltro.Sucursal?.EmpresaId;
+                if (empresaFiltro != null)
+                {
+                    query = query.Where(e => e.LocalizacionesAsignadas.Any(l =>
+                        l.Localizacion != null
+                        && l.Localizacion.Sucursal != null
+                        && l.Localizacion.Sucursal.EmpresaId == empresaFiltro
+                        && l.Localizacion.Nombre.Equals(nombreFiltro, StringComparison.OrdinalIgnoreCase)));
+                }
+                else
+                {
+                    query = query.Where(e => e.LocalizacionesAsignadas.Any(l =>
+                        l.Localizacion != null
+                        && l.Localizacion.Nombre.Equals(nombreFiltro, StringComparison.OrdinalIgnoreCase)));
+                }
+            }
         }
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
@@ -71,7 +105,10 @@ public class EmpleadosController : Controller
         var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
         ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
         ViewBag.EmpresaId = empresaId; ViewBag.SucursalId = sucursalId; ViewBag.LocalizacionId = localizacionId; ViewBag.Q = q;
-        var paged = await query.OrderBy(e => e.Nombre).ToPagedResultAsync(page, pageSize);
+        var hasFilters = empresaId != null || sucursalId != null || localizacionId != null || !string.IsNullOrWhiteSpace(q);
+        var paged = hasFilters
+            ? await query.OrderBy(e => e.Nombre).ToPagedResultAsync(page, pageSize)
+            : new PagedResult<Empleado> { Items = Array.Empty<Empleado>(), Page = page, PageSize = pageSize, TotalItems = 0 };
         // Usuario por empleado en pagina
         var ids = paged.Items.Select(i => i.Id).ToList();
         var usuarios = await _db.Set<ApplicationUser>()
@@ -132,6 +169,8 @@ public class EmpleadosController : Controller
             ViewBag.LocalizacionesAsignadasIds = localizacionesAsignadas ?? new List<Guid>();
             return View(model);
         }
+        if (string.IsNullOrWhiteSpace(model.Nombre) || string.IsNullOrWhiteSpace(model.Codigo))
+            ModelState.AddModelError(string.Empty, "Por favor ingresa los datos del empleado.");
         if (!ModelState.IsValid)
             return await ReturnInvalidAsync();
         // Seguridad: Empresa solo puede crear en sus sucursales
@@ -178,6 +217,9 @@ public class EmpleadosController : Controller
 
         await _db.Empleados.AddAsync(model);
         await _db.SaveChangesAsync();
+        var autoUserMessage = await TryCreateIdentityUsuarioAsync(model.Id, model.Codigo, model.SucursalId);
+        if (!string.IsNullOrEmpty(autoUserMessage))
+            TempData["Info"] = autoUserMessage;
         if (localizacionIds.Count > 0)
         {
             var rows = localizacionIds.Select(lid => new EmpleadoLocalizacion { EmpleadoId = model.Id, LocalizacionId = lid }).ToList();
@@ -645,6 +687,42 @@ public class EmpleadosController : Controller
         {
             ModelState.AddModelError("SubsidioValor", "Valor de subsidio invalido.");
         }
+    }
+
+    private async Task<string?> TryCreateIdentityUsuarioAsync(Guid empleadoId, string? codigo, Guid sucursalId)
+    {
+        if (string.IsNullOrWhiteSpace(codigo)) return null;
+        var username = codigo.Trim();
+        if (string.IsNullOrEmpty(username)) return null;
+
+        var existingEmpleadoUser = await _userManager.Users.FirstOrDefaultAsync(u => u.EmpleadoId == empleadoId && u.UserName == username);
+        if (existingEmpleadoUser != null)
+            return null;
+
+        if (await _userManager.FindByNameAsync(username) != null)
+            return $"Ya existe un usuario con el código {username}.";
+
+        var empresaId = await _db.Sucursales
+            .Where(s => s.Id == sucursalId)
+            .Select(s => (Guid?)s.EmpresaId)
+            .FirstOrDefaultAsync();
+
+        var usuario = new ApplicationUser
+        {
+            UserName = username,
+            EmailConfirmed = true,
+            EmpleadoId = empleadoId,
+            EmpresaId = empresaId
+        };
+
+        var result = await _userManager.CreateAsync(usuario, username);
+        if (!result.Succeeded)
+            return $"No se pudo crear el usuario: {string.Join("; ", result.Errors.Select(e => e.Description))}";
+
+        if (!await _userManager.IsInRoleAsync(usuario, "Empleado"))
+            await _userManager.AddToRoleAsync(usuario, "Empleado");
+
+        return $"Usuario creado automáticamente ({username}).";
     }
 
     private async Task<string?> ValidatePasswordAsync(ApplicationUser user, string newPassword)

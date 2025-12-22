@@ -55,6 +55,9 @@ public class EmpresasController : Controller
         if (ent == null) return NotFound();
         ent.Nombre = model.Nombre;
         ent.Rnc = model.Rnc;
+        ent.ContactoNombre = model.ContactoNombre;
+        ent.ContactoTelefono = model.ContactoTelefono;
+        ent.Direccion = model.Direccion;
         ent.SubsidiaEmpleados = model.SubsidiaEmpleados;
         ent.SubsidioTipo = model.SubsidioTipo;
         ent.SubsidioValor = model.SubsidioValor;

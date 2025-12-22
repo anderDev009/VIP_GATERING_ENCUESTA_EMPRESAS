@@ -48,8 +48,8 @@ public class ReportesController : Controller
             .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
             .Where(r => r.OpcionMenu != null
                 && r.OpcionMenu.Menu != null
-                && r.OpcionMenu.Menu.FechaInicio == inicio
-                && r.OpcionMenu.Menu.FechaTermino == fin);
+                && r.OpcionMenu.Menu.FechaInicio >= inicio
+                && r.OpcionMenu.Menu.FechaTermino <= fin);
 
         if (empresaId != null)
             baseQuery = baseQuery.Where(x => x.SucursalEntrega != null && x.SucursalEntrega.EmpresaId == empresaId);
@@ -411,9 +411,33 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> Distribucion(Guid? empresaId = null, Guid? sucursalId = null)
+    public async Task<IActionResult> Distribucion(Guid? empresaId = null, Guid? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        var (inicio, fin) = _fechas.RangoSemanaSiguiente();
+        DateOnly inicio;
+        DateOnly fin;
+        if (desde.HasValue && hasta.HasValue)
+        {
+            inicio = desde.Value;
+            fin = hasta.Value;
+            if (fin < inicio)
+            {
+                (inicio, fin) = (fin, inicio);
+            }
+        }
+        else if (desde.HasValue)
+        {
+            inicio = desde.Value;
+            fin = inicio.AddDays(4);
+        }
+        else if (hasta.HasValue)
+        {
+            fin = hasta.Value;
+            inicio = fin.AddDays(-4);
+        }
+        else
+        {
+            (inicio, fin) = _fechas.RangoSemanaSiguiente();
+        }
 
         var empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         var sucursalesBase = _db.Sucursales.AsQueryable();
@@ -452,7 +476,7 @@ public class ReportesController : Controller
         {
             if (r.OpcionMenu == null || r.Empleado == null) continue;
             if (r.SucursalEntrega == null) continue;
-            var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
+            var fechaDia = ObtenerFechaDiaSemana(r.OpcionMenu.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
             var sucEmpleado = r.Empleado.Sucursal;
             var empresaEmpleado = sucEmpleado?.Empresa;
             if (sucEmpleado == null || empresaEmpleado == null) continue;
@@ -484,7 +508,7 @@ public class ReportesController : Controller
                 var itbisEmpleado = Math.Round(itbis * ratio, 2);
                 var itbisEmpresa = itbis - itbisEmpleado;
 
-                items.Add((fecha, filialId, filial, empleadoId, empleadoNombre, tanda, nombre, localizacion, basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado));
+                items.Add((fechaDia, filialId, filial, empleadoId, empleadoNombre, tanda, nombre, localizacion, basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado));
             }
 
             var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);

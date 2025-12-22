@@ -67,6 +67,8 @@
                 <th class="text-left p-2">Localizacion</th>
                 <th class="text-left p-2">Filial</th>
                 <th class="text-left p-2">Empresa</th>
+                <th class="text-left p-2">Dirección</th>
+                <th class="text-left p-2">Notas</th>
                 <th class="p-2">Acciones</th>
             </tr>
         </thead>
@@ -77,6 +79,8 @@
                 <td class="p-2">@l.Nombre</td>
                 <td class="p-2">@l.Sucursal?.Nombre</td>
                 <td class="p-2">@l.Sucursal?.Empresa?.Nombre</td>
+                <td class="p-2">@l.Direccion</td>
+                <td class="p-2">@l.IndicacionesEntrega</td>
                 <td class="p-2 text-right">
                     <div class="flex justify-end gap-2">
                         <a asp-action="Edit" asp-route-id="@l.Id" class="btn-outline">Editar</a>
