@@ -174,6 +174,14 @@ public class SucursalesController : Controller
     private void ApplySubsidioFromForm(Sucursal target)
     {
         var scope = Request.Form["subsidioScope"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(scope))
+        {
+            var tieneCustom = !string.IsNullOrWhiteSpace(Request.Form["CustomSubsidioTipo"].FirstOrDefault())
+                || !string.IsNullOrWhiteSpace(Request.Form["CustomSubsidioValor"].FirstOrDefault())
+                || !string.IsNullOrWhiteSpace(Request.Form["CustomSubsidia"].FirstOrDefault());
+            if (tieneCustom)
+                scope = "custom";
+        }
         if (string.Equals(scope, "custom", StringComparison.OrdinalIgnoreCase))
         {
             var subsidiaStr = Request.Form["CustomSubsidia"].FirstOrDefault();

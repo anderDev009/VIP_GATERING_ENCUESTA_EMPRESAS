@@ -146,7 +146,7 @@ else if (Model.Bloqueado)
     </div>
 
     <div class="tab-switch">
-        <div class="tab-switch__label">Horarios</div>
+        <div class="tab-switch__label">Tandas</div>
         <div class="tab-switch__group" id="tabs-horario">
             @for (var gi = 0; gi < grupos.Count; gi++)
             {
@@ -304,6 +304,7 @@ else if (Model.Bloqueado)
     </div>
 </form>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     (() => {
         const updateDaySelection = (dayIndex) => {
@@ -459,11 +460,20 @@ else if (Model.Bloqueado)
                 const seleccionadas = document.querySelectorAll('input[type="radio"][name*="Dias"]:checked').length;
                 const loc = (form.dataset.localizacion || '').trim();
                 const locLabel = loc ? `Localizacion: ${loc}` : 'Localizacion: sin asignar';
-                const mensaje = `Estas por guardar tu menu.\\nPlatos seleccionados: ${seleccionadas}\\n${locLabel}\\nDeseas continuar?`;
-                if (window.confirm(mensaje)) {
-                    form.dataset.confirmed = '1';
-                    form.submit();
-                }
+                const resumen = `Platos seleccionados: ${seleccionadas}<br>${locLabel}`;
+                Swal.fire({
+                    title: 'Confirmar menu',
+                    html: `Estas por guardar tu menu.<br>${resumen}`,
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonText: 'Confirmar',
+                    cancelButtonText: 'Cancelar'
+                }).then(result => {
+                    if (result.isConfirmed) {
+                        form.dataset.confirmed = '1';
+                        form.submit();
+                    }
+                });
             });
         }
     })();

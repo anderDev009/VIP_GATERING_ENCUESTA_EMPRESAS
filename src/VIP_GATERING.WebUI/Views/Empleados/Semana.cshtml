@@ -1,6 +1,9 @@
 @model VIP_GATERING.WebUI.Models.SemanaEmpleadoVM
 @{
     ViewData["Title"] = "Semana del empleado";
+    var culture = new System.Globalization.CultureInfo("es-DO");
+    var diasConIndice = Model.Dias.Select((d, idx) => new { Dia = d, Index = idx }).ToList();
+    var grupos = diasConIndice.GroupBy(x => string.IsNullOrWhiteSpace(x.Dia.HorarioNombre) ? "General" : x.Dia.HorarioNombre!).ToList();
 }
 @section Breadcrumb{<div class="text-sm text-slate-500 mb-4">Inicio / Empleados / Semana</div>}
 
@@ -60,53 +63,92 @@
     }
 </section>
 
-<div class="grid md:grid-cols-2 gap-4">
-@foreach (var d in Model.Dias)
-{
-    <div class="card">
-        <div class="font-medium mb-2">@d.DiaSemana</div>
-        @{
-            var opcionesDia = new[]
-            {
-                new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA },
-                new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB },
-                new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC },
-                new { Clave = "D", Nombre = d.D, Imagen = d.ImagenD },
-                new { Clave = "E", Nombre = d.E, Imagen = d.ImagenE }
-            }.Take(d.OpcionesMaximas <= 0 ? 3 : d.OpcionesMaximas).ToList();
+<div class="tab-switch mb-4">
+    <div class="tab-switch__label">Tandas</div>
+    <div class="tab-switch__group" id="tabs-horario">
+        @for (var gi = 0; gi < grupos.Count; gi++)
+        {
+            var g = grupos[gi];
+            var tabId = $"tab-{gi}";
+            <button type="button" class="tab-pill" data-tab-target="@tabId">@g.Key</button>
         }
-        <div class="space-y-2">
-            @foreach (var opc in opcionesDia)
-            {
-                var seleccionada = d.Seleccion == opc.Clave[0];
-                <div class="flex items-center gap-3 border rounded-lg p-3 @(seleccionada ? "border-emerald-500 bg-emerald-50" : "border-slate-200")">
-                    @if (!string.IsNullOrWhiteSpace(opc.Imagen))
+    </div>
+</div>
+
+@for (var gi = 0; gi < grupos.Count; gi++)
+{
+    var g = grupos[gi];
+    var tabId = $"tab-{gi}";
+    <div id="@tabId" class="tab-panel @(gi == 0 ? "is-active" : "") space-y-3" data-tab-panel>
+        <div class="grid md:grid-cols-2 gap-4">
+        @foreach (var item in g)
+        {
+            var d = item.Dia;
+            var diaLabel = culture.DateTimeFormat.GetDayName(d.DiaSemana);
+            <div class="card">
+                <div class="font-medium mb-2">@diaLabel</div>
+                @{
+                    var opcionesDia = new[]
                     {
-                        <img src="@opc.Imagen" alt="Plato @opc.Clave" class="w-16 h-16 object-cover rounded-md border" />
-                    }
-                    <div class="flex-1">
-                        <div class="text-xs uppercase text-slate-500">Plato @opc.Clave</div>
-                        <div class="font-medium">@(!string.IsNullOrWhiteSpace(opc.Nombre) ? opc.Nombre : "Sin definir")</div>
-                    </div>
-                    @if (seleccionada)
+                        new { Clave = "A", Nombre = d.A, Imagen = d.ImagenA },
+                        new { Clave = "B", Nombre = d.B, Imagen = d.ImagenB },
+                        new { Clave = "C", Nombre = d.C, Imagen = d.ImagenC },
+                        new { Clave = "D", Nombre = d.D, Imagen = d.ImagenD },
+                        new { Clave = "E", Nombre = d.E, Imagen = d.ImagenE }
+                    }.Take(d.OpcionesMaximas <= 0 ? 3 : d.OpcionesMaximas).ToList();
+                }
+                <div class="space-y-2">
+                    @foreach (var opc in opcionesDia)
                     {
-                        <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Seleccionado</span>
+                        var seleccionada = d.Seleccion == opc.Clave[0];
+                        <div class="flex items-center gap-3 border rounded-lg p-3 @(seleccionada ? "border-emerald-500 bg-emerald-50" : "border-slate-200")">
+                            @if (!string.IsNullOrWhiteSpace(opc.Imagen))
+                            {
+                                <img src="@opc.Imagen" alt="Plato @opc.Clave" class="w-16 h-16 object-cover rounded-md border" />
+                            }
+                            <div class="flex-1">
+                                <div class="text-xs uppercase text-slate-500">Plato @opc.Clave</div>
+                                <div class="font-medium">@(!string.IsNullOrWhiteSpace(opc.Nombre) ? opc.Nombre : "Sin definir")</div>
+                            </div>
+                            @if (seleccionada)
+                            {
+                                <span class="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Seleccionado</span>
+                            }
+                        </div>
                     }
                 </div>
-            }
-        </div>
-        @{
-            var opcionSeleccionada = opcionesDia.FirstOrDefault(o => o.Clave[0] == d.Seleccion);
-            var labelSeleccion = opcionSeleccionada == null
-                ? "Sin seleccionar"
-                : $"Plato {opcionSeleccionada.Clave} - {(string.IsNullOrWhiteSpace(opcionSeleccionada.Nombre) ? "Sin definir" : opcionSeleccionada.Nombre)}";
+                @{
+                    var opcionSeleccionada = opcionesDia.FirstOrDefault(o => o.Clave[0] == d.Seleccion);
+                    var labelSeleccion = opcionSeleccionada == null
+                        ? "Sin seleccionar"
+                        : $"Plato {opcionSeleccionada.Clave} - {(string.IsNullOrWhiteSpace(opcionSeleccionada.Nombre) ? "Sin definir" : opcionSeleccionada.Nombre)}";
+                }
+                <div class="mt-2 text-slate-700">Seleccion: <strong>@labelSeleccion</strong></div>
+            </div>
         }
-        <div class="mt-2 text-slate-700">Seleccion: <strong>@labelSeleccion</strong></div>
+        </div>
     </div>
 }
-</div>
 
 <div class="mt-6">
     <a asp-action="Index" class="btn-outline">Volver a empleados</a>
 </div>
+
+@section Scripts {
+    <script>
+        const tabButtons = document.querySelectorAll('.tab-pill');
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-tab-target');
+                if (!targetId) return;
+                document.querySelectorAll('[data-tab-panel]').forEach(p => p.classList.remove('is-active'));
+                const target = document.getElementById(targetId);
+                if (target) target.classList.add('is-active');
+                tabButtons.forEach(b => b.classList.remove('is-active'));
+                btn.classList.add('is-active');
+            });
+        });
+        if (tabButtons.length > 0) tabButtons[0].classList.add('is-active');
+    </script>
+}
 

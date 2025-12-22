@@ -32,9 +32,13 @@ public class EmpleadosController : Controller
     public EmpleadosController(AppDbContext db, ICurrentUserService currentUser, IEmpleadoUsuarioService empUserService, UserManager<ApplicationUser> userManager, IMenuService menuService, IEncuestaCierreService cierre, ISubsidioService subsidios)
     { _db = db; _currentUser = currentUser; _empUserService = empUserService; _userManager = userManager; _menuService = menuService; _cierre = cierre; _subsidios = subsidios; }
 
-    public async Task<IActionResult> Index(Guid? empresaId, Guid? sucursalId, string? q, int page = 1, int pageSize = 10)
+    public async Task<IActionResult> Index(Guid? empresaId, Guid? sucursalId, Guid? localizacionId, string? q, int page = 1, int pageSize = 10)
     {
-        var query = _db.Empleados.Include(e => e.Sucursal).ThenInclude(s => s!.Empresa).Where(e => !e.Borrado).AsQueryable();
+        var query = _db.Empleados
+            .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
+            .Include(e => e.LocalizacionesAsignadas).ThenInclude(l => l.Localizacion)
+            .Where(e => !e.Borrado)
+            .AsQueryable();
         // If Empresa role, limit to current Empresa
         if (User.IsInRole("Empresa"))
         {
@@ -44,6 +48,8 @@ public class EmpleadosController : Controller
         }
         if (empresaId != null) query = query.Where(e => e.Sucursal!.EmpresaId == empresaId);
         if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId);
+        if (localizacionId != null)
+            query = query.Where(e => e.LocalizacionesAsignadas.Any(l => l.LocalizacionId == localizacionId));
         if (!string.IsNullOrWhiteSpace(q))
         {
             var ql = q.ToLower();
@@ -51,7 +57,20 @@ public class EmpleadosController : Controller
         }
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
-        ViewBag.EmpresaId = empresaId; ViewBag.SucursalId = sucursalId; ViewBag.Q = q;
+        var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
+        if (User.IsInRole("Empresa"))
+        {
+            var empresaActual = _currentUser.EmpresaId;
+            if (empresaActual != null)
+                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaActual);
+        }
+        if (empresaId != null)
+            localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+        if (sucursalId != null)
+            localizacionesQuery = localizacionesQuery.Where(l => l.SucursalId == sucursalId);
+        var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
+        ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
+        ViewBag.EmpresaId = empresaId; ViewBag.SucursalId = sucursalId; ViewBag.LocalizacionId = localizacionId; ViewBag.Q = q;
         var paged = await query.OrderBy(e => e.Nombre).ToPagedResultAsync(page, pageSize);
         // Usuario por empleado en pagina
         var ids = paged.Items.Select(i => i.Id).ToList();
@@ -121,6 +140,17 @@ public class EmpleadosController : Controller
             var empresaId = _currentUser.EmpresaId;
             var sucEmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
             if (empresaId == null || sucEmpresaId != empresaId) return Forbid();
+        }
+        if (!string.IsNullOrWhiteSpace(model.Codigo))
+        {
+            var codigoExiste = await _db.Empleados
+                .Where(e => !e.Borrado && e.SucursalId == model.SucursalId && e.Codigo == model.Codigo)
+                .AnyAsync();
+            if (codigoExiste)
+            {
+                ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en esta filial.");
+                return await ReturnInvalidAsync();
+            }
         }
 
         var localizacionIds = (localizacionesAsignadas ?? new List<Guid>())
@@ -232,6 +262,17 @@ public class EmpleadosController : Controller
             var empresaId = _currentUser.EmpresaId;
             var newSucEmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
             if (empresaId == null || newSucEmpresaId != empresaId) return Forbid();
+        }
+        if (!string.IsNullOrWhiteSpace(model.Codigo))
+        {
+            var codigoExiste = await _db.Empleados
+                .Where(e => !e.Borrado && e.SucursalId == model.SucursalId && e.Codigo == model.Codigo && e.Id != ent.Id)
+                .AnyAsync();
+            if (codigoExiste)
+            {
+                ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en esta filial.");
+                return await ReturnInvalidAsync();
+            }
         }
         ent.Codigo = model.Codigo;
         ent.Nombre = model.Nombre;

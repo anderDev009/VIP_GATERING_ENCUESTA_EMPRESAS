@@ -238,7 +238,6 @@ public class MenuService : IMenuService
             localizacion = await _localizaciones.GetByIdAsync(localizacionEntregaId.Value, ct);
             if (localizacion == null)
                 throw new ArgumentException("Localizacion de entrega invalida", nameof(localizacionEntregaId));
-            sucursalEntregaId = localizacion.SucursalId;
         }
 
         if (sucursalEntregaId == Guid.Empty)
@@ -250,8 +249,8 @@ public class MenuService : IMenuService
         var asignadas = await _empleadosSucursales.ListAsync(es => es.EmpleadoId == empleadoId, ct);
         var sucursalesPermitidas = asignadas.Select(a => a.SucursalId).ToHashSet();
         sucursalesPermitidas.Add(empleado.SucursalId);
-        if (!sucursalesPermitidas.Contains(sucursalEntregaId))
-            throw new InvalidOperationException("La filial de entrega no esta asignada al empleado.");
+        if (sucursalEntregaId == Guid.Empty || !sucursalesPermitidas.Contains(sucursalEntregaId))
+            sucursalEntregaId = empleado.SucursalId;
 
         if (localizacion != null)
         {
