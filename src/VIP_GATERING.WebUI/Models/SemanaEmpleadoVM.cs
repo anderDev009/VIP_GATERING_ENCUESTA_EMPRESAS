@@ -17,6 +17,8 @@ public class SemanaEmpleadoVM
     public bool Bloqueado { get; set; }
     public bool BloqueadoPorEstado { get; set; }
     public string? MensajeBloqueo { get; set; }
+    public bool MenuDisponible { get; set; } = true;
+    public string? MensajeSinMenu { get; set; }
     public string? NotaVentana { get; set; }
     public string? EmpleadoNombre { get; set; }
     public string? EmpleadoCodigo { get; set; }

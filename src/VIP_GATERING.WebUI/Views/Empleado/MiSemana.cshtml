@@ -45,6 +45,17 @@
         <span class="week-banner__badge">@tituloSemana</span>
     </div>
 
+    @if (!Model.MenuDisponible)
+    {
+        <div class="alert alert-info mb-4 flex items-start gap-3">
+            <span class="alert__icon" aria-hidden="true">!</span>
+            <div>
+                <p class="font-semibold text-slate-900">Sin men&uacute; configurado para la semana actual</p>
+                <p class="text-sm text-slate-500">@Model.MensajeSinMenu ?? "Cuando el administrador publique el men&uacute;, podr&aacute;s acceder a &eacute;l desde esta pantalla."</p>
+            </div>
+        </div>
+    }
+
     @if (Model.SemanasDisponibles != null && Model.SemanasDisponibles.Any())
     {
         <form method="get" asp-action="MiSemana" class="control-panel">
@@ -109,6 +120,8 @@ else if (Model.Bloqueado)
     </div>
 }
 
+@if (Model.MenuDisponible)
+{
 <section class="page-panel space-y-3 mb-5">
     <div class="panel-header">
         <div>
@@ -302,7 +315,18 @@ else if (Model.Bloqueado)
     <div class="form-actions">
         <button class="btn-primary btn-lg" @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>Grabar seleccion</button>
     </div>
-</form>
+    </form>
+}
+else
+{
+    <section class="page-panel space-y-4">
+        <p class="text-slate-600 font-medium">Todav&iacute;a no se ha publicado el men&uacute; de esta semana. Puedes consultar con tu administrador o volver m&aacute;s tarde.</p>
+        <div class="flex flex-wrap gap-3">
+            <a asp-controller="Menu" asp-action="Administrar" class="btn-outline">Ir a Administrar</a>
+            <a asp-action="MiSemana" asp-route-semana="actual" class="btn-primary">Refrescar</a>
+        </div>
+    </section>
+}
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
