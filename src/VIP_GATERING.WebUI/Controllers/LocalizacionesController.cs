@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using VIP_GATERING.Domain.Entities;
@@ -23,17 +23,21 @@ public class LocalizacionesController : Controller
     public async Task<IActionResult> Index(Guid? empresaId, Guid? sucursalId, string? q, int page = 1, int pageSize = 10)
     {
         var query = _db.Localizaciones
+            .Include(l => l.Empresa)
             .Include(l => l.Sucursal).ThenInclude(s => s!.Empresa)
             .AsQueryable();
 
-        if (User.IsInRole("Empresa"))
+        if (User.IsInRole("Empresa") && _current.EmpresaId != null)
         {
             var currentEmpresaId = _current.EmpresaId;
-            if (currentEmpresaId != null)
-                query = query.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == currentEmpresaId);
+            query = query.Where(l => l.EmpresaId == currentEmpresaId);
         }
-        if (empresaId != null) query = query.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
-        if (sucursalId != null) query = query.Where(l => l.SucursalId == sucursalId);
+
+        if (empresaId != null)
+            query = query.Where(l => l.EmpresaId == empresaId);
+        if (sucursalId != null)
+            query = query.Where(l => l.SucursalId == sucursalId);
+
         if (!string.IsNullOrWhiteSpace(q))
         {
             var ql = q.ToLower();
@@ -55,16 +59,13 @@ public class LocalizacionesController : Controller
     public async Task<IActionResult> Create()
     {
         var empresas = _db.Empresas.AsQueryable();
-        var sucursales = _db.Sucursales.AsQueryable();
         if (User.IsInRole("Empresa"))
         {
             var empresaId = _current.EmpresaId;
             if (empresaId == null) return Forbid();
             empresas = empresas.Where(e => e.Id == empresaId);
-            sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
         }
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
-        ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
         return View(new Localizacion());
     }
 
@@ -82,34 +83,39 @@ public class LocalizacionesController : Controller
         if (!ModelState.IsValid)
             return await ReturnInvalidAsync(model);
 
-        var sucursalEmpresaId = await _db.Sucursales
-            .Where(s => s.Id == model.SucursalId)
-            .Select(s => s.EmpresaId)
-            .FirstOrDefaultAsync();
-
-        if (sucursalEmpresaId == Guid.Empty)
+        if (model.EmpresaId == Guid.Empty)
         {
-            ModelState.AddModelError("SucursalId", "Filial invalida.");
+            ModelState.AddModelError("EmpresaId", "Empresa requerida.");
             return await ReturnInvalidAsync(model);
         }
 
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null && _current.EmpresaId != sucursalEmpresaId)
+        if (User.IsInRole("Empresa") && _current.EmpresaId != null && _current.EmpresaId != model.EmpresaId)
             return Forbid();
 
+        var sucursal = await _db.Sucursales
+            .Where(s => s.EmpresaId == model.EmpresaId)
+            .OrderBy(s => s.Nombre)
+            .FirstOrDefaultAsync();
+        if (sucursal == null)
+        {
+            ModelState.AddModelError("EmpresaId", "La empresa seleccionada no tiene filiales.");
+            return await ReturnInvalidAsync(model);
+        }
+
+        model.SucursalId = sucursal.Id;
         await _db.Localizaciones.AddAsync(model);
         await _db.SaveChangesAsync();
         TempData["Success"] = "Localizacion creada.";
-        return RedirectToAction(nameof(Index), new { empresaId = sucursalEmpresaId });
+        return RedirectToAction(nameof(Index), new { empresaId = model.EmpresaId });
     }
 
     public async Task<IActionResult> Edit(Guid id)
     {
         var ent = await _db.Localizaciones.Include(l => l.Sucursal).FirstOrDefaultAsync(l => l.Id == id);
         if (ent == null) return NotFound();
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null && ent.Sucursal != null && ent.Sucursal.EmpresaId != _current.EmpresaId)
+        if (User.IsInRole("Empresa") && _current.EmpresaId != null && ent.EmpresaId != _current.EmpresaId)
             return Forbid();
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
-        ViewBag.Sucursales = await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
         return View(ent);
     }
 
@@ -130,32 +136,38 @@ public class LocalizacionesController : Controller
         if (!ModelState.IsValid)
         {
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
-            ViewBag.Sucursales = await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
             return View(model);
         }
 
-        var sucursalEmpresaId = await _db.Sucursales
-            .Where(s => s.Id == model.SucursalId)
-            .Select(s => s.EmpresaId)
-            .FirstOrDefaultAsync();
-        if (sucursalEmpresaId == Guid.Empty)
+        if (model.EmpresaId == Guid.Empty)
         {
-            ModelState.AddModelError("SucursalId", "Filial invalida.");
+            ModelState.AddModelError("EmpresaId", "Empresa requerida.");
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
-            ViewBag.Sucursales = await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
             return View(model);
         }
 
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null && _current.EmpresaId != sucursalEmpresaId)
+        if (User.IsInRole("Empresa") && _current.EmpresaId != null && _current.EmpresaId != model.EmpresaId)
             return Forbid();
 
+        var sucursal = await _db.Sucursales
+            .Where(s => s.EmpresaId == model.EmpresaId)
+            .OrderBy(s => s.Nombre)
+            .FirstOrDefaultAsync();
+        if (sucursal == null)
+        {
+            ModelState.AddModelError("EmpresaId", "La empresa seleccionada no tiene filiales.");
+            ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
+            return View(model);
+        }
+
         ent.Nombre = model.Nombre;
-        ent.SucursalId = model.SucursalId;
+        ent.EmpresaId = model.EmpresaId;
+        ent.SucursalId = sucursal.Id;
         ent.Direccion = model.Direccion;
         ent.IndicacionesEntrega = model.IndicacionesEntrega;
         await _db.SaveChangesAsync();
         TempData["Success"] = "Localizacion actualizada.";
-        return RedirectToAction(nameof(Index), new { empresaId = sucursalEmpresaId });
+        return RedirectToAction(nameof(Index), new { empresaId = sucursal.EmpresaId });
     }
 
     [HttpPost]
@@ -165,7 +177,7 @@ public class LocalizacionesController : Controller
         var ent = await _db.Localizaciones.Include(l => l.Sucursal).FirstOrDefaultAsync(l => l.Id == id);
         if (ent == null) return RedirectToAction(nameof(Index));
 
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null && ent.Sucursal != null && ent.Sucursal.EmpresaId != _current.EmpresaId)
+        if (User.IsInRole("Empresa") && _current.EmpresaId != null && ent.EmpresaId != _current.EmpresaId)
             return Forbid();
 
         var usado = await _db.EmpleadosLocalizaciones.AnyAsync(el => el.LocalizacionId == ent.Id)
@@ -173,27 +185,24 @@ public class LocalizacionesController : Controller
         if (usado)
         {
             TempData["Error"] = "No se puede eliminar la localizacion porque esta asignada a empleados o menus.";
-            return RedirectToAction(nameof(Index), new { empresaId = ent.Sucursal?.EmpresaId, sucursalId = ent.SucursalId });
+            return RedirectToAction(nameof(Index), new { empresaId = ent.EmpresaId });
         }
 
         _db.Localizaciones.Remove(ent);
         await _db.SaveChangesAsync();
         TempData["Success"] = "Localizacion eliminada.";
-        return RedirectToAction(nameof(Index), new { empresaId = ent.Sucursal?.EmpresaId, sucursalId = ent.SucursalId });
+        return RedirectToAction(nameof(Index), new { empresaId = ent.EmpresaId });
     }
 
     private async Task<IActionResult> ReturnInvalidAsync(Localizacion model)
     {
         var empresas = _db.Empresas.AsQueryable();
-        var sucursales = _db.Sucursales.AsQueryable();
         if (User.IsInRole("Empresa"))
         {
             var empresaId = _current.EmpresaId;
             empresas = empresas.Where(e => e.Id == empresaId);
-            sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
         }
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
-        ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
         return View(model);
     }
 }

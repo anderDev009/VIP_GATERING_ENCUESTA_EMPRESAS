@@ -133,10 +133,10 @@ public static class SeedData
                     .ToListAsync();
                 var existentes = await db.Localizaciones
                     .AsNoTracking()
-                    .Select(l => new { l.SucursalId, l.Nombre })
+                    .Select(l => new { l.SucursalId, l.EmpresaId, l.Nombre })
                     .ToListAsync();
                 var existentesSet = new HashSet<string>(
-                    existentes.Select(e => $"{e.SucursalId:N}|{e.Nombre}"),
+                    existentes.Select(e => $"{e.SucursalId:N}|{e.EmpresaId:N}|{e.Nombre}"),
                     StringComparer.OrdinalIgnoreCase);
 
                 foreach (var suc in sucursalesPorEmpresa)
@@ -144,14 +144,15 @@ public static class SeedData
                     if (suc.SucursalId == Guid.Empty) continue;
                     foreach (var nombre in nombresLoc)
                     {
-                        var key = $"{suc.SucursalId:N}|{nombre}";
+                        var key = $"{suc.SucursalId:N}|{suc.EmpresaId:N}|{nombre}";
                         if (existentesSet.Contains(key)) continue;
                         var sucursalNombre = string.IsNullOrWhiteSpace(suc.SucursalNombre) ? "filial" : suc.SucursalNombre;
                         db.Localizaciones.Add(new Localizacion
                         {
                             Nombre = nombre,
+                            EmpresaId = suc.EmpresaId,
                             SucursalId = suc.SucursalId,
-                            Direccion = $"Dirección de {sucursalNombre}",
+                            Direccion = $"Direccion de {sucursalNombre}",
                             IndicacionesEntrega = $"Entrega en {nombre}"
                         });
                         existentesSet.Add(key);

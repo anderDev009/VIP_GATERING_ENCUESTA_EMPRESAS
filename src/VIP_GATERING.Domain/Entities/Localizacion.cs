@@ -10,6 +10,9 @@ public class Localizacion
     public Guid SucursalId { get; set; }
     public Sucursal? Sucursal { get; set; }
 
+    public Guid EmpresaId { get; set; }
+    public Empresa? Empresa { get; set; }
+
     [Required]
     public string Direccion { get; set; } = string.Empty;
 

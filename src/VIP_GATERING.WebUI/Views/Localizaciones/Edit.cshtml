@@ -2,8 +2,6 @@
 @{
     ViewData["Title"] = "Editar localizacion";
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
-    var sucursales = (IEnumerable<VIP_GATERING.Domain.Entities.Sucursal>)ViewBag.Sucursales;
-    var empresaActual = Model.Sucursal?.EmpresaId;
 }
 <h1 class="text-2xl font-semibold mb-4 max-w-lg mx-auto">Editar localizacion</h1>
 
@@ -17,10 +15,11 @@
     </div>
     <div>
         <label class="block text-sm">Empresa</label>
-        <select class="w-full border rounded p-2" id="selEmpresa">
+        <select asp-for="EmpresaId" class="w-full border rounded p-2">
+            <option value="">Seleccione una empresa</option>
             @foreach (var e in empresas)
             {
-                if (empresaActual == e.Id)
+                if (Model.EmpresaId == e.Id)
                 {
                     <option selected value="@e.Id">@e.Nombre</option>
                 }
@@ -30,22 +29,7 @@
                 }
             }
         </select>
-    </div>
-    <div>
-        <label class="block text-sm">Filial</label>
-        <select asp-for="SucursalId" class="w-full border rounded p-2" id="selSucursal">
-            @foreach (var s in sucursales)
-            {
-                if (Model.SucursalId == s.Id)
-                {
-                    <option selected value="@s.Id" data-empresa="@s.EmpresaId">@s.Nombre</option>
-                }
-                else
-                {
-                    <option value="@s.Id" data-empresa="@s.EmpresaId">@s.Nombre</option>
-                }
-            }
-        </select>
+        <span asp-validation-for="EmpresaId" class="text-rose-600 text-xs"></span>
     </div>
     <div>
         <label class="block text-sm">Dirección</label>
@@ -61,27 +45,5 @@
         <button class="btn-primary">Guardar</button>
         <a asp-action="Index" class="btn-outline">Cancelar</a>
     </div>
-</form>
 
-<script>
-    (() => {
-        const emp = document.getElementById('selEmpresa');
-        const suc = document.getElementById('selSucursal');
-        if (!emp || !suc) return;
-        const refresh = () => {
-            const empresaId = emp.value;
-            Array.from(suc.options).forEach(opt => {
-                if (!opt.value) return;
-                const show = !empresaId || opt.dataset.empresa === empresaId;
-                opt.style.display = show ? '' : 'none';
-            });
-            const current = suc.options[suc.selectedIndex];
-            if (current && current.style.display === 'none') {
-                const firstVisible = Array.from(suc.options).find(o => o.value && o.style.display !== 'none');
-                if (firstVisible) suc.value = firstVisible.value;
-            }
-        };
-        emp.addEventListener('change', refresh);
-        refresh();
-    })();
-</script>
+</form>
