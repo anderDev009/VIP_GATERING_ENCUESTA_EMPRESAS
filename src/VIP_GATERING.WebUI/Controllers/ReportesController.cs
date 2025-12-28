@@ -468,6 +468,11 @@ public class ReportesController : Controller
             baseQuery = baseQuery.Where(x => x.SucursalEntregaId == sucursalId);
 
         var respuestas = await baseQuery.ToListAsync();
+        var hoy = _fechas.Hoy();
+        respuestas = respuestas
+            .Where(r => r.OpcionMenu != null && r.OpcionMenu.Menu != null
+                && ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana) <= hoy)
+            .ToList();
 
         const decimal itbisRate = 0.18m;
         var items = new List<(DateOnly Fecha, Guid FilialId, string Filial, Guid EmpleadoId, string Empleado, string Tanda, string Opcion, string Localizacion, decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado)>();
