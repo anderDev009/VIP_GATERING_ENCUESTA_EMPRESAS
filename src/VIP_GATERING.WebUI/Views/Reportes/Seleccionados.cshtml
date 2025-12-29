@@ -1,0 +1,138 @@
+@model VIP_GATERING.WebUI.Models.Reportes.SeleccionesVM
+@{
+    ViewData["Title"] = "Selecciones pendientes";
+    var isAdmin = User.IsInRole("Admin");
+}
+
+<h1 class="text-xl font-semibold mb-4">Selecciones pendientes (@Model.Inicio:yyyy-MM-dd a @Model.Fin:yyyy-MM-dd)</h1>
+
+<form asp-action="Seleccionados" method="get" class="mb-6 grid gap-4 md:grid-cols-4 items-end">
+    @if (isAdmin)
+    {
+        <div class="md:col-span-2">
+            <label class="text-xs uppercase tracking-widest text-slate-400">Empresa</label>
+            <select name="empresaId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+                <option value="">Todas</option>
+                @foreach (var e in Model.Empresas)
+                {
+                    <option value="@e.Id" selected="@(Model.EmpresaId == e.Id ? "selected" : null)">@e.Nombre</option>
+                }
+            </select>
+        </div>
+    }
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Filial</label>
+        <select name="sucursalId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="">Todas</option>
+            @foreach (var s in Model.Sucursales)
+            {
+                <option value="@s.Id" selected="@(Model.SucursalId == s.Id ? "selected" : null)">@s.Nombre</option>
+            }
+        </select>
+    </div>
+            <div class="flex gap-3 md:col-span-4">
+                <button type="submit" class="btn-primary">Filtrar</button>
+                <a class="btn-outline" asp-action="Seleccionados">Limpiar</a>
+    </div>
+    <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3">
+        <div class="text-sm text-slate-600">Total costo</div>
+        <div class="text-lg font-semibold">@Model.TotalCosto.ToString("C")</div>
+        <div class="text-xs text-slate-500">@Model.TotalRespuestas selecciones</div>
+        @if (isAdmin)
+        {
+            <div class="text-sm text-slate-600 pt-1 border-t border-slate-200">Consumo empleados: <span class="font-semibold">@Model.TotalPrecio.ToString("C")</span></div>
+            <div class="text-sm text-slate-600">Beneficio: <span class="font-semibold">@Model.TotalBeneficio.ToString("C")</span></div>
+        }
+    </div>
+    <input type="hidden" name="_" value="@DateTime.UtcNow.Ticks" />
+ </form>
+<script>history.scrollRestoration = 'manual';</script>
+
+<h2 class="font-semibold mb-2">Subtotales por Filial</h2>
+<table class="mb-6">
+    <thead>
+    <tr>
+        <th>Filial</th>
+        <th class="text-right">Selecciones</th>
+        <th class="text-right">Costo</th>
+        @if (isAdmin)
+        {
+            <th class="text-right">Consumo</th>
+            <th class="text-right">Beneficio</th>
+        }
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var s in Model.PorSucursal)
+    {
+        <tr>
+            <td>@s.Sucursal</td>
+            <td class="text-right">@s.Cantidad</td>
+            <td class="text-right">@s.TotalCosto.ToString("C")</td>
+            @if (isAdmin)
+            {
+                <td class="text-right">@s.TotalPrecio.ToString("C")</td>
+                <td class="text-right">@s.TotalBeneficio.ToString("C")</td>
+            }
+        </tr>
+    }
+    </tbody>
+    <tfoot>
+    <tr>
+        <th>Total</th>
+        <th class="text-right">@Model.PorSucursal.Sum(x => x.Cantidad)</th>
+        <th class="text-right">@Model.PorSucursal.Sum(x => x.TotalCosto).ToString("C")</th>
+        @if (isAdmin)
+        {
+            <th class="text-right">@Model.PorSucursal.Sum(x => x.TotalPrecio).ToString("C")</th>
+            <th class="text-right">@Model.PorSucursal.Sum(x => x.TotalBeneficio).ToString("C")</th>
+        }
+    </tr>
+    </tfoot>
+</table>
+
+<h2 class="font-semibold mb-2">Detalle por empleado</h2>
+<table>
+    <thead>
+    <tr>
+        <th>Empleado</th>
+        <th>Filial</th>
+        <th class="text-right">Selecciones</th>
+        <th class="text-right">Costo</th>
+        @if (isAdmin)
+        {
+            <th class="text-right">Consumo</th>
+            <th class="text-right">Beneficio</th>
+        }
+    </tr>
+    </thead>
+    <tbody>
+    @foreach (var e in Model.PorEmpleado)
+    {
+        <tr>
+            <td>@e.Empleado</td>
+            <td>@e.Sucursal</td>
+            <td class="text-right">@e.Cantidad</td>
+            <td class="text-right">@e.TotalCosto.ToString("C")</td>
+            @if (isAdmin)
+            {
+                <td class="text-right">@e.TotalPrecio.ToString("C")</td>
+                <td class="text-right">@e.TotalBeneficio.ToString("C")</td>
+            }
+        </tr>
+    }
+    </tbody>
+    <tfoot>
+    <tr>
+        <th colspan="2" class="text-right">Total</th>
+        <th class="text-right">@Model.PorEmpleado.Sum(x => x.Cantidad)</th>
+        <th class="text-right">@Model.PorEmpleado.Sum(x => x.TotalCosto).ToString("C")</th>
+        @if (isAdmin)
+        {
+            <th class="text-right">@Model.PorEmpleado.Sum(x => x.TotalPrecio).ToString("C")</th>
+            <th class="text-right">@Model.PorEmpleado.Sum(x => x.TotalBeneficio).ToString("C")</th>
+        }
+    </tr>
+    </tfoot>
+</table>
+

@@ -199,13 +199,13 @@
                 <input type="hidden" name="id" value="@Model.Id" />
                 <div>
                     <label class="block text-sm">Nueva contrasena</label>
-                    <input type="password" name="newPassword" required minlength="20" class="border rounded p-2 w-full" placeholder="Minimo 20 caracteres seguros" />
+                <input type="password" name="newPassword" required minlength="6" class="border rounded p-2 w-full" placeholder="Minimo 6 caracteres" />
                 </div>
                 <div>
                     <label class="block text-sm">Confirmar nueva contrasena</label>
-                    <input type="password" name="confirmPassword" required minlength="20" class="border rounded p-2 w-full" placeholder="Repite la contrasena" />
+                <input type="password" name="confirmPassword" required minlength="6" class="border rounded p-2 w-full" placeholder="Repite la contrasena" />
                 </div>
-                <div class="text-xs text-slate-500">Debe incluir mayusculas, minusculas, numero y simbolo.</div>
+            <div class="text-xs text-slate-500">Debe tener al menos 6 caracteres de longitud.</div>
                 <button class="btn-outline">Resetear contrasena</button>
             </form>
             <div class="text-xs text-slate-500 mt-2">Se requerira cambio de contrasena en el proximo inicio de sesion.</div>

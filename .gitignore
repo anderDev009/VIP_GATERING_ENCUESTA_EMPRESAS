@@ -52,6 +52,8 @@ secrets.json
 .env
 .env.*
 
+# Local sqlite helpers
+src/VIP_GATERING.WebUI/app.db*
 # Coverage / analytics
 coverage*/
 *.coverage

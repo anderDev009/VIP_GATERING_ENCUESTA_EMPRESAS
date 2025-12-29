@@ -165,10 +165,9 @@ public static class IdentitySeeder
     {
         var result = value;
         if (!result.Any(char.IsLower)) result += "a";
-        if (!result.Any(char.IsUpper)) result += "A";
         if (!result.Any(char.IsDigit)) result += "1";
         if (!result.Any(ch => !char.IsLetterOrDigit(ch))) result += "_";
-        if (result.Length < 20) result += new string('0', 20 - result.Length);
+        if (result.Length < 8) result += new string('0', 8 - result.Length);
         return result;
     }
 }

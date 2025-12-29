@@ -35,7 +35,7 @@
             <span class="week-dot" aria-hidden="true"></span>
             <div>
                 <p class="week-banner__eyebrow">MEN&Uacute; DE LA SEMANA</p>
-                <p class="week-banner__title">Lunes @Model.FechaInicio.ToString("dd") - Viernes @Model.FechaTermino.ToString("dd 'de' MMMM yyyy")</p>
+        <p class="week-banner__title">Hoy @DateOnly.FromDateTime(DateTime.Today).ToString("dd 'de' MMMM yyyy")</p>
                 @if (!string.IsNullOrWhiteSpace(Model.NotaVentana))
                 {
                     <p class="week-banner__subtitle">@Model.NotaVentana</p>

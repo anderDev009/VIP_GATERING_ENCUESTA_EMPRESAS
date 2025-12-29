@@ -105,10 +105,7 @@ public class EmpleadosController : Controller
         var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
         ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
         ViewBag.EmpresaId = empresaId; ViewBag.SucursalId = sucursalId; ViewBag.LocalizacionId = localizacionId; ViewBag.Q = q;
-        var hasFilters = empresaId != null || sucursalId != null || localizacionId != null || !string.IsNullOrWhiteSpace(q);
-        var paged = hasFilters
-            ? await query.OrderBy(e => e.Nombre).ToPagedResultAsync(page, pageSize)
-            : new PagedResult<Empleado> { Items = Array.Empty<Empleado>(), Page = page, PageSize = pageSize, TotalItems = 0 };
+        var paged = await query.OrderBy(e => e.Nombre).ToPagedResultAsync(page, pageSize);
         // Usuario por empleado en pagina
         var ids = paged.Items.Select(i => i.Id).ToList();
         var usuarios = await _db.Set<ApplicationUser>()
@@ -180,16 +177,10 @@ public class EmpleadosController : Controller
             var sucEmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
             if (empresaId == null || sucEmpresaId != empresaId) return Forbid();
         }
-        if (!string.IsNullOrWhiteSpace(model.Codigo))
+        if (!string.IsNullOrWhiteSpace(model.Codigo) && await CodigoEmpleadoEnUsoAsync(model.Codigo, model.SucursalId))
         {
-            var codigoExiste = await _db.Empleados
-                .Where(e => !e.Borrado && e.SucursalId == model.SucursalId && e.Codigo == model.Codigo)
-                .AnyAsync();
-            if (codigoExiste)
-            {
-                ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en esta filial.");
-                return await ReturnInvalidAsync();
-            }
+            ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en la misma empresa.");
+            return await ReturnInvalidAsync();
         }
 
         var localizacionIds = (localizacionesAsignadas ?? new List<Guid>())
@@ -217,9 +208,13 @@ public class EmpleadosController : Controller
 
         await _db.Empleados.AddAsync(model);
         await _db.SaveChangesAsync();
-        var autoUserMessage = await TryCreateIdentityUsuarioAsync(model.Id, model.Codigo, model.SucursalId);
-        if (!string.IsNullOrEmpty(autoUserMessage))
-            TempData["Info"] = autoUserMessage;
+        var codigoUsuario = model.Codigo?.Trim();
+        if (!string.IsNullOrWhiteSpace(codigoUsuario))
+        {
+            var autoUserError = await TryCreateIdentityUsuarioAsync(model.Id, codigoUsuario, model.SucursalId);
+            if (!string.IsNullOrEmpty(autoUserError))
+                TempData["Error"] = autoUserError;
+        }
         if (localizacionIds.Count > 0)
         {
             var rows = localizacionIds.Select(lid => new EmpleadoLocalizacion { EmpleadoId = model.Id, LocalizacionId = lid }).ToList();
@@ -305,16 +300,10 @@ public class EmpleadosController : Controller
             var newSucEmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
             if (empresaId == null || newSucEmpresaId != empresaId) return Forbid();
         }
-        if (!string.IsNullOrWhiteSpace(model.Codigo))
+        if (!string.IsNullOrWhiteSpace(model.Codigo) && await CodigoEmpleadoEnUsoAsync(model.Codigo, model.SucursalId, ent.Id))
         {
-            var codigoExiste = await _db.Empleados
-                .Where(e => !e.Borrado && e.SucursalId == model.SucursalId && e.Codigo == model.Codigo && e.Id != ent.Id)
-                .AnyAsync();
-            if (codigoExiste)
-            {
-                ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en esta filial.");
-                return await ReturnInvalidAsync();
-            }
+            ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en la misma empresa.");
+            return await ReturnInvalidAsync();
         }
         ent.Codigo = model.Codigo;
         ent.Nombre = model.Nombre;
@@ -553,42 +542,22 @@ public class EmpleadosController : Controller
             if (empresaId == null || empleado.Sucursal!.EmpresaId != empresaId) return Forbid();
         }
 
-        var empresaNombre = empleado.Sucursal?.Empresa?.Nombre ?? "Empresa";
-        var userName = BuildUserName(empresaNombre, empleado.Codigo, empleado.Id);
-        var existingByUserName = await _userManager.FindByNameAsync(userName);
-        if (existingByUserName != null)
+        var codigo = empleado.Codigo?.Trim();
+        if (string.IsNullOrWhiteSpace(codigo))
         {
-            TempData["Error"] = "Ya existe un usuario con ese nombre. Ajusta el codigo o la empresa.";
+            TempData["Error"] = "El codigo del empleado es requerido para generar el usuario.";
             return RedirectToAction(nameof(Edit), new { id });
         }
 
-        var exists = await _db.Set<ApplicationUser>().AnyAsync(u => u.EmpleadoId == id);
-        if (!exists)
+        var resultMessage = await TryCreateIdentityUsuarioAsync(empleado.Id, codigo, empleado.SucursalId);
+        if (string.IsNullOrEmpty(resultMessage))
         {
-            var tempPassword = userName;
-            var user = new ApplicationUser
-            {
-                UserName = userName,
-                Email = null,
-                EmailConfirmed = true,
-                EmpleadoId = empleado.Id,
-                EmpresaId = empleado.Sucursal!.EmpresaId
-            };
-            var res = await _userManager.CreateAsync(user, tempPassword);
-            if (res.Succeeded)
-            {
-                await _userManager.AddToRoleAsync(user, "Empleado");
-                await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("must_change_password", "1"));
-                TempData["Success"] = "Usuario creado. La contrasena inicial es el mismo usuario y se pedira cambio al iniciar sesion.";
-            }
-            else
-            {
-                TempData["Error"] = string.Join("; ", res.Errors.Select(e => e.Description));
-            }
+            var defaultPassword = BuildDefaultPassword(empleado.Sucursal?.Nombre, codigo, empleado.Id);
+            TempData["Success"] = $"Usuario creado automaticamente ({codigo}). La contrasena inicial es {defaultPassword}.";
         }
         else
         {
-            TempData["Error"] = "Ya existe un usuario para este empleado.";
+            TempData["Error"] = resultMessage;
         }
         return RedirectToAction(nameof(Edit), new { id });
     }
@@ -689,23 +658,24 @@ public class EmpleadosController : Controller
         }
     }
 
-    private async Task<string?> TryCreateIdentityUsuarioAsync(Guid empleadoId, string? codigo, Guid sucursalId)
+    private async Task<string?> TryCreateIdentityUsuarioAsync(Guid empleadoId, string username, Guid sucursalId)
     {
-        if (string.IsNullOrWhiteSpace(codigo)) return null;
-        var username = codigo.Trim();
-        if (string.IsNullOrEmpty(username)) return null;
+        if (string.IsNullOrWhiteSpace(username))
+            return "El codigo es requerido para crear el usuario.";
+        username = username.Trim();
 
-        var existingEmpleadoUser = await _userManager.Users.FirstOrDefaultAsync(u => u.EmpleadoId == empleadoId && u.UserName == username);
-        if (existingEmpleadoUser != null)
-            return null;
+        if (await _db.Set<ApplicationUser>().AnyAsync(u => u.EmpleadoId == empleadoId))
+            return "El empleado ya tiene un usuario asignado.";
 
         if (await _userManager.FindByNameAsync(username) != null)
-            return $"Ya existe un usuario con el código {username}.";
+            return $"Ya existe un usuario con el codigo {username}.";
 
-        var empresaId = await _db.Sucursales
+        var sucursalData = await _db.Sucursales
             .Where(s => s.Id == sucursalId)
-            .Select(s => (Guid?)s.EmpresaId)
+            .Select(s => new { s.EmpresaId, s.Nombre })
             .FirstOrDefaultAsync();
+        var empresaId = sucursalData?.EmpresaId;
+        var sucursalNombre = sucursalData?.Nombre;
 
         var usuario = new ApplicationUser
         {
@@ -715,14 +685,15 @@ public class EmpleadosController : Controller
             EmpresaId = empresaId
         };
 
-        var result = await _userManager.CreateAsync(usuario, username);
+        var password = BuildDefaultPassword(sucursalNombre, username, empleadoId);
+        var result = await _userManager.CreateAsync(usuario, password);
         if (!result.Succeeded)
             return $"No se pudo crear el usuario: {string.Join("; ", result.Errors.Select(e => e.Description))}";
 
         if (!await _userManager.IsInRoleAsync(usuario, "Empleado"))
             await _userManager.AddToRoleAsync(usuario, "Empleado");
 
-        return $"Usuario creado automáticamente ({username}).";
+        return null;
     }
 
     private async Task<string?> ValidatePasswordAsync(ApplicationUser user, string newPassword)
@@ -736,6 +707,25 @@ public class EmpleadosController : Controller
         return allErrors.Count > 0 ? string.Join("; ", allErrors.Select(e => e.Description)) : null;
     }
 
+    private async Task<bool> CodigoEmpleadoEnUsoAsync(string codigo, Guid sucursalId, Guid? excluirEmpleadoId = null)
+    {
+        if (string.IsNullOrWhiteSpace(codigo)) return false;
+        var clave = codigo.Trim().ToUpperInvariant();
+        var sucursalData = await _db.Sucursales
+            .Where(s => s.Id == sucursalId)
+            .Select(s => new { s.EmpresaId, s.Nombre })
+            .FirstOrDefaultAsync();
+        var empresaId = sucursalData?.EmpresaId;
+        var sucursalNombre = sucursalData?.Nombre;
+        if (empresaId == null) return false;
+
+        var query = _db.Empleados
+            .Where(e => !e.Borrado && e.Codigo != null && e.Codigo.ToUpper() == clave && e.Sucursal != null && e.Sucursal.EmpresaId == empresaId);
+        if (excluirEmpleadoId.HasValue)
+            query = query.Where(e => e.Id != excluirEmpleadoId.Value);
+        return await query.AnyAsync();
+    }
+
 
     private static string BuildUserName(string empresaNombre, string? empleadoCodigo, Guid empleadoId)
     {
@@ -746,6 +736,16 @@ public class EmpleadosController : Controller
 
         var baseUser = $"{empresa}_{codigo}";
         return EnsurePasswordCompliance(baseUser);
+    }
+
+    private static string BuildDefaultPassword(string? sucursalNombre, string codigo, Guid empleadoId)
+    {
+        var sucursalToken = string.IsNullOrWhiteSpace(sucursalNombre) ? "Sucursal" : ToToken(sucursalNombre);
+        var codigoToken = ToToken(codigo);
+        if (string.IsNullOrWhiteSpace(codigoToken))
+            codigoToken = empleadoId.ToString("N").Substring(0, 6).ToUpperInvariant();
+
+        return $"{sucursalToken}_{codigoToken}";
     }
 
     private static string ToTitleToken(string value)
@@ -786,10 +786,9 @@ public class EmpleadosController : Controller
     {
         var result = value;
         if (!result.Any(char.IsLower)) result += "a";
-        if (!result.Any(char.IsUpper)) result += "A";
         if (!result.Any(char.IsDigit)) result += "1";
         if (!result.Any(ch => !char.IsLetterOrDigit(ch))) result += "_";
-        if (result.Length < 20) result += new string('0', 20 - result.Length);
+        if (result.Length < 8) result += new string('0', 8 - result.Length);
         return result;
     }
 

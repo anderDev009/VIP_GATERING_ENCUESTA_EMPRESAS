@@ -6,7 +6,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - VIP GATERING</title>
+    <title>@ViewData["Title"] - VIP CATERING</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body class="app-body">
@@ -17,7 +17,7 @@
     <div class="app-shell">
         <header class="app-header">
             <div>
-                <a asp-controller="Home" asp-action="Index" class="app-logo">VIP GATERING</a>
+                <a asp-controller="Home" asp-action="Index" class="app-logo">VIP CATERING</a>
             </div>
             <nav class="app-nav">
                 <a asp-controller="Empleado" asp-action="MiSemana" class="btn-primary">Mi semana</a>
@@ -41,17 +41,17 @@
                             <a asp-controller="Sucursales" asp-action="Index" class="nav-dropdown__item">Filial</a>
                             <a asp-controller="Localizaciones" asp-action="Index" class="nav-dropdown__item">Localizaciones</a>
                             <a asp-controller="Empleados" asp-action="Index" class="nav-dropdown__item">Empleado</a>
-                            <a asp-controller="Menu" asp-action="Sucursales" class="nav-dropdown__item">Menu</a>
-                            @if (User.IsInRole("Admin"))
-                            {
-                                <a asp-controller="Opciones" asp-action="Index" class="nav-dropdown__item">Platos</a>
-                                <a asp-controller="Security" asp-action="Index" class="nav-dropdown__item">Seguridad</a>
+                        <a asp-controller="Opciones" asp-action="Index" class="nav-dropdown__item">Platos</a>
+                        <a asp-controller="Menu" asp-action="Sucursales" class="nav-dropdown__item">Menu</a>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <a asp-controller="Security" asp-action="Index" class="nav-dropdown__item">Seguridad</a>
                             }
                         </div>
                     </div>
                 }
 
-                @if (User.IsInRole("Admin"))
+                @if (User.IsInRole("Admin") || User.IsInRole("Empresa"))
                 {
                     <div class="nav-dropdown">
                         <button type="button" class="btn-primary nav-dropdown__trigger">
@@ -59,7 +59,12 @@
                             <span class="nav-dropdown__chevron" aria-hidden="true">&#9662;</span>
                         </button>
                         <div class="nav-dropdown__menu">
-                            <a asp-controller="Reportes" asp-action="Distribucion" class="nav-dropdown__item">Distribucion</a>
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <a asp-controller="Reportes" asp-action="Distribucion" class="nav-dropdown__item">Distribucion</a>
+                            }
+                            <a asp-controller="Reportes" asp-action="Selecciones" class="nav-dropdown__item">Selecciones</a>
+                            <a asp-controller="Reportes" asp-action="Seleccionados" class="nav-dropdown__item">Seleccionados pendientes</a>
                         </div>
                     </div>
                 }
@@ -89,7 +94,7 @@
         </main>
 
         <footer class="app-footer">
-            &copy; @DateTime.Now.Year VIP GATERING
+            &copy; @DateTime.Now.Year VIP CATERING
         </footer>
     </div>
 

@@ -113,6 +113,11 @@
             </div>
         }
     </div>
+    <div class="flex justify-end gap-3 mt-2">
+        <a class="btn-primary btn-sm" href="@Url.Action("Administrar", new { fecha = Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId = Model.EmpresaId })">
+            Configurar menú empresa completa
+        </a>
+    </div>
     @if (Model.EncuestaCerrada)
     {
         <div class="text-sm text-amber-700">Mientras el menu esta cerrado no se pueden modificar los platos.</div>
@@ -221,7 +226,7 @@
                                     var i = item.Index;
                                     var horarioId = d.HorarioId;
                                     var opcionesHorario = Model.Opciones
-                                        .Where(o => horarioId == null || o.Horarios == null || o.Horarios.Count == 0 || o.Horarios.Any(h => h.HorarioId == horarioId))
+                                        .OrderBy(o => o.Nombre)
                                         .ToList();
                                     <tr data-card>
                                         <td class="menu-daycell">
