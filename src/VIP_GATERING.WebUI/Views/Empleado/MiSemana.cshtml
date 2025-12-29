@@ -109,9 +109,12 @@
 
 @if (noHabilitado)
 {
-    <div class="alert alert-warning mb-4">
-        Tu cuenta no esta habilitada para seleccionar platos. Si crees que es un error, contacta a tu administrador.
-    </div>
+        <div class="alert alert-warning mb-4">
+            Tu cuenta no esta habilitada para seleccionar opciones (platos). Si crees que es un error, contacta a tu administrador.
+            <div class="mt-3">
+                <button class="btn-primary btn-sm" disabled>Guardar seleccion</button>
+            </div>
+        </div>
 }
 else if (Model.Bloqueado)
 {

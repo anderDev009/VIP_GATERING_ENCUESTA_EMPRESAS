@@ -68,6 +68,8 @@ public class MenuEdicionService : IMenuEdicionService
         foreach (var o in opciones)
         {
             var fechaDia = _fechas.ObtenerFechaDelDia(fechaInicio, o.DiaSemana);
+            if (fechaDia <= fechaRef)
+                continue;
             var limite = fechaDia.ToDateTime(horaLimite).AddDays(-diasAnticipo);
             if (referenciaUtc < limite)
             {

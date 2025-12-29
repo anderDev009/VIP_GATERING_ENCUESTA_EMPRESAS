@@ -55,11 +55,6 @@ public class ReportesController : Controller
 
         var hoy = _fechas.Hoy();
         var respuestas = await baseQuery.ToListAsync();
-        respuestas = respuestas
-            .Where(r => r.OpcionMenu != null && r.OpcionMenu.Menu != null
-                && ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana) <= hoy)
-            .ToList();
-
         var itemsRaw = new List<(Guid OpcionId, string Nombre, decimal Costo, decimal PrecioEmpleado)>();
         foreach (var r in respuestas)
         {
@@ -111,9 +106,9 @@ public class ReportesController : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa")]
+    [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> Selecciones(Guid? empresaId = null, Guid? sucursalId = null)
+    public async Task<IActionResult> Selecciones(Guid? empresaId = null, Guid? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
         // Empresa solo puede ver su propia data
         if (User.IsInRole("Empresa"))
@@ -122,13 +117,49 @@ public class ReportesController : Controller
             if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
             empresaId = _current.EmpresaId;
         }
+        else if (User.IsInRole("Empleado"))
+        {
+            if (_current.EmpresaId == null) return Forbid();
+            empresaId = _current.EmpresaId;
+            sucursalId = _current.SucursalId;
+        }
 
-        var (inicio, fin) = _fechas.RangoSemanaSiguiente();
+        var isEmpleado = User.IsInRole("Empleado");
+        DateOnly inicio;
+        DateOnly fin;
+        if (desde.HasValue && hasta.HasValue)
+        {
+            inicio = desde.Value;
+            fin = hasta.Value;
+            if (fin < inicio)
+            {
+                (inicio, fin) = (fin, inicio);
+            }
+        }
+        else if (desde.HasValue)
+        {
+            inicio = desde.Value;
+            fin = inicio.AddDays(4);
+        }
+        else if (hasta.HasValue)
+        {
+            fin = hasta.Value;
+            inicio = fin.AddDays(-4);
+        }
+        else
+        {
+            (inicio, fin) = isEmpleado ? _fechas.RangoSemanaActual() : _fechas.RangoSemanaSiguiente();
+        }
 
-        var empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
+        var empresasQuery = _db.Empresas.AsQueryable();
+        if (User.IsInRole("Empleado") && empresaId != null)
+            empresasQuery = empresasQuery.Where(e => e.Id == empresaId);
+        var empresas = await empresasQuery.OrderBy(e => e.Nombre).ToListAsync();
         var sucursalesBase = _db.Sucursales.AsQueryable();
         if (empresaId != null)
             sucursalesBase = sucursalesBase.Where(s => s.EmpresaId == empresaId);
+        if (isEmpleado && sucursalId != null)
+            sucursalesBase = sucursalesBase.Where(s => s.Id == sucursalId);
         var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
 
         var baseQuery = _db.RespuestasFormulario
@@ -143,20 +174,25 @@ public class ReportesController : Controller
             .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
             .Where(r => r.OpcionMenu != null
                 && r.OpcionMenu.Menu != null
-                && r.OpcionMenu.Menu.FechaInicio == inicio
-                && r.OpcionMenu.Menu.FechaTermino == fin);
+                && r.OpcionMenu.Menu.FechaInicio <= fin
+                && r.OpcionMenu.Menu.FechaTermino >= inicio);
 
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
 
         var hoy = _fechas.Hoy();
         var respuestas = await baseQuery.ToListAsync();
-        respuestas = respuestas
-            .Where(r => r.OpcionMenu != null && r.OpcionMenu.Menu != null
-                && ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana) <= hoy)
+        var respuestasVisible = respuestas
+            .Where(r => r.OpcionMenu != null && r.OpcionMenu.Menu != null)
+            .Where(r =>
+            {
+                var fecha = ObtenerFechaDiaSemana(r.OpcionMenu!.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
+                if (fecha < inicio || fecha > fin) return false;
+                return isEmpleado ? fecha > hoy : fecha <= hoy;
+            })
             .ToList();
 
         var detalleRaw = new List<(Guid EmpleadoId, string EmpleadoNombre, Guid SucursalId, string SucursalNombre, decimal Costo, decimal Precio)>();
-        foreach (var r in respuestas)
+        foreach (var r in respuestasVisible)
         {
             if (r.OpcionMenu == null || r.Empleado == null) continue;
             var suc = r.SucursalEntrega ?? r.Empleado.Sucursal;
@@ -209,6 +245,45 @@ public class ReportesController : Controller
             .OrderBy(g => g.Sucursal)
             .ToList();
 
+        var seleccionesEmpleado = new List<SeleccionesVM.SeleccionDetalleEmpleadoRow>();
+        if (isEmpleado)
+        {
+            var culture = CultureInfo.CurrentCulture;
+            foreach (var r in respuestasVisible)
+            {
+                if (r.OpcionMenu == null || r.Empleado == null) continue;
+                var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
+                var localizacion = r.SucursalEntrega?.Nombre ?? r.Empleado.Sucursal?.Nombre ?? "Sin asignar";
+
+                var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
+                if (opcion != null)
+                {
+                    var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, r.Empleado.Sucursal!, r.Empleado.Sucursal!.Empresa!);
+                    var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
+                    seleccionesEmpleado.Add(new SeleccionesVM.SeleccionDetalleEmpleadoRow
+                    {
+                        Fecha = fecha,
+                        DiaNombre = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
+                        OpcionNombre = opcion.Nombre ?? "Sin definir",
+                        Precio = precio,
+                        Localizacion = localizacion
+                    });
+                }
+
+                if (r.AdicionalOpcion != null)
+                {
+                    seleccionesEmpleado.Add(new SeleccionesVM.SeleccionDetalleEmpleadoRow
+                    {
+                        Fecha = fecha,
+                        DiaNombre = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
+                        OpcionNombre = $"Adicional: {r.AdicionalOpcion.Nombre ?? "Sin definir"}",
+                        Precio = r.AdicionalOpcion.Precio ?? r.AdicionalOpcion.Costo,
+                        Localizacion = localizacion
+                    });
+                }
+            }
+        }
+
         var vm = new SeleccionesVM
         {
             Inicio = inicio,
@@ -221,12 +296,13 @@ public class ReportesController : Controller
             TotalCosto = detalle.Sum(d => d.TotalCosto),
             TotalPrecio = detalle.Sum(d => d.TotalPrecio),
             PorSucursal = porSucursal,
-            PorEmpleado = detalle
+            PorEmpleado = detalle,
+            SeleccionesEmpleado = seleccionesEmpleado
         };
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa")]
+    [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
     public async Task<IActionResult> TotalesEmpleados(Guid? empresaId = null, Guid? sucursalId = null)
     {
@@ -257,8 +333,8 @@ public class ReportesController : Controller
             .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
             .Where(r => r.OpcionMenu != null
                 && r.OpcionMenu.Menu != null
-                && r.OpcionMenu.Menu.FechaInicio == inicio
-                && r.OpcionMenu.Menu.FechaTermino == fin);
+                && r.OpcionMenu.Menu.FechaInicio <= fin
+                && r.OpcionMenu.Menu.FechaTermino >= inicio);
 
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
 
@@ -420,9 +496,9 @@ public class ReportesController : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa")]
+    [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> Seleccionados(Guid? empresaId = null, Guid? sucursalId = null)
+    public async Task<IActionResult> Seleccionados(Guid? empresaId = null, Guid? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
         if (User.IsInRole("Empresa"))
         {
@@ -451,16 +527,20 @@ public class ReportesController : Controller
             .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
             .Where(r => r.OpcionMenu != null
                 && r.OpcionMenu.Menu != null
-                && r.OpcionMenu.Menu.FechaInicio == inicio
-                && r.OpcionMenu.Menu.FechaTermino == fin);
+                && r.OpcionMenu.Menu.FechaInicio <= fin
+                && r.OpcionMenu.Menu.FechaTermino >= inicio);
 
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
 
         var hoy = _fechas.Hoy();
         var respuestas = await baseQuery.ToListAsync();
         var pendientes = respuestas
-            .Where(r => r.OpcionMenu != null && r.OpcionMenu.Menu != null
-                && ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana) > hoy)
+            .Where(r =>
+            {
+                if (r.OpcionMenu == null || r.OpcionMenu.Menu == null) return false;
+                var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana);
+                return fecha > hoy && fecha >= inicio && fecha <= fin;
+            })
             .ToList();
 
         var detalleRaw = new List<(Guid EmpleadoId, string EmpleadoNombre, Guid SucursalId, string SucursalNombre, decimal Costo, decimal Precio)>();
@@ -584,16 +664,19 @@ public class ReportesController : Controller
             .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
             .Where(r => r.OpcionMenu != null
                 && r.OpcionMenu.Menu != null
-                && r.OpcionMenu.Menu.FechaInicio == inicio
-                && r.OpcionMenu.Menu.FechaTermino == fin);
+                && r.OpcionMenu.Menu.FechaInicio <= fin
+                && r.OpcionMenu.Menu.FechaTermino >= inicio);
 
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
 
-        var hoy = _fechas.Hoy();
         var respuestas = await baseQuery.ToListAsync();
         respuestas = respuestas
-            .Where(r => r.OpcionMenu != null && r.OpcionMenu.Menu != null
-                && ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana) <= hoy)
+            .Where(r =>
+            {
+                if (r.OpcionMenu == null || r.OpcionMenu.Menu == null) return false;
+                var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana);
+                return fecha >= inicio && fecha <= fin;
+            })
             .ToList();
 
         const decimal itbisRate = 0.18m;
@@ -846,7 +929,7 @@ public class ReportesController : Controller
         return File(pdf, "application/pdf", $"items-semana-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
     }
 
-    [Authorize(Roles = "Admin,Empresa")]
+    [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
     public async Task<IActionResult> SeleccionesPdf(Guid? empresaId = null, Guid? sucursalId = null)
     {

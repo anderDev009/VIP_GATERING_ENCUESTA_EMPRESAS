@@ -1,4 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using VIP_GATERING.Domain.Entities;
 
@@ -233,6 +236,10 @@ public static class SeedData
         if (!await db.Roles.AnyAsync(r => r.Nombre == "Empleado"))
             db.Roles.Add(new Rol { Nombre = "Empleado" });
         await db.SaveChangesAsync();
+
+        await EnsureDemoLocalizacionesAsync(db);
+        await EnsureDemoEmployeesAsync(db);
+        await EnsureDemoMenusAndResponsesAsync(db);
     }
 
     private static MenuEtlData? LoadMenuEtlData(string? contentRootPath)
@@ -285,6 +292,264 @@ public static class SeedData
         if (categorias.Contains("Cena") && cena.HasValue)
             return cena;
         return null;
+    }
+
+    private static readonly DayOfWeek[] DemoWeekDays = new[]
+    {
+        DayOfWeek.Monday,
+        DayOfWeek.Tuesday,
+        DayOfWeek.Wednesday,
+        DayOfWeek.Thursday,
+        DayOfWeek.Friday
+    };
+
+    private static readonly string[] DemoHorarioNames = new[] { "Desayuno", "Almuerzo" };
+
+    private static async Task EnsureDemoLocalizacionesAsync(AppDbContext db)
+    {
+        var sucursales = await db.Sucursales.AsNoTracking().ToListAsync();
+        var localizacionNombres = new[] { "Logistica", "Operaciones", "Mesa de control" };
+        foreach (var suc in sucursales)
+        {
+            foreach (var nombre in localizacionNombres)
+            {
+                if (await db.Localizaciones.AnyAsync(l => l.SucursalId == suc.Id && l.Nombre == nombre))
+                    continue;
+
+                db.Localizaciones.Add(new Localizacion
+                {
+                    Nombre = nombre,
+                    EmpresaId = suc.EmpresaId,
+                    SucursalId = suc.Id,
+                    Direccion = $"{suc.Nombre} - {nombre}",
+                    IndicacionesEntrega = $"Entrega en {nombre}"
+                });
+            }
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureDemoEmployeesAsync(AppDbContext db)
+    {
+        var sucursales = await db.Sucursales.ToListAsync();
+        var empleadosDemo = new[]
+        {
+            new { Codigo = "RIC001", Nombre = "Richard", Sucursal = "ADMINISTRACION UNIVERSAL" },
+            new { Codigo = "ANDO001", Nombre = "Anderson", Sucursal = "ARS UNIVERSAL" },
+            new { Codigo = "DAMIAN1", Nombre = "Damian", Sucursal = "ASISTENCIA UNIVERSAL" },
+            new { Codigo = "ADONYS1", Nombre = "Adonys", Sucursal = "SUPLIDORA PROPARTES" }
+        };
+
+        foreach (var demo in empleadosDemo)
+        {
+            var sucursal = sucursales.FirstOrDefault(s => string.Equals(s.Nombre, demo.Sucursal, StringComparison.OrdinalIgnoreCase));
+            if (sucursal == null)
+                continue;
+
+            var empleado = await db.Empleados.FirstOrDefaultAsync(e => e.Codigo == demo.Codigo);
+            if (empleado == null)
+            {
+                empleado = new Empleado
+                {
+                    Nombre = demo.Nombre,
+                    Codigo = demo.Codigo,
+                    SucursalId = sucursal.Id,
+                    EsSubsidiado = true,
+                    Estado = EmpleadoEstado.Habilitado
+                };
+                db.Empleados.Add(empleado);
+            }
+            else
+            {
+                empleado.Nombre = demo.Nombre;
+                empleado.SucursalId = sucursal.Id;
+                empleado.Estado = EmpleadoEstado.Habilitado;
+                empleado.EsSubsidiado = true;
+            }
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureDemoMenusAndResponsesAsync(AppDbContext db)
+    {
+        var empresa = await db.Empresas.FirstOrDefaultAsync(e => e.Nombre == "SEGURO UNIVERSAL");
+        if (empresa == null)
+            return;
+
+        var sucursales = await db.Sucursales.Where(s => s.EmpresaId == empresa.Id).ToListAsync();
+        var horarios = await db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
+        if (!horarios.Any())
+            return;
+
+        var opciones = await db.Opciones.Where(o => !o.Borrado).OrderBy(o => o.Nombre).Take(20).ToListAsync();
+        if (opciones.Count < 3)
+            return;
+
+        var empleados = await db.Empleados.ToListAsync();
+        if (!empleados.Any())
+            return;
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var currentMonday = GetWeekStart(today);
+        var weekStarts = new[] { currentMonday.AddDays(-14), currentMonday.AddDays(-7), currentMonday };
+
+        var menuCache = new Dictionary<(Guid sucursalId, DateOnly inicio), Menu>();
+        foreach (var weekStart in weekStarts)
+        {
+            var weekEnd = weekStart.AddDays(4);
+            foreach (var suc in sucursales)
+            {
+                var menu = await EnsureMenuWithOptionsAsync(db, suc, weekStart, weekEnd, horarios, opciones);
+                menuCache[(suc.Id, weekStart)] = menu;
+            }
+        }
+
+        var localizMap = await db.Localizaciones
+            .GroupBy(l => l.SucursalId)
+            .ToDictionaryAsync(g => g.Key, g => g.ToList());
+
+        var employeeMap = empleados
+            .Where(e => !string.IsNullOrWhiteSpace(e.Codigo))
+            .ToDictionary(e => e.Codigo!, StringComparer.OrdinalIgnoreCase);
+
+        var historyCodes = new[] { "RIC001", "ANDO001", "DAMIAN1" };
+        var currentCodes = new[] { "DAMIAN1", "ADONYS1" };
+        var demoDays = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday };
+
+        foreach (var weekStart in weekStarts.Take(2))
+        {
+            foreach (var code in historyCodes)
+            {
+                if (!employeeMap.TryGetValue(code, out var empleado))
+                    continue;
+                if (!menuCache.TryGetValue((empleado.SucursalId, weekStart), out var menu))
+                    continue;
+                if (!localizMap.TryGetValue(empleado.SucursalId, out var locs) || locs.Count == 0)
+                    continue;
+
+                for (var i = 0; i < demoDays.Length; i++)
+                {
+                    var day = demoDays[i];
+                    var horario = DemoHorarioNames[i % DemoHorarioNames.Length];
+                    var location = locs[i % locs.Count];
+                    var selection = i % 2 == 0 ? 'A' : 'B';
+                    await AddOrUpdateDemoResponseAsync(db, empleado, menu, day, horario, selection, location.Id, horarios);
+                }
+            }
+        }
+
+        foreach (var code in currentCodes)
+        {
+            if (!employeeMap.TryGetValue(code, out var empleado))
+                continue;
+            var weekStart = weekStarts.Last();
+            if (!menuCache.TryGetValue((empleado.SucursalId, weekStart), out var menu))
+                continue;
+            if (!localizMap.TryGetValue(empleado.SucursalId, out var locs) || locs.Count == 0)
+                continue;
+
+            for (var i = 0; i < demoDays.Length; i++)
+            {
+                var day = demoDays[i];
+                var horario = DemoHorarioNames[i % DemoHorarioNames.Length];
+                var location = locs[(i + 1) % locs.Count];
+                var selection = i % 2 == 0 ? 'A' : 'B';
+                await AddOrUpdateDemoResponseAsync(db, empleado, menu, day, horario, selection, location.Id, horarios);
+            }
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
+    }
+
+    private static DateOnly GetWeekStart(DateOnly date)
+    {
+        var diff = ((int)date.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        return date.AddDays(-diff);
+    }
+
+    private static async Task<Menu> EnsureMenuWithOptionsAsync(AppDbContext db, Sucursal sucursal, DateOnly inicio, DateOnly fin, IReadOnlyList<Horario> horarios, IReadOnlyList<Opcion> opciones)
+    {
+        var menu = await db.Menus
+            .Include(m => m.OpcionesPorDia)
+            .FirstOrDefaultAsync(m => m.SucursalId == sucursal.Id && m.FechaInicio == inicio && m.FechaTermino == fin);
+        if (menu == null)
+        {
+            menu = new Menu
+            {
+                FechaInicio = inicio,
+                FechaTermino = fin,
+                EmpresaId = sucursal.EmpresaId,
+                SucursalId = sucursal.Id
+            };
+            db.Menus.Add(menu);
+        }
+
+        var dias = DemoWeekDays;
+        if (menu.OpcionesPorDia == null)
+            menu.OpcionesPorDia = new List<OpcionMenu>();
+
+        for (var dayIndex = 0; dayIndex < dias.Length; dayIndex++)
+        {
+            var day = dias[dayIndex];
+            for (var horarioIndex = 0; horarioIndex < horarios.Count; horarioIndex++)
+            {
+                var horario = horarios[horarioIndex];
+                var opcionMenu = menu.OpcionesPorDia.FirstOrDefault(o => o.DiaSemana == day && o.HorarioId == horario.Id);
+                if (opcionMenu == null)
+                {
+                    opcionMenu = new OpcionMenu
+                    {
+                        Menu = menu,
+                        DiaSemana = day,
+                        HorarioId = horario.Id
+                    };
+                    menu.OpcionesPorDia.Add(opcionMenu);
+                }
+
+                var baseIndex = (dayIndex * horarios.Count + horarioIndex) * 3;
+                opcionMenu.OpcionIdA = opciones[(baseIndex) % opciones.Count].Id;
+                opcionMenu.OpcionIdB = opciones[(baseIndex + 1) % opciones.Count].Id;
+                opcionMenu.OpcionIdC = opciones[(baseIndex + 2) % opciones.Count].Id;
+                opcionMenu.OpcionesMaximas = 3;
+            }
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
+
+        return menu;
+    }
+
+    private static async Task AddOrUpdateDemoResponseAsync(AppDbContext db, Empleado empleado, Menu menu, DayOfWeek dia, string horarioNombre, char seleccion, Guid localizacionId, IReadOnlyList<Horario> horarios)
+    {
+        var horario = horarios.FirstOrDefault(h => string.Equals(h.Nombre, horarioNombre, StringComparison.OrdinalIgnoreCase)) ?? horarios.First();
+        var opcionMenu = await db.OpcionesMenu.FirstOrDefaultAsync(o => o.MenuId == menu.Id && o.DiaSemana == dia && o.HorarioId == horario.Id);
+        if (opcionMenu == null)
+            return;
+
+        var existing = await db.RespuestasFormulario.FirstOrDefaultAsync(r => r.EmpleadoId == empleado.Id && r.OpcionMenuId == opcionMenu.Id);
+        if (existing == null)
+        {
+            db.RespuestasFormulario.Add(new RespuestaFormulario
+            {
+                EmpleadoId = empleado.Id,
+                OpcionMenuId = opcionMenu.Id,
+                Seleccion = seleccion,
+                SucursalEntregaId = empleado.SucursalId,
+                LocalizacionEntregaId = localizacionId
+            });
+        }
+        else
+        {
+            existing.Seleccion = seleccion;
+            existing.SucursalEntregaId = empleado.SucursalId;
+            existing.LocalizacionEntregaId = localizacionId;
+        }
     }
 
     private sealed class MenuEtlData

@@ -3,11 +3,17 @@
     ViewData["Title"] = "Editar plato";
     var horarios = ViewBag.Horarios as List<VIP_GATERING.Domain.Entities.Horario> ?? new();
     var seleccionados = ViewBag.HorarioIds as List<Guid> ?? new();
+    var esAdicional = (bool?)(ViewBag.EsAdicional) ?? false;
+    var tipoEtiqueta = esAdicional ? "Adicional (100% empleado)" : "Plato principal";
 }
 <h1 class="text-2xl font-semibold mb-4 max-w-lg mx-auto">Editar plato</h1>
 
 <form asp-action="Edit" method="post" enctype="multipart/form-data" class="space-y-4 bg-white p-4 border rounded max-w-lg mx-auto">
     <input type="hidden" asp-for="Id" />
+    <div class="text-sm text-slate-600 flex items-center gap-2">
+        <span class="font-semibold">Tipo:</span>
+        <span class="px-2 py-0.5 rounded border text-xs uppercase tracking-wide">@tipoEtiqueta</span>
+    </div>
     <div>
         <label class="block text-sm">C&oacute;digo</label>
         <input asp-for="Codigo" class="w-full border rounded p-2" />

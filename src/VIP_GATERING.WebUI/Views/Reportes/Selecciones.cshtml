@@ -2,11 +2,20 @@
 @{
     ViewData["Title"] = "Selecciones y subtotales";
     var isAdmin = User.IsInRole("Admin");
+    var isEmpleado = User.IsInRole("Empleado");
 }
 
 <h1 class="text-xl font-semibold mb-4">Selecciones (@Model.Inicio:yyyy-MM-dd a @Model.Fin:yyyy-MM-dd)</h1>
 
 <form method="get" class="mb-6 grid gap-4 md:grid-cols-4 items-end">
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Desde</label>
+        <input type="date" name="desde" value="@Model.Inicio.ToString("yyyy-MM-dd")" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" />
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Hasta</label>
+        <input type="date" name="hasta" value="@Model.Fin.ToString("yyyy-MM-dd")" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" />
+    </div>
     @if (isAdmin)
     {
         <div class="md:col-span-2">
@@ -33,7 +42,7 @@
     <div class="flex gap-3 md:col-span-4">
         <button type="submit" class="btn-primary">Filtrar</button>
         <a class="btn-outline" asp-action="Selecciones">Limpiar</a>
-        <a class="btn-outline" asp-action="SeleccionesPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId">Exportar PDF</a>
+        <a class="btn-outline" asp-action="SeleccionesPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar PDF</a>
     </div>
     <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3">
         <div class="text-sm text-slate-600">Total costo</div>
@@ -92,48 +101,85 @@
     </tfoot>
 </table>
 
-<h2 class="font-semibold mb-2">Detalle por empleado</h2>
-<table>
-    <thead>
-    <tr>
-        <th>Empleado</th>
-        <th>Filial</th>
-        <th class="text-right">Selecciones</th>
-        <th class="text-right">Costo</th>
-        @if (isAdmin)
-        {
-            <th class="text-right">Consumo</th>
-            <th class="text-right">Beneficio</th>
-        }
-    </tr>
-    </thead>
-    <tbody>
-    @foreach (var e in Model.PorEmpleado)
-    {
+@if (isEmpleado)
+{
+    <h2 class="font-semibold mb-2">Tus selecciones</h2>
+    <table>
+        <thead>
         <tr>
-            <td>@e.Empleado</td>
-            <td>@e.Sucursal</td>
-            <td class="text-right">@e.Cantidad</td>
-            <td class="text-right">@e.TotalCosto.ToString("C")</td>
+            <th>Fecha</th>
+            <th>Día</th>
+            <th>Plato</th>
+            <th class="text-right">Precio</th>
+            <th>Localización</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var s in Model.SeleccionesEmpleado)
+        {
+            <tr>
+                <td>@s.Fecha</td>
+                <td>@s.DiaNombre</td>
+                <td>@s.OpcionNombre</td>
+                <td class="text-right">@s.Precio.ToString("C")</td>
+                <td>@s.Localizacion</td>
+            </tr>
+        }
+        </tbody>
+        <tfoot>
+        <tr>
+            <th colspan="3" class="text-right">Total</th>
+            <th class="text-right">@Model.SeleccionesEmpleado.Sum(x => x.Precio).ToString("C")</th>
+            <th></th>
+        </tr>
+        </tfoot>
+    </table>
+}
+else
+{
+    <h2 class="font-semibold mb-2">Detalle por empleado</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Empleado</th>
+            <th>Filial</th>
+            <th class="text-right">Selecciones</th>
+            <th class="text-right">Costo</th>
             @if (isAdmin)
             {
-                <td class="text-right">@e.TotalPrecio.ToString("C")</td>
-                <td class="text-right">@e.TotalBeneficio.ToString("C")</td>
+                <th class="text-right">Consumo</th>
+                <th class="text-right">Beneficio</th>
             }
         </tr>
-    }
-    </tbody>
-    <tfoot>
-    <tr>
-        <th colspan="2" class="text-right">Total</th>
-        <th class="text-right">@Model.PorEmpleado.Sum(x => x.Cantidad)</th>
-        <th class="text-right">@Model.PorEmpleado.Sum(x => x.TotalCosto).ToString("C")</th>
-        @if (isAdmin)
+        </thead>
+        <tbody>
+        @foreach (var e in Model.PorEmpleado)
         {
-            <th class="text-right">@Model.PorEmpleado.Sum(x => x.TotalPrecio).ToString("C")</th>
-            <th class="text-right">@Model.PorEmpleado.Sum(x => x.TotalBeneficio).ToString("C")</th>
+            <tr>
+                <td>@e.Empleado</td>
+                <td>@e.Sucursal</td>
+                <td class="text-right">@e.Cantidad</td>
+                <td class="text-right">@e.TotalCosto.ToString("C")</td>
+                @if (isAdmin)
+                {
+                    <td class="text-right">@e.TotalPrecio.ToString("C")</td>
+                    <td class="text-right">@e.TotalBeneficio.ToString("C")</td>
+                }
+            </tr>
         }
-    </tr>
-    </tfoot>
-</table>
+        </tbody>
+        <tfoot>
+        <tr>
+            <th colspan="2" class="text-right">Total</th>
+            <th class="text-right">@Model.PorEmpleado.Sum(x => x.Cantidad)</th>
+            <th class="text-right">@Model.PorEmpleado.Sum(x => x.TotalCosto).ToString("C")</th>
+            @if (isAdmin)
+            {
+                <th class="text-right">@Model.PorEmpleado.Sum(x => x.TotalPrecio).ToString("C")</th>
+                <th class="text-right">@Model.PorEmpleado.Sum(x => x.TotalBeneficio).ToString("C")</th>
+            }
+        </tr>
+        </tfoot>
+    </table>
+}
 

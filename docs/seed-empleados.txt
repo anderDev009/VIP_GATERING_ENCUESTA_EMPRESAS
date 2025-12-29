@@ -1,0 +1,29 @@
+Nombre: Richard
+Codigo: RIC001
+Usuario: ZRichard1_
+Contrasena: ZRichard1_
+Rol: Empleado
+Filial: ADMINISTRACION UNIVERSAL
+
+Nombre: Anderson
+Codigo: ANDO001
+Usuario: ZAnderson1_
+Contrasena: ZAnderson1_
+Rol: Empleado
+Filial: ARS UNIVERSAL
+
+Nombre: Damian
+Codigo: DAMIAN1
+Usuario: ZDamian1_
+Contrasena: ZDamian1_
+Rol: Empleado
+Filial: ASISTENCIA UNIVERSAL
+
+Nombre: Adonys
+Codigo: ADONYS1
+Usuario: ZAdonys1_
+Contrasena: ZAdonys1_
+Rol: Empleado
+Filial: SUPLIDORA PROPARTES
+
+Notas: Hay un seed de Admin con usuario ADMINa1_ (usuario y contrasena iguales).

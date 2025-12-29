@@ -24,6 +24,7 @@ public class EmpleadoEstadoTests : IClassFixture<TestWebAppFactory>
         // Arrange: set empleado demo to Suspendido
         using (var scope = _factory.Services.CreateScope())
         {
+            await TestDataHelpers.EnsureDemoDataAsync(scope.ServiceProvider);
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var empleadoUser = (await userManager.GetUsersInRoleAsync("Empleado")).First();
@@ -39,6 +40,7 @@ public class EmpleadoEstadoTests : IClassFixture<TestWebAppFactory>
         var token = m.Success ? m.Groups[1].Value : string.Empty;
         using (var scope = _factory.Services.CreateScope())
         {
+            await TestDataHelpers.EnsureDemoDataAsync(scope.ServiceProvider);
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var empleadoUser = (await userManager.GetUsersInRoleAsync("Empleado")).First();
             var userName = empleadoUser.UserName ?? string.Empty;

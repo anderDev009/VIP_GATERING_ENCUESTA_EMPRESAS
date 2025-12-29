@@ -25,6 +25,7 @@ public class EmpresaPermissionsTests : IClassFixture<TestWebAppFactory>
     public async Task Empresa_Can_Create_User_For_Own_Empleado()
     {
         using var scope = _factory.Services.CreateScope();
+        await TestDataHelpers.EnsureDemoDataAsync(scope.ServiceProvider);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var empresaUser = (await userManager.GetUsersInRoleAsync("Empresa")).First();
@@ -46,6 +47,7 @@ public class EmpresaPermissionsTests : IClassFixture<TestWebAppFactory>
     public async Task Empresa_Can_View_Semana_For_Own_Empleado()
     {
         using var scope = _factory.Services.CreateScope();
+        await TestDataHelpers.EnsureDemoDataAsync(scope.ServiceProvider);
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var empresaUser = (await userManager.GetUsersInRoleAsync("Empresa")).First();

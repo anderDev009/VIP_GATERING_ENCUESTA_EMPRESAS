@@ -2,7 +2,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
+using System;
 using System.Globalization;
+using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
 using VIP_GATERING.Infrastructure.Data;
@@ -114,6 +117,24 @@ public static class IdentitySeeder
 
         var adminUserName = EnsurePasswordCompliance("ADMIN");
         await EnsureUser(adminUserName, "Admin");
+
+        var demoEmployees = new[]
+        {
+            new { Codigo = "RIC001", Nombre = "ZRichard1_" },
+            new { Codigo = "ANDO001", Nombre = "ZAnderson1_" },
+            new { Codigo = "DAMIAN1", Nombre = "ZDamian1_" },
+            new { Codigo = "ADONYS1", Nombre = "ZAdonys1_" }
+        };
+
+        foreach (var demo in demoEmployees)
+        {
+            var empleado = await db.Empleados.FirstOrDefaultAsync(e => e.Codigo == demo.Codigo);
+            if (empleado == null)
+                continue;
+            var userName = EnsurePasswordCompliance(demo.Nombre);
+            var user = await EnsureUser(userName, "Empleado", empleado.Sucursal?.EmpresaId, empleado.Id);
+            await EnsureClaimAsync(users, user, "must_change_password", "1");
+        }
     }
 
     private static string BuildUserName(string filialNombre, string? empleadoCodigo, Guid empleadoId)
@@ -169,5 +190,12 @@ public static class IdentitySeeder
         if (!result.Any(ch => !char.IsLetterOrDigit(ch))) result += "_";
         if (result.Length < 8) result += new string('0', 8 - result.Length);
         return result;
+    }
+
+    private static async Task EnsureClaimAsync(UserManager<ApplicationUser> users, ApplicationUser user, string claimType, string claimValue)
+    {
+        var claims = await users.GetClaimsAsync(user);
+        if (claims.Any(c => c.Type == claimType && c.Value == claimValue)) return;
+        await users.AddClaimAsync(user, new Claim(claimType, claimValue));
     }
 }

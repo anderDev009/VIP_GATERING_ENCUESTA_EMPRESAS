@@ -24,6 +24,7 @@
                 @if (User.IsInRole("Empleado"))
                 {
                     <a asp-controller="Reportes" asp-action="EstadoCuenta" class="btn-outline">Estado de cuenta</a>
+                    <a asp-controller="Reportes" asp-action="Selecciones" class="btn-outline">Selecciones</a>
                 }
 
                 @if (User.IsInRole("Admin") || User.IsInRole("Empresa"))

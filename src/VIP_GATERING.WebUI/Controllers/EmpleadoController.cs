@@ -348,30 +348,37 @@ public class EmpleadoController : Controller
             EmpresaNombre = sucursalDependencia.EmpresaNombre,
             SucursalNombre = sucursalDependencia.Nombre,
             TotalEmpleado = totalEmpleado,
-            Dias = opciones.OrderBy(o => o.DiaSemana).ThenBy(o => o.Horario!.Orden).Select(o => new DiaEmpleadoVM
+            Dias = opciones.OrderBy(o => o.DiaSemana).ThenBy(o => o.Horario!.Orden).Select(o =>
             {
-                OpcionMenuId = o.Id,
-                DiaSemana = o.DiaSemana,
-                HorarioNombre = o.Horario?.Nombre,
-                A = o.OpcionA?.Nombre,
-                B = o.OpcionB?.Nombre,
-                C = o.OpcionC?.Nombre,
-                D = o.OpcionD?.Nombre,
-                E = o.OpcionE?.Nombre,
-                ImagenA = o.OpcionA?.ImagenUrl,
-                ImagenB = o.OpcionB?.ImagenUrl,
-                ImagenC = o.OpcionC?.ImagenUrl,
-                ImagenD = o.OpcionD?.ImagenUrl,
-                ImagenE = o.OpcionE?.ImagenUrl,
-                PrecioEmpleadoA = CalcularPrecioEmpleado(o.OpcionA),
-                PrecioEmpleadoB = CalcularPrecioEmpleado(o.OpcionB),
-                PrecioEmpleadoC = CalcularPrecioEmpleado(o.OpcionC),
-                PrecioEmpleadoD = CalcularPrecioEmpleado(o.OpcionD),
-                PrecioEmpleadoE = CalcularPrecioEmpleado(o.OpcionE),
-                OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas,
-                Seleccion = respuestasPorOpcion.TryGetValue(o.Id, out var resp) ? resp.Seleccion : null,
-                AdicionalOpcionId = respuestasPorOpcion.TryGetValue(o.Id, out var resp2) ? resp2.AdicionalOpcionId : null,
-                Editable = edicion.EdicionPorOpcion.TryGetValue(o.Id, out var ed) ? ed && !noHabilitado : !bloqueadoPorTiempo
+                var fechaDia = _fechas.ObtenerFechaDelDia(menu.FechaInicio, o.DiaSemana);
+                var diaFuturo = fechaDia > hoy;
+                var puedeEditarPorOpcion = edicion.EdicionPorOpcion.TryGetValue(o.Id, out var ed) ? ed && !noHabilitado : !bloqueadoPorTiempo;
+                var editableFinal = diaFuturo && puedeEditarPorOpcion;
+                return new DiaEmpleadoVM
+                {
+                    OpcionMenuId = o.Id,
+                    DiaSemana = o.DiaSemana,
+                    HorarioNombre = o.Horario?.Nombre,
+                    A = o.OpcionA?.Nombre,
+                    B = o.OpcionB?.Nombre,
+                    C = o.OpcionC?.Nombre,
+                    D = o.OpcionD?.Nombre,
+                    E = o.OpcionE?.Nombre,
+                    ImagenA = o.OpcionA?.ImagenUrl,
+                    ImagenB = o.OpcionB?.ImagenUrl,
+                    ImagenC = o.OpcionC?.ImagenUrl,
+                    ImagenD = o.OpcionD?.ImagenUrl,
+                    ImagenE = o.OpcionE?.ImagenUrl,
+                    PrecioEmpleadoA = CalcularPrecioEmpleado(o.OpcionA),
+                    PrecioEmpleadoB = CalcularPrecioEmpleado(o.OpcionB),
+                    PrecioEmpleadoC = CalcularPrecioEmpleado(o.OpcionC),
+                    PrecioEmpleadoD = CalcularPrecioEmpleado(o.OpcionD),
+                    PrecioEmpleadoE = CalcularPrecioEmpleado(o.OpcionE),
+                    OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas,
+                    Seleccion = respuestasPorOpcion.TryGetValue(o.Id, out var resp) ? resp.Seleccion : null,
+                    AdicionalOpcionId = respuestasPorOpcion.TryGetValue(o.Id, out var resp2) ? resp2.AdicionalOpcionId : null,
+                    Editable = editableFinal
+                };
             }).ToList()
         };
         return View(modelo);

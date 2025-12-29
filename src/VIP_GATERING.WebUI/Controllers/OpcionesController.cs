@@ -74,6 +74,7 @@ public class OpcionesController : Controller
     {
         var ent = await _db.Opciones.Include(o => o.Horarios).FirstOrDefaultAsync(o => o.Id == id);
         if (ent == null) return NotFound();
+        await SetOptionTypeAsync(ent.Id);
         await LoadHorariosAsync(ent.Horarios.Select(h => h.HorarioId));
         return View(ent);
     }
@@ -93,6 +94,7 @@ public class OpcionesController : Controller
         if (!ModelState.IsValid)
         {
             model.ImagenUrl = ent.ImagenUrl;
+            await SetOptionTypeAsync(ent.Id);
             await LoadHorariosAsync(selectedHorarios);
             return View(model);
         }
@@ -120,6 +122,12 @@ public class OpcionesController : Controller
 
         await _db.SaveChangesAsync();
         return RedirectToAction(nameof(Index));
+    }
+
+    private async Task SetOptionTypeAsync(Guid optionId)
+    {
+        var esAdicional = await _db.MenusAdicionales.AnyAsync(m => m.OpcionId == optionId);
+        ViewBag.EsAdicional = esAdicional;
     }
 
     [HttpPost]

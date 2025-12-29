@@ -40,4 +40,24 @@ public class MenuEdicionServiceTests
         var bloqueado = await svc.CalcularVentanaAsync(menu, new[] { opcion }, new DateTime(2025, 1, 6, 13, 0, 0, DateTimeKind.Utc), true);
         bloqueado.EdicionPorOpcion[opcion.Id].Should().BeFalse();
     }
+
+    [Fact]
+    public async Task Semana_actual_no_permite_dia_actual_ni_dias_pasados()
+    {
+        using var ctx = Ctx();
+        IRepository<MenuConfiguracion> repoCfg = new EfRepository<MenuConfiguracion>(ctx);
+        IUnitOfWork uow = new UnitOfWork(ctx);
+        var cfgSvc = new MenuConfiguracionService(repoCfg, uow);
+        var fechaSvc = new FechaServicio();
+        var svc = new MenuEdicionService(cfgSvc, fechaSvc);
+
+        var menu = new Menu { FechaInicio = new DateOnly(2025, 1, 6), FechaTermino = new DateOnly(2025, 1, 10) };
+        var opcionMartes = new OpcionMenu { MenuId = menu.Id, DiaSemana = DayOfWeek.Tuesday };
+        var opcionLunes = new OpcionMenu { MenuId = menu.Id, DiaSemana = DayOfWeek.Monday };
+
+        var referenciaMartes = new DateTime(2025, 1, 7, 9, 0, 0, DateTimeKind.Utc);
+        var resultado = await svc.CalcularVentanaAsync(menu, new[] { opcionMartes, opcionLunes }, referenciaMartes, true);
+        resultado.EdicionPorOpcion[opcionMartes.Id].Should().BeFalse();
+        resultado.EdicionPorOpcion[opcionLunes.Id].Should().BeFalse();
+    }
 }

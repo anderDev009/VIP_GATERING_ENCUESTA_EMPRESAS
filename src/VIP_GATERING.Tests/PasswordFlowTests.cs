@@ -19,6 +19,7 @@ public class PasswordFlowTests : IClassFixture<TestWebAppFactory>
     public async Task Empleado_First_Login_Redirects_To_ChangePassword()
     {
         using var scope = _factory.Services.CreateScope();
+        await TestDataHelpers.EnsureDemoDataAsync(scope.ServiceProvider);
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var empleadoUser = (await userManager.GetUsersInRoleAsync("Empleado")).First();
         var userName = empleadoUser.UserName ?? string.Empty;
@@ -36,4 +37,3 @@ public class PasswordFlowTests : IClassFixture<TestWebAppFactory>
         login.Headers.Location!.ToString().Should().Contain("/Account/ChangePassword");
     }
 }
-
