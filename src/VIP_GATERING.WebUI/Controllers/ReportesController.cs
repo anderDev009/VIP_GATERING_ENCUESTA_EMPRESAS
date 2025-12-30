@@ -29,7 +29,7 @@ public class ReportesController : Controller
     [HttpGet]
     public async Task<IActionResult> ItemsSemana(Guid? empresaId = null, Guid? sucursalId = null)
     {
-        var (inicio, fin) = _fechas.RangoSemanaSiguiente();
+        var (inicio, fin) = GetDefaultReportRange(_fechas.Hoy());
 
         var empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         var sucursales = await _db.Sucursales
@@ -148,7 +148,7 @@ public class ReportesController : Controller
         }
         else
         {
-            (inicio, fin) = isEmpleado ? _fechas.RangoSemanaActual() : _fechas.RangoSemanaSiguiente();
+            (inicio, fin) = isEmpleado ? _fechas.RangoSemanaActual() : GetDefaultReportRange(_fechas.Hoy());
         }
 
         var empresasQuery = _db.Empresas.AsQueryable();
@@ -641,7 +641,7 @@ public class ReportesController : Controller
         }
         else
         {
-            (inicio, fin) = _fechas.RangoSemanaSiguiente();
+            (inicio, fin) = GetDefaultReportRange(_fechas.Hoy());
         }
 
         var empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
@@ -1103,5 +1103,12 @@ public class ReportesController : Controller
     {
         var offset = ((int)dia - (int)DayOfWeek.Monday + 7) % 7;
         return inicioSemana.AddDays(offset);
+    }
+
+    private static (DateOnly inicio, DateOnly fin) GetDefaultReportRange(DateOnly hoy)
+    {
+        var inicio = new DateOnly(hoy.Year, hoy.Month, 1);
+        var fin = inicio.AddMonths(1).AddDays(-1);
+        return (inicio, fin);
     }
 }
