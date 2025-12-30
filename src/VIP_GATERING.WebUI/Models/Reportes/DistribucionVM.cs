@@ -41,6 +41,7 @@ public class DistribucionVM
         public string Empleado { get; set; } = string.Empty;
         public string Tanda { get; set; } = string.Empty;
         public string Opcion { get; set; } = string.Empty;
+        public string Seleccion { get; set; } = string.Empty;
         public int Cantidad { get; set; }
         public decimal MontoTotal { get; set; }
         public decimal EmpresaPaga { get; set; }
@@ -53,6 +54,7 @@ public class DistribucionVM
     {
         public string Localizacion { get; set; } = string.Empty;
         public string Opcion { get; set; } = string.Empty;
+        public string Seleccion { get; set; } = string.Empty;
         public int Cantidad { get; set; }
         public decimal MontoTotal { get; set; }
         public decimal EmpresaPaga { get; set; }

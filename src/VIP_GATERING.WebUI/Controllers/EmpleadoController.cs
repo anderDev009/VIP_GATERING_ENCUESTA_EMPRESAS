@@ -85,8 +85,10 @@ public class EmpleadoController : Controller
             .Where(l => l.SucursalId == sucursalPrincipalId)
             .Select(l => new { l.Id, l.Nombre, l.SucursalId })
             .ToListAsync();
-        if (tieneLocalizacionesAsignadas)
+        if (localizacionesAsignadasIds.Count > 0)
+        {
             localizacionesRaw = localizacionesRaw.Where(l => localizacionesAsignadasIds.Contains(l.Id)).ToList();
+        }
 
         var sucursalesEntregaMap = new Dictionary<Guid, string>
         {

@@ -124,15 +124,9 @@ public static class SeedData
 
             if (nombresLoc.Count > 0)
             {
-                var sucursalesPorEmpresa = await db.Sucursales
+                var sucursales = await db.Sucursales
                     .AsNoTracking()
-                    .GroupBy(s => s.EmpresaId)
-                    .Select(g => new
-                    {
-                        EmpresaId = g.Key,
-                        SucursalId = g.Select(s => s.Id).FirstOrDefault(),
-                        SucursalNombre = g.Select(s => s.Nombre).FirstOrDefault()
-                    })
+                    .Select(s => new { s.Id, s.EmpresaId, s.Nombre })
                     .ToListAsync();
                 var existentes = await db.Localizaciones
                     .AsNoTracking()
@@ -142,19 +136,19 @@ public static class SeedData
                     existentes.Select(e => $"{e.SucursalId:N}|{e.EmpresaId:N}|{e.Nombre}"),
                     StringComparer.OrdinalIgnoreCase);
 
-                foreach (var suc in sucursalesPorEmpresa)
+                foreach (var suc in sucursales)
                 {
-                    if (suc.SucursalId == Guid.Empty) continue;
+                    if (suc.Id == Guid.Empty) continue;
                     foreach (var nombre in nombresLoc)
                     {
-                        var key = $"{suc.SucursalId:N}|{suc.EmpresaId:N}|{nombre}";
+                        var key = $"{suc.Id:N}|{suc.EmpresaId:N}|{nombre}";
                         if (existentesSet.Contains(key)) continue;
-                        var sucursalNombre = string.IsNullOrWhiteSpace(suc.SucursalNombre) ? "filial" : suc.SucursalNombre;
+                        var sucursalNombre = string.IsNullOrWhiteSpace(suc.Nombre) ? "filial" : suc.Nombre;
                         db.Localizaciones.Add(new Localizacion
                         {
                             Nombre = nombre,
                             EmpresaId = suc.EmpresaId,
-                            SucursalId = suc.SucursalId,
+                            SucursalId = suc.Id,
                             Direccion = $"Direccion de {sucursalNombre}",
                             IndicacionesEntrega = $"Entrega en {nombre}"
                         });
@@ -395,7 +389,8 @@ public static class SeedData
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var currentMonday = GetWeekStart(today);
-        var weekStarts = new[] { currentMonday.AddDays(-14), currentMonday.AddDays(-7), currentMonday };
+        var nextMonday = currentMonday.AddDays(7);
+        var weekStarts = new[] { currentMonday.AddDays(-14), currentMonday.AddDays(-7), currentMonday, nextMonday };
 
         var menuCache = new Dictionary<(Guid sucursalId, DateOnly inicio), Menu>();
         foreach (var weekStart in weekStarts)

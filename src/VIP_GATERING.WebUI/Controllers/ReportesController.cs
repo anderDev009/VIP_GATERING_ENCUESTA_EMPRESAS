@@ -680,7 +680,7 @@ public class ReportesController : Controller
             .ToList();
 
         const decimal itbisRate = 0.18m;
-        var items = new List<(DateOnly Fecha, Guid FilialId, string Filial, Guid EmpleadoId, string Empleado, string Tanda, string Opcion, string Localizacion, decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado)>();
+        var items = new List<(DateOnly Fecha, Guid FilialId, string Filial, Guid EmpleadoId, string Empleado, string Tanda, string Opcion, string Seleccion, string Localizacion, decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado)>();
 
         foreach (var r in respuestas)
         {
@@ -698,7 +698,7 @@ public class ReportesController : Controller
             var empleadoId = r.Empleado.Id;
             var localizacion = r.LocalizacionEntrega?.Nombre ?? "Sin asignar";
 
-            void AddItem(Opcion opcion, string nombre, bool aplicaSubsidio)
+            void AddItem(Opcion opcion, string nombre, string seleccionLabel, bool aplicaSubsidio)
             {
                 var basePrecio = opcion.Precio ?? opcion.Costo;
                 if (basePrecio < 0) basePrecio = 0;
@@ -718,15 +718,15 @@ public class ReportesController : Controller
                 var itbisEmpleado = Math.Round(itbis * ratio, 2);
                 var itbisEmpresa = itbis - itbisEmpleado;
 
-                items.Add((fechaDia, filialId, filial, empleadoId, empleadoNombre, tanda, nombre, localizacion, basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado));
+                items.Add((fechaDia, filialId, filial, empleadoId, empleadoNombre, tanda, nombre, seleccionLabel, localizacion, basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado));
             }
 
             var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
             if (opcion != null)
-                AddItem(opcion, opcion.Nombre ?? "Sin definir", true);
+                AddItem(opcion, opcion.Nombre ?? "Sin definir", MapSeleccion(r.Seleccion), true);
 
             if (r.AdicionalOpcion != null)
-                AddItem(r.AdicionalOpcion, $"Adicional: {r.AdicionalOpcion.Nombre ?? "Sin definir"}", false);
+                AddItem(r.AdicionalOpcion, $"Adicional: {r.AdicionalOpcion.Nombre ?? "Sin definir"}", "Adicional", false);
         }
 
         var resumen = items
@@ -745,7 +745,7 @@ public class ReportesController : Controller
             .ToList();
 
         var detalle = items
-            .GroupBy(i => new { i.Fecha, i.FilialId, i.Filial, i.EmpleadoId, i.Empleado, i.Tanda, i.Opcion })
+            .GroupBy(i => new { i.Fecha, i.FilialId, i.Filial, i.EmpleadoId, i.Empleado, i.Tanda, i.Opcion, i.Seleccion })
             .Select(g => new DistribucionVM.DetalleEmpleadoRow
             {
                 Fecha = g.Key.Fecha,
@@ -753,6 +753,7 @@ public class ReportesController : Controller
                 Empleado = g.Key.Empleado,
                 Tanda = g.Key.Tanda,
                 Opcion = g.Key.Opcion,
+                Seleccion = g.Key.Seleccion,
                 Cantidad = g.Count(),
                 MontoTotal = g.Sum(x => x.Total),
                 EmpresaPaga = g.Sum(x => x.EmpresaPaga),
@@ -767,11 +768,12 @@ public class ReportesController : Controller
             .ToList();
 
         var porLocalizacion = items
-            .GroupBy(i => new { i.Localizacion, i.Opcion })
+            .GroupBy(i => new { i.Localizacion, i.Opcion, i.Seleccion })
             .Select(g => new DistribucionVM.DistribucionLocalizacionRow
             {
                 Localizacion = g.Key.Localizacion,
                 Opcion = g.Key.Opcion,
+                Seleccion = g.Key.Seleccion,
                 Cantidad = g.Count(),
                 MontoTotal = g.Sum(x => x.Total),
                 EmpresaPaga = g.Sum(x => x.EmpresaPaga),
@@ -1111,4 +1113,14 @@ public class ReportesController : Controller
         var fin = inicio.AddMonths(1).AddDays(-1);
         return (inicio, fin);
     }
+
+    private static string MapSeleccion(char seleccion) => seleccion switch
+    {
+        'A' => "Opcion 1",
+        'B' => "Opcion 2",
+        'C' => "Opcion 3",
+        'D' => "Opcion 4",
+        'E' => "Opcion 5",
+        _ => "Opcion"
+    };
 }
