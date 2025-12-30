@@ -370,12 +370,11 @@ public static class SeedData
 
     private static async Task EnsureDemoMenusAndResponsesAsync(AppDbContext db)
     {
-        var empresa = await db.Empresas.FirstOrDefaultAsync(e => e.Nombre == "SEGURO UNIVERSAL");
-        if (empresa == null)
-            return;
-
-        var sucursales = await db.Sucursales.Where(s => s.EmpresaId == empresa.Id).ToListAsync();
-        var horarios = await db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
+        var sucursales = await db.Sucursales.ToListAsync();
+        var horarios = await db.Horarios
+            .Where(h => h.Activo && (h.Nombre == "Desayuno" || h.Nombre == "Almuerzo"))
+            .OrderBy(h => h.Orden)
+            .ToListAsync();
         if (!horarios.Any())
             return;
 

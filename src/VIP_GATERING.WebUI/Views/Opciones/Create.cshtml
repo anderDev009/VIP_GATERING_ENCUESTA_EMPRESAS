@@ -69,19 +69,11 @@
     </div>
 </form>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" />
-<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-<script>
-    (() => {
-        const sel = document.getElementById('horarios-select');
-        if (sel && typeof TomSelect !== 'undefined') {
-            new TomSelect(sel, {
-                plugins: ['remove_button'],
-                maxItems: null,
-                persist: false,
-                create: false,
-                placeholder: 'Selecciona categorias...'
-            });
-        }
-    })();
-</script>
+@section Styles {
+    <link rel="stylesheet" href="~/vendor/tom-select/tom-select.css" />
+}
+
+@section Scripts {
+    <script src="~/vendor/tom-select/tom-select.complete.min.js" defer></script>
+    <script src="~/js/opciones-form.js" defer></script>
+}
