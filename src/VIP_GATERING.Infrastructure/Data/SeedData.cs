@@ -224,6 +224,25 @@ public static class SeedData
             await db.SaveChangesAsync();
         }
 
+        var opciones = await db.Opciones.ToListAsync();
+        if (opciones.Count > 0)
+        {
+            foreach (var opcion in opciones)
+            {
+                opcion.Costo = 240m;
+                opcion.Precio = 240m;
+            }
+            await db.SaveChangesAsync();
+        }
+
+        var opcionesSinItbis = await db.Opciones.Where(o => !o.LlevaItbis).ToListAsync();
+        if (opcionesSinItbis.Count > 0)
+        {
+            foreach (var opcion in opcionesSinItbis)
+                opcion.LlevaItbis = true;
+            await db.SaveChangesAsync();
+        }
+
         // Semilla legacy mÃ­nima de roles/usuarios de dominio (sin duplicar)
         if (!await db.Roles.AnyAsync(r => r.Nombre == "Admin"))
             db.Roles.Add(new Rol { Nombre = "Admin" });
@@ -232,6 +251,7 @@ public static class SeedData
         await db.SaveChangesAsync();
 
         await EnsureDemoLocalizacionesAsync(db);
+        await EnsureDemoSucursalHorariosAsync(db);
         await EnsureDemoEmployeesAsync(db);
         await EnsureDemoMenusAndResponsesAsync(db);
     }
@@ -368,6 +388,46 @@ public static class SeedData
             await db.SaveChangesAsync();
     }
 
+    private static async Task EnsureDemoSucursalHorariosAsync(AppDbContext db)
+    {
+        var horarios = await db.Horarios
+            .AsNoTracking()
+            .Where(h => h.Nombre == "Desayuno" || h.Nombre == "Almuerzo")
+            .ToListAsync();
+        if (horarios.Count == 0)
+            return;
+
+        var sucursales = await db.Sucursales.AsNoTracking().Select(s => s.Id).ToListAsync();
+        if (sucursales.Count == 0)
+            return;
+
+        var existentes = await db.SucursalesHorarios
+            .AsNoTracking()
+            .Select(sh => new { sh.SucursalId, sh.HorarioId })
+            .ToListAsync();
+        var existentesSet = new HashSet<string>(
+            existentes.Select(e => $"{e.SucursalId:N}|{e.HorarioId:N}"),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var sucursalId in sucursales)
+        {
+            foreach (var horario in horarios)
+            {
+                var key = $"{sucursalId:N}|{horario.Id:N}";
+                if (existentesSet.Contains(key)) continue;
+                db.SucursalesHorarios.Add(new SucursalHorario
+                {
+                    SucursalId = sucursalId,
+                    HorarioId = horario.Id
+                });
+                existentesSet.Add(key);
+            }
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
+    }
+
     private static async Task EnsureDemoMenusAndResponsesAsync(AppDbContext db)
     {
         var sucursales = await db.Sucursales.ToListAsync();
@@ -400,6 +460,32 @@ public static class SeedData
                 var menu = await EnsureMenuWithOptionsAsync(db, suc, weekStart, weekEnd, horarios, opciones);
                 menuCache[(suc.Id, weekStart)] = menu;
             }
+        }
+
+        var adicionalesBase = opciones
+            .OrderBy(o => o.Nombre)
+            .Take(3)
+            .ToList();
+        if (adicionalesBase.Count > 0)
+        {
+            foreach (var menu in menuCache.Values.Distinct())
+            {
+                foreach (var adicional in adicionalesBase)
+                {
+                    var existe = await db.MenusAdicionales
+                        .AnyAsync(a => a.MenuId == menu.Id && a.OpcionId == adicional.Id);
+                    if (!existe)
+                    {
+                        db.MenusAdicionales.Add(new MenuAdicional
+                        {
+                            MenuId = menu.Id,
+                            OpcionId = adicional.Id
+                        });
+                    }
+                }
+            }
+            if (db.ChangeTracker.HasChanges())
+                await db.SaveChangesAsync();
         }
 
         var localizMap = await db.Localizaciones
