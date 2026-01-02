@@ -5,7 +5,7 @@ namespace VIP_GATERING.Application.Services;
 
 public interface IMenuCloneService
 {
-    Task<(int updated, int skipped)> CloneEmpresaMenuToSucursalesAsync(DateOnly inicio, DateOnly fin, Guid empresaId, IEnumerable<Guid> sucursalIds, CancellationToken ct = default);
+    Task<(int updated, int skipped)> CloneEmpresaMenuToSucursalesAsync(DateOnly inicio, DateOnly fin, int empresaId, IEnumerable<int> sucursalIds, CancellationToken ct = default);
 }
 
 public class MenuCloneService : IMenuCloneService
@@ -29,7 +29,7 @@ public class MenuCloneService : IMenuCloneService
         _uow = uow;
     }
 
-    public async Task<(int updated, int skipped)> CloneEmpresaMenuToSucursalesAsync(DateOnly inicio, DateOnly fin, Guid empresaId, IEnumerable<Guid> sucursalIds, CancellationToken ct = default)
+    public async Task<(int updated, int skipped)> CloneEmpresaMenuToSucursalesAsync(DateOnly inicio, DateOnly fin, int empresaId, IEnumerable<int> sucursalIds, CancellationToken ct = default)
     {
         var menuEmpresa = await _menuService.GetOrCreateMenuAsync(inicio, fin, empresaId, null, ct);
         var diasEmpresa = (await _opcionesMenu.ListAsync(om => om.MenuId == menuEmpresa.Id, ct)).OrderBy(d => d.DiaSemana).ToList();

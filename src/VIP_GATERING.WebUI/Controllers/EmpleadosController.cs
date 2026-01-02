@@ -32,7 +32,7 @@ public class EmpleadosController : Controller
     public EmpleadosController(AppDbContext db, ICurrentUserService currentUser, IEmpleadoUsuarioService empUserService, UserManager<ApplicationUser> userManager, IMenuService menuService, IEncuestaCierreService cierre, ISubsidioService subsidios)
     { _db = db; _currentUser = currentUser; _empUserService = empUserService; _userManager = userManager; _menuService = menuService; _cierre = cierre; _subsidios = subsidios; }
 
-    public async Task<IActionResult> Index(Guid? empresaId, Guid? sucursalId, Guid? localizacionId, string? q, int page = 1, int pageSize = 10)
+    public async Task<IActionResult> Index(int? empresaId, int? sucursalId, int? localizacionId, string? q, int page = 1, int pageSize = 10)
     {
         var query = _db.Empleados
             .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
@@ -51,7 +51,9 @@ public class EmpleadosController : Controller
         if (!string.IsNullOrWhiteSpace(q))
         {
             var ql = q.ToLower();
-            query = query.Where(e => e.Nombre.ToLower().Contains(ql) || (e.Codigo != null && e.Codigo.ToLower().Contains(ql)));
+            query = query.Where(e =>
+                (e.Nombre != null && e.Nombre.ToLower().Contains(ql))
+                || (e.Codigo != null && e.Codigo.ToLower().Contains(ql)));
         }
         var localizacionFiltro = localizacionId != null
             ? await _db.Localizaciones
@@ -137,13 +139,13 @@ public class EmpleadosController : Controller
         }
         var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
         ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
-        ViewBag.LocalizacionesAsignadasIds = new List<Guid>();
+        ViewBag.LocalizacionAsignadaId = null;
         return View(new Empleado());
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Empleado model, [FromForm] List<Guid> localizacionesAsignadas)
+    public async Task<IActionResult> Create(Empleado model, [FromForm] int? localizacionAsignadaId)
     {
         ApplySubsidioEmpleadoFromForm(model);
         async Task<IActionResult> ReturnInvalidAsync()
@@ -162,12 +164,12 @@ public class EmpleadosController : Controller
             ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
             var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
-            ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList, localizacionesAsignadas);
-            ViewBag.LocalizacionesAsignadasIds = localizacionesAsignadas ?? new List<Guid>();
+            ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
+            ViewBag.LocalizacionAsignadaId = localizacionAsignadaId;
             return View(model);
         }
-        if (string.IsNullOrWhiteSpace(model.Nombre) || string.IsNullOrWhiteSpace(model.Codigo))
-            ModelState.AddModelError(string.Empty, "Por favor ingresa los datos del empleado.");
+        if (string.IsNullOrWhiteSpace(model.Codigo))
+            ModelState.AddModelError(string.Empty, "Por favor ingresa el codigo del empleado.");
         if (!ModelState.IsValid)
             return await ReturnInvalidAsync();
         // Seguridad: Empresa solo puede crear en sus sucursales
@@ -183,25 +185,24 @@ public class EmpleadosController : Controller
             return await ReturnInvalidAsync();
         }
 
-        var localizacionIds = (localizacionesAsignadas ?? new List<Guid>())
-            .Where(x => x != Guid.Empty)
-            .Distinct()
-            .ToList();
-        if (localizacionIds.Count > 0)
+        var localizacionId = localizacionAsignadaId.HasValue && localizacionAsignadaId.Value != 0
+            ? localizacionAsignadaId.Value
+            : (int?)null;
+        if (localizacionId.HasValue)
         {
             var empresaPrimaria = await _db.Sucursales
                 .Where(s => s.Id == model.SucursalId)
                 .Select(s => s.EmpresaId)
                 .FirstOrDefaultAsync();
-            var locs = await _db.Localizaciones
+            var loc = await _db.Localizaciones
                 .AsNoTracking()
                 .Include(l => l.Sucursal)
-                .Where(l => localizacionIds.Contains(l.Id))
-                .Select(l => new { l.Id, EmpresaId = l.Sucursal != null ? l.Sucursal.EmpresaId : Guid.Empty })
-                .ToListAsync();
-            if (locs.Count != localizacionIds.Count || locs.Any(l => l.EmpresaId != empresaPrimaria))
+                .Where(l => l.Id == localizacionId.Value)
+                .Select(l => new { l.Id, EmpresaId = l.Sucursal != null ? l.Sucursal.EmpresaId : 0 })
+                .FirstOrDefaultAsync();
+            if (loc == null || loc.EmpresaId != empresaPrimaria)
             {
-                ModelState.AddModelError(string.Empty, "Las localizaciones asignadas deben pertenecer a la empresa del empleado.");
+                ModelState.AddModelError(string.Empty, "La localizacion por defecto debe pertenecer a la empresa del empleado.");
                 return await ReturnInvalidAsync();
             }
         }
@@ -215,17 +216,20 @@ public class EmpleadosController : Controller
             if (!string.IsNullOrEmpty(autoUserError))
                 TempData["Error"] = autoUserError;
         }
-        if (localizacionIds.Count > 0)
+        if (localizacionId.HasValue)
         {
-            var rows = localizacionIds.Select(lid => new EmpleadoLocalizacion { EmpleadoId = model.Id, LocalizacionId = lid }).ToList();
-            await _db.EmpleadosLocalizaciones.AddRangeAsync(rows);
+            await _db.EmpleadosLocalizaciones.AddAsync(new EmpleadoLocalizacion
+            {
+                EmpleadoId = model.Id,
+                LocalizacionId = localizacionId.Value
+            });
             await _db.SaveChangesAsync();
         }
         TempData["Success"] = "Empleado creado.";
         return RedirectToAction(nameof(Index), new { sucursalId = model.SucursalId });
     }
 
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(int id)
     {
         var ent = await _db.Empleados
             .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
@@ -254,10 +258,13 @@ public class EmpleadosController : Controller
             if (empresaId != null)
                 localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
         }
-        var localizacionesAsignadasIds = await _db.EmpleadosLocalizaciones.Where(el => el.EmpleadoId == ent.Id).Select(el => el.LocalizacionId).ToListAsync();
+        var localizacionAsignadaId = await _db.EmpleadosLocalizaciones
+            .Where(el => el.EmpleadoId == ent.Id)
+            .Select(el => (int?)el.LocalizacionId)
+            .FirstOrDefaultAsync();
         var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
-        ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList, localizacionesAsignadasIds);
-        ViewBag.LocalizacionesAsignadasIds = localizacionesAsignadasIds;
+        ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
+        ViewBag.LocalizacionAsignadaId = localizacionAsignadaId;
         var user = await _db.Set<ApplicationUser>().FirstOrDefaultAsync(u => u.EmpleadoId == ent.Id);
         ViewBag.UsuarioExiste = user != null;
         ViewBag.UsuarioNombre = user?.UserName;
@@ -267,7 +274,7 @@ public class EmpleadosController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Empleado model, [FromForm] List<Guid> localizacionesAsignadas)
+    public async Task<IActionResult> Edit(int id, Empleado model, [FromForm] int? localizacionAsignadaId)
     {
         ApplySubsidioEmpleadoFromForm(model);
         async Task<IActionResult> ReturnInvalidAsync()
@@ -286,8 +293,8 @@ public class EmpleadosController : Controller
             ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
             var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
-            ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList, localizacionesAsignadas);
-            ViewBag.LocalizacionesAsignadasIds = localizacionesAsignadas ?? new List<Guid>();
+            ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
+            ViewBag.LocalizacionAsignadaId = localizacionAsignadaId;
             return View(model);
         }
         if (!ModelState.IsValid)
@@ -313,25 +320,24 @@ public class EmpleadosController : Controller
         ent.SubsidioTipo = model.SubsidioTipo;
         ent.SubsidioValor = model.SubsidioValor;
 
-        var localizacionIds = (localizacionesAsignadas ?? new List<Guid>())
-            .Where(x => x != Guid.Empty)
-            .Distinct()
-            .ToList();
-        if (localizacionIds.Count > 0)
+        var localizacionId = localizacionAsignadaId.HasValue && localizacionAsignadaId.Value != 0
+            ? localizacionAsignadaId.Value
+            : (int?)null;
+        if (localizacionId.HasValue)
         {
             var empresaPrimaria = await _db.Sucursales
                 .Where(s => s.Id == ent.SucursalId)
                 .Select(s => s.EmpresaId)
                 .FirstOrDefaultAsync();
-            var locs = await _db.Localizaciones
+            var loc = await _db.Localizaciones
                 .AsNoTracking()
                 .Include(l => l.Sucursal)
-                .Where(l => localizacionIds.Contains(l.Id))
-                .Select(l => new { l.Id, EmpresaId = l.Sucursal != null ? l.Sucursal.EmpresaId : Guid.Empty })
-                .ToListAsync();
-            if (locs.Count != localizacionIds.Count || locs.Any(l => l.EmpresaId != empresaPrimaria))
+                .Where(l => l.Id == localizacionId.Value)
+                .Select(l => new { l.Id, EmpresaId = l.Sucursal != null ? l.Sucursal.EmpresaId : 0 })
+                .FirstOrDefaultAsync();
+            if (loc == null || loc.EmpresaId != empresaPrimaria)
             {
-                ModelState.AddModelError(string.Empty, "Las localizaciones asignadas deben pertenecer a la empresa del empleado.");
+                ModelState.AddModelError(string.Empty, "La localizacion por defecto debe pertenecer a la empresa del empleado.");
                 return await ReturnInvalidAsync();
             }
         }
@@ -339,12 +345,15 @@ public class EmpleadosController : Controller
         if (actuales.Count > 0) _db.EmpleadosSucursales.RemoveRange(actuales);
 
         var actualesLoc = await _db.EmpleadosLocalizaciones.Where(el => el.EmpleadoId == ent.Id).ToListAsync();
-        var actualesLocSet = actualesLoc.Select(a => a.LocalizacionId).ToHashSet();
-        var nuevosLocSet = localizacionIds.ToHashSet();
-        var toRemoveLoc = actualesLoc.Where(a => !nuevosLocSet.Contains(a.LocalizacionId)).ToList();
-        if (toRemoveLoc.Count > 0) _db.EmpleadosLocalizaciones.RemoveRange(toRemoveLoc);
-        var toAddLoc = nuevosLocSet.Except(actualesLocSet).Select(lid => new EmpleadoLocalizacion { EmpleadoId = ent.Id, LocalizacionId = lid }).ToList();
-        if (toAddLoc.Count > 0) await _db.EmpleadosLocalizaciones.AddRangeAsync(toAddLoc);
+        if (actualesLoc.Count > 0) _db.EmpleadosLocalizaciones.RemoveRange(actualesLoc);
+        if (localizacionId.HasValue)
+        {
+            await _db.EmpleadosLocalizaciones.AddAsync(new EmpleadoLocalizacion
+            {
+                EmpleadoId = ent.Id,
+                LocalizacionId = localizacionId.Value
+            });
+        }
 
         await _db.SaveChangesAsync();
         TempData["Success"] = "Empleado actualizado.";
@@ -353,7 +362,7 @@ public class EmpleadosController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(int id)
     {
         var ent = await _db.Empleados.FindAsync(id);
         if (ent != null)
@@ -374,14 +383,14 @@ public class EmpleadosController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    private static List<Localizacion> DistinctLocalizaciones(List<Localizacion> localizaciones, IEnumerable<Guid>? seleccionadas = null)
+    private static List<Localizacion> DistinctLocalizaciones(List<Localizacion> localizaciones, IEnumerable<int>? seleccionadas = null)
     {
         if (localizaciones.Count == 0) return localizaciones;
-        var selected = seleccionadas != null ? new HashSet<Guid>(seleccionadas) : new HashSet<Guid>();
+        var selected = seleccionadas != null ? new HashSet<int>(seleccionadas) : new HashSet<int>();
         var grupos = localizaciones
             .GroupBy(l => new
             {
-                EmpresaId = l.Sucursal?.EmpresaId ?? Guid.Empty,
+                EmpresaId = l.Sucursal?.EmpresaId ?? 0,
                 Nombre = l.Nombre.Trim().ToUpperInvariant()
             })
             .ToList();
@@ -398,7 +407,7 @@ public class EmpleadosController : Controller
     // Atajo: simular sesion del usuario del empleado y abrir "Mi semana"
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> VerSemana(Guid id)
+    public async Task<IActionResult> VerSemana(int id)
     {
         var usuario = await _empUserService.EnsureUsuarioParaEmpleadoAsync(id);
         await _currentUser.SetUsuarioAsync(usuario.Id);
@@ -407,7 +416,7 @@ public class EmpleadosController : Controller
 
     // Vista de semana para Admin/Empresa (solo lectura) de un empleado especifico
     [HttpGet]
-    public async Task<IActionResult> Semana(Guid id)
+    public async Task<IActionResult> Semana(int id)
     {
         // Validar alcance para rol Empresa
         if (User.IsInRole("Empresa"))
@@ -425,7 +434,7 @@ public class EmpleadosController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> EditarSemana(Guid id)
+    public async Task<IActionResult> EditarSemana(int id)
     {
         var modelo = await ConstruirSemanaEmpleadoAsync(id, true);
         if (modelo == null) return NotFound();
@@ -440,7 +449,7 @@ public class EmpleadosController : Controller
     [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> GuardarSemanaJefe(Guid empleadoId, SemanaEmpleadoVM model)
+    public async Task<IActionResult> GuardarSemanaJefe(int empleadoId, SemanaEmpleadoVM model)
     {
         var empleado = await _db.Empleados.FirstOrDefaultAsync(e => e.Id == empleadoId);
         if (empleado == null) return NotFound();
@@ -515,7 +524,7 @@ public class EmpleadosController : Controller
                     sucursalEntregaId = empleado.SucursalId;
 
                 var localizacionEntregaId = existente?.LocalizacionEntregaId;
-                Guid? adicionalOpcionId = existente?.AdicionalOpcionId;
+                int? adicionalOpcionId = existente?.AdicionalOpcionId;
                 if (adicionalOpcionId != null && !setAdicionales.Contains(adicionalOpcionId.Value))
                     adicionalOpcionId = null;
 
@@ -530,7 +539,7 @@ public class EmpleadosController : Controller
     // Crear usuario de Identity para un empleado (solo Admin o Empresa dentro de su empresa)
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CrearUsuario(Guid id)
+    public async Task<IActionResult> CrearUsuario(int id)
     {
         var empleado = await _db.Empleados
             .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
@@ -565,7 +574,7 @@ public class EmpleadosController : Controller
     // Reset de contrasena (Admin o Empresa sobre su empleado)
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ResetPassword(Guid id, string newPassword, string confirmPassword)
+    public async Task<IActionResult> ResetPassword(int id, string newPassword, string confirmPassword)
     {
         var empleado = await _db.Empleados.Include(e => e.Sucursal).FirstOrDefaultAsync(e => e.Id == id);
         if (empleado == null) return NotFound();
@@ -658,7 +667,7 @@ public class EmpleadosController : Controller
         }
     }
 
-    private async Task<string?> TryCreateIdentityUsuarioAsync(Guid empleadoId, string username, Guid sucursalId)
+    private async Task<string?> TryCreateIdentityUsuarioAsync(int empleadoId, string username, int sucursalId)
     {
         if (string.IsNullOrWhiteSpace(username))
             return "El codigo es requerido para crear el usuario.";
@@ -707,7 +716,7 @@ public class EmpleadosController : Controller
         return allErrors.Count > 0 ? string.Join("; ", allErrors.Select(e => e.Description)) : null;
     }
 
-    private async Task<bool> CodigoEmpleadoEnUsoAsync(string codigo, Guid sucursalId, Guid? excluirEmpleadoId = null)
+    private async Task<bool> CodigoEmpleadoEnUsoAsync(string codigo, int sucursalId, int? excluirEmpleadoId = null)
     {
         if (string.IsNullOrWhiteSpace(codigo)) return false;
         var clave = codigo.Trim().ToUpperInvariant();
@@ -727,23 +736,23 @@ public class EmpleadosController : Controller
     }
 
 
-    private static string BuildUserName(string empresaNombre, string? empleadoCodigo, Guid empleadoId)
+    private static string BuildUserName(string empresaNombre, string? empleadoCodigo, int empleadoId)
     {
         var empresa = ToTitleToken(empresaNombre);
         var codigo = ToToken(empleadoCodigo);
         if (string.IsNullOrWhiteSpace(codigo))
-            codigo = empleadoId.ToString("N").Substring(0, 6).ToUpperInvariant();
+            codigo = empleadoId.ToString().PadLeft(6, '0');
 
         var baseUser = $"{empresa}_{codigo}";
         return EnsurePasswordCompliance(baseUser);
     }
 
-    private static string BuildDefaultPassword(string? sucursalNombre, string codigo, Guid empleadoId)
+    private static string BuildDefaultPassword(string? sucursalNombre, string codigo, int empleadoId)
     {
         var sucursalToken = string.IsNullOrWhiteSpace(sucursalNombre) ? "Sucursal" : ToToken(sucursalNombre);
         var codigoToken = ToToken(codigo);
         if (string.IsNullOrWhiteSpace(codigoToken))
-            codigoToken = empleadoId.ToString("N").Substring(0, 6).ToUpperInvariant();
+            codigoToken = empleadoId.ToString().PadLeft(6, '0');
 
         return $"{sucursalToken}_{codigoToken}";
     }
@@ -793,7 +802,7 @@ public class EmpleadosController : Controller
     }
 
 
-    private async Task<SemanaEmpleadoVM?> ConstruirSemanaEmpleadoAsync(Guid empleadoId, bool paraAdministrador)
+    private async Task<SemanaEmpleadoVM?> ConstruirSemanaEmpleadoAsync(int empleadoId, bool paraAdministrador)
     {
         var info = await _db.Empleados
             .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
@@ -888,10 +897,11 @@ public class EmpleadosController : Controller
             }
         }
 
+        var empleadoNombre = GetEmpleadoDisplayName(info.Nombre, info.Codigo);
         return new SemanaEmpleadoVM
         {
             EmpleadoId = info.Id,
-            EmpleadoNombre = info.Nombre,
+            EmpleadoNombre = empleadoNombre,
             EmpleadoCodigo = info.Codigo,
             MenuId = menu.Id,
             FechaInicio = menu.FechaInicio,
@@ -943,6 +953,13 @@ public class EmpleadosController : Controller
             'E' when max >= 5 => opcionMenu.OpcionE,
             _ => null
         };
+    }
+
+    private static string GetEmpleadoDisplayName(string? nombre, string? codigo)
+    {
+        if (!string.IsNullOrWhiteSpace(nombre)) return nombre;
+        if (!string.IsNullOrWhiteSpace(codigo)) return codigo;
+        return "Sin nombre";
     }
 }
 

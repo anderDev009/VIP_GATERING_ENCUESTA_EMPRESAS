@@ -7,8 +7,8 @@ public class ItemsSemanaVM
     public DateOnly Inicio { get; set; }
     public DateOnly Fin { get; set; }
 
-    public Guid? EmpresaId { get; set; }
-    public Guid? SucursalId { get; set; }
+    public int? EmpresaId { get; set; }
+    public int? SucursalId { get; set; }
 
     public IEnumerable<Empresa> Empresas { get; set; } = Enumerable.Empty<Empresa>();
     public IEnumerable<Sucursal> Sucursales { get; set; } = Enumerable.Empty<Sucursal>();
@@ -22,7 +22,7 @@ public class ItemsSemanaVM
 
     public class ItemRow
     {
-        public Guid? OpcionId { get; set; }
+        public int? OpcionId { get; set; }
         public string Nombre { get; set; } = string.Empty;
         public decimal CostoUnitario { get; set; }
         public decimal PrecioUnitario { get; set; }

@@ -4,13 +4,13 @@ namespace VIP_GATERING.WebUI.Models;
 
 public class SemanaEmpleadoVM
 {
-    public Guid EmpleadoId { get; set; }
-    public Guid MenuId { get; set; }
+    public int EmpleadoId { get; set; }
+    public int MenuId { get; set; }
     public DateOnly FechaInicio { get; set; }
     public DateOnly FechaTermino { get; set; }
-    public Guid SucursalEntregaId { get; set; }
-    public Guid? LocalizacionEntregaId { get; set; }
-    public List<(Guid id, string nombre)> LocalizacionesEntregaDisponibles { get; set; } = new();
+    public int SucursalEntregaId { get; set; }
+    public int? LocalizacionEntregaId { get; set; }
+    public List<(int id, string nombre)> LocalizacionesEntregaDisponibles { get; set; } = new();
     public List<AdicionalDisponibleVM> AdicionalesDisponibles { get; set; } = new();
     public string SemanaClave { get; set; } = "siguiente";
     public List<SemanaOpcionVM> SemanasDisponibles { get; set; } = new();
@@ -46,7 +46,7 @@ public class SemanaOpcionVM
 
 public class DiaEmpleadoVM
 {
-    public Guid OpcionMenuId { get; set; }
+    public int OpcionMenuId { get; set; }
     public DayOfWeek DiaSemana { get; set; }
     public string? HorarioNombre { get; set; }
     public string? A { get; set; }
@@ -66,14 +66,14 @@ public class DiaEmpleadoVM
     public decimal? PrecioEmpleadoD { get; set; }
     public decimal? PrecioEmpleadoE { get; set; }
     public bool Editable { get; set; } = true;
-    public Guid? AdicionalOpcionId { get; set; }
+    public int? AdicionalOpcionId { get; set; }
     [RegularExpression("[ABCDE]", ErrorMessage = "Seleccione A, B, C, D o E")]
     public char? Seleccion { get; set; }
 }
 
 public class AdicionalDisponibleVM
 {
-    public Guid Id { get; set; }
+    public int Id { get; set; }
     public string Nombre { get; set; } = string.Empty;
     public decimal Precio { get; set; }
 }

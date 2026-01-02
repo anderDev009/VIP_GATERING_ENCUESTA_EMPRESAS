@@ -2,11 +2,11 @@ namespace VIP_GATERING.Domain.Entities;
 
 public class EmpleadoLocalizacion
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
 
-    public Guid EmpleadoId { get; set; }
+    public int EmpleadoId { get; set; }
     public Empleado? Empleado { get; set; }
 
-    public Guid LocalizacionId { get; set; }
+    public int LocalizacionId { get; set; }
     public Localizacion? Localizacion { get; set; }
 }

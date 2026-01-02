@@ -6,7 +6,6 @@ namespace VIP_GATERING.Infrastructure.Identity;
 public static class IdentityDefaults
 {
     public const string EnvPasswordKey = "IDENTITY_DEFAULT_PASSWORD";
-    public const string FallbackPassword = "Dev123$!Dev123$!Dev1";
 
     public static string GetDefaultPassword()
     {
@@ -15,7 +14,7 @@ public static class IdentityDefaults
         {
             return envPwd;
         }
-        return FallbackPassword;
+        throw new InvalidOperationException($"Missing or weak {EnvPasswordKey} environment variable.");
     }
 
     private static bool MeetsPolicy(string pwd)

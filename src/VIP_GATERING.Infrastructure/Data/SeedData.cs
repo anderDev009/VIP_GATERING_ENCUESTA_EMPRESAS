@@ -138,7 +138,7 @@ public static class SeedData
 
                 foreach (var suc in sucursales)
                 {
-                    if (suc.Id == Guid.Empty) continue;
+                    if (suc.Id == 0) continue;
                     foreach (var nombre in nombresLoc)
                     {
                         var key = $"{suc.Id:N}|{suc.EmpresaId:N}|{nombre}";
@@ -208,9 +208,16 @@ public static class SeedData
                 {
                     if (!horarioMap.TryGetValue(cat, out var horarioId))
                         continue;
-                    var existe = await db.OpcionesHorarios.AnyAsync(oh => oh.OpcionId == opcion.Id && oh.HorarioId == horarioId);
-                    if (!existe)
-                        db.OpcionesHorarios.Add(new OpcionHorario { OpcionId = opcion.Id, HorarioId = horarioId });
+
+                    if (opcion.Id != 0)
+                    {
+                        var existe = await db.OpcionesHorarios.AnyAsync(oh => oh.OpcionId == opcion.Id && oh.HorarioId == horarioId);
+                        if (!existe)
+                            db.OpcionesHorarios.Add(new OpcionHorario { OpcionId = opcion.Id, HorarioId = horarioId });
+                        continue;
+                    }
+
+                    db.OpcionesHorarios.Add(new OpcionHorario { Opcion = opcion, HorarioId = horarioId });
                 }
             }
             await db.SaveChangesAsync();
@@ -451,7 +458,7 @@ public static class SeedData
         var nextMonday = currentMonday.AddDays(7);
         var weekStarts = new[] { currentMonday.AddDays(-14), currentMonday.AddDays(-7), currentMonday, nextMonday };
 
-        var menuCache = new Dictionary<(Guid sucursalId, DateOnly inicio), Menu>();
+        var menuCache = new Dictionary<(int sucursalId, DateOnly inicio), Menu>();
         foreach (var weekStart in weekStarts)
         {
             var weekEnd = weekStart.AddDays(4);
@@ -605,7 +612,7 @@ public static class SeedData
         return menu;
     }
 
-    private static async Task AddOrUpdateDemoResponseAsync(AppDbContext db, Empleado empleado, Menu menu, DayOfWeek dia, string horarioNombre, char seleccion, Guid localizacionId, IReadOnlyList<Horario> horarios)
+    private static async Task AddOrUpdateDemoResponseAsync(AppDbContext db, Empleado empleado, Menu menu, DayOfWeek dia, string horarioNombre, char seleccion, int localizacionId, IReadOnlyList<Horario> horarios)
     {
         var horario = horarios.FirstOrDefault(h => string.Equals(h.Nombre, horarioNombre, StringComparison.OrdinalIgnoreCase)) ?? horarios.First();
         var opcionMenu = await db.OpcionesMenu.FirstOrDefaultAsync(o => o.MenuId == menu.Id && o.DiaSemana == dia && o.HorarioId == horario.Id);

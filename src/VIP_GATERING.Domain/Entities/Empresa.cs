@@ -4,7 +4,7 @@ namespace VIP_GATERING.Domain.Entities;
 
 public class Empresa
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
     public string Nombre { get; set; } = string.Empty;
     public string? Rnc { get; set; }
     [Required]

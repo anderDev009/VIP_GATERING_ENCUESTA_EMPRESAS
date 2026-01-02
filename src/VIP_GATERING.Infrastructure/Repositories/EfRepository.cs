@@ -25,7 +25,7 @@ public class EfRepository<T> : IRepository<T> where T : class
         await _set.AddRangeAsync(entities, ct);
     }
 
-    public async Task<T?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<T?> GetByIdAsync(int id, CancellationToken ct = default)
     {
         return await _set.FindAsync([id], ct);
     }

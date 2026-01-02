@@ -20,7 +20,7 @@ public class LocalizacionesController : Controller
         _current = current;
     }
 
-    public async Task<IActionResult> Index(Guid? empresaId, Guid? sucursalId, string? q, int page = 1, int pageSize = 10)
+    public async Task<IActionResult> Index(int? empresaId, int? sucursalId, string? q, int page = 1, int pageSize = 10)
     {
         var query = _db.Localizaciones
             .Include(l => l.Empresa)
@@ -83,7 +83,7 @@ public class LocalizacionesController : Controller
         if (!ModelState.IsValid)
             return await ReturnInvalidAsync(model);
 
-        if (model.EmpresaId == Guid.Empty)
+        if (model.EmpresaId == 0)
         {
             ModelState.AddModelError("EmpresaId", "Empresa requerida.");
             return await ReturnInvalidAsync(model);
@@ -109,7 +109,7 @@ public class LocalizacionesController : Controller
         return RedirectToAction(nameof(Index), new { empresaId = model.EmpresaId });
     }
 
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(int id)
     {
         var ent = await _db.Localizaciones.Include(l => l.Sucursal).FirstOrDefaultAsync(l => l.Id == id);
         if (ent == null) return NotFound();
@@ -121,7 +121,7 @@ public class LocalizacionesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Localizacion model)
+    public async Task<IActionResult> Edit(int id, Localizacion model)
     {
         var ent = await _db.Localizaciones.Include(l => l.Sucursal).FirstOrDefaultAsync(l => l.Id == id);
         if (ent == null) return NotFound();
@@ -139,7 +139,7 @@ public class LocalizacionesController : Controller
             return View(model);
         }
 
-        if (model.EmpresaId == Guid.Empty)
+        if (model.EmpresaId == 0)
         {
             ModelState.AddModelError("EmpresaId", "Empresa requerida.");
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
@@ -172,7 +172,7 @@ public class LocalizacionesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(int id)
     {
         var ent = await _db.Localizaciones.Include(l => l.Sucursal).FirstOrDefaultAsync(l => l.Id == id);
         if (ent == null) return RedirectToAction(nameof(Index));

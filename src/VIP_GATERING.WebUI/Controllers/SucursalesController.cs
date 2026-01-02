@@ -22,7 +22,7 @@ public class SucursalesController : Controller
         _current = current;
     }
 
-    public async Task<IActionResult> Index(Guid? empresaId, string? q, int page = 1, int pageSize = 10)
+    public async Task<IActionResult> Index(int? empresaId, string? q, int page = 1, int pageSize = 10)
     {
         var query = _db.Sucursales.Include(s => s.Empresa).Where(s => !s.Borrado).AsQueryable();
         if (User.IsInRole("Empresa"))
@@ -77,17 +77,17 @@ public class SucursalesController : Controller
         await _db.SaveChangesAsync();
         // asignar horarios seleccionados o por defecto (Almuerzo)
         var seleccion = Request.Form["horarios"].ToArray();
-        IEnumerable<Guid> horarioIds;
+        IEnumerable<int> horarioIds;
         if (seleccion != null && seleccion.Length > 0)
         {
             horarioIds = seleccion
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Distinct()
-                .Select(value => Guid.Parse(value!));
+                .Select(value => int.Parse(value!));
         }
         else
         {
-            var almuerzoId = await _db.Horarios.Where(h => h.Nombre == "Almuerzo").Select(h => (Guid?)h.Id).FirstOrDefaultAsync();
+            var almuerzoId = await _db.Horarios.Where(h => h.Nombre == "Almuerzo").Select(h => (int?)h.Id).FirstOrDefaultAsync();
             if (almuerzoId != null)
                 horarioIds = new[] { almuerzoId.Value };
             else
@@ -100,7 +100,7 @@ public class SucursalesController : Controller
         return RedirectToAction(nameof(Index), new { empresaId = model.EmpresaId });
     }
 
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(int id)
     {
         var ent = await _db.Sucursales.FindAsync(id);
         if (ent == null) return NotFound();
@@ -113,7 +113,7 @@ public class SucursalesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Sucursal model)
+    public async Task<IActionResult> Edit(int id, Sucursal model)
     {
         var ent = await _db.Sucursales.FindAsync(id);
         if (ent == null) return NotFound();
@@ -145,7 +145,7 @@ public class SucursalesController : Controller
         {
             foreach (var val in seleccion.Distinct())
             {
-                if (Guid.TryParse(val, out var hid))
+                if (int.TryParse(val, out var hid))
                     await _db.SucursalesHorarios.AddAsync(new SucursalHorario { SucursalId = ent.Id, HorarioId = hid });
             }
             await _db.SaveChangesAsync();
@@ -156,7 +156,7 @@ public class SucursalesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(int id)
     {
         var ent = await _db.Sucursales.FindAsync(id);
         if (ent != null)

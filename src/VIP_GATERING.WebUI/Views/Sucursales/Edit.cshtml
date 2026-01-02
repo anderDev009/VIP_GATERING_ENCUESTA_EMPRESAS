@@ -3,7 +3,7 @@
     ViewData["Title"] = "Editar Filial";
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
     var horarios = (IEnumerable<VIP_GATERING.Domain.Entities.Horario>)ViewBag.Horarios;
-    var sel = (IEnumerable<System.Guid>)(ViewBag.SelHorarios ?? new List<System.Guid>());
+    var sel = (IEnumerable<int>)(ViewBag.SelHorarios ?? new List<int>());
     var usaPersonalizado = Model.SubsidioTipo != null || Model.SubsidiaEmpleados != null || Model.SubsidioValor != null;
     var subsidia = Model.SubsidiaEmpleados ?? true;
     var subsidioTipo = Model.SubsidioTipo ?? VIP_GATERING.Domain.Entities.SubsidioTipo.Porcentaje;

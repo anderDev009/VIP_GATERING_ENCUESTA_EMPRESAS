@@ -8,11 +8,11 @@ namespace VIP_GATERING.WebUI.Services;
 
 public interface ICurrentUserService
 {
-    Guid? UserId { get; }
-    Guid? EmpleadoId { get; }
-    Guid? EmpresaId { get; }
-    Guid? SucursalId { get; }
-    Task SetUsuarioAsync(Guid usuarioId); // legacy dev helper
+    int? UserId { get; }
+    int? EmpleadoId { get; }
+    int? EmpresaId { get; }
+    int? SucursalId { get; }
+    Task SetUsuarioAsync(int usuarioId); // legacy dev helper
 }
 
 public class CurrentUserService : ICurrentUserService
@@ -20,12 +20,12 @@ public class CurrentUserService : ICurrentUserService
     private readonly IHttpContextAccessor _http;
     private readonly AppDbContext _db;
     private readonly UserManager<ApplicationUser> _users;
-    private Guid? _cachedUserId;
+    private int? _cachedUserId;
     private bool _userIdResolved;
     private UserSnapshot? _userSnapshot;
     private bool _snapshotResolved;
 
-    private sealed record UserSnapshot(Guid? EmpleadoId, Guid? EmpresaId);
+    private sealed record UserSnapshot(int? EmpleadoId, int? EmpresaId);
 
     public CurrentUserService(IHttpContextAccessor http, AppDbContext db, UserManager<ApplicationUser> users)
     {
@@ -34,13 +34,13 @@ public class CurrentUserService : ICurrentUserService
         _users = users;
     }
 
-    public Guid? UserId => EnsureUserId();
+    public int? UserId => EnsureUserId();
 
-    public Guid? EmpleadoId => EnsureSnapshot()?.EmpleadoId;
+    public int? EmpleadoId => EnsureSnapshot()?.EmpleadoId;
 
-    public Guid? EmpresaId => EnsureSnapshot()?.EmpresaId;
+    public int? EmpresaId => EnsureSnapshot()?.EmpresaId;
 
-    public Guid? SucursalId
+    public int? SucursalId
     {
         get
         {
@@ -50,18 +50,18 @@ public class CurrentUserService : ICurrentUserService
             return _db.Empleados
                 .AsNoTracking()
                 .Where(e => e.Id == empleadoId)
-                .Select(e => (Guid?)e.SucursalId)
+                .Select(e => (int?)e.SucursalId)
                 .FirstOrDefault();
         }
     }
 
-    public Task SetUsuarioAsync(Guid usuarioId)
+    public Task SetUsuarioAsync(int usuarioId)
     {
         // Legacy no-op in Identity world; kept to avoid breaking callers.
         return Task.CompletedTask;
     }
 
-    private Guid? EnsureUserId()
+    private int? EnsureUserId()
     {
         if (_userIdResolved) return _cachedUserId;
 
@@ -69,7 +69,7 @@ public class CurrentUserService : ICurrentUserService
         if (principal?.Identity?.IsAuthenticated == true)
         {
             var userIdString = _users.GetUserId(principal);
-            if (Guid.TryParse(userIdString, out var parsed))
+            if (int.TryParse(userIdString, out var parsed))
             {
                 _cachedUserId = parsed;
             }

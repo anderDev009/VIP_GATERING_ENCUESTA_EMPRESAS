@@ -35,7 +35,7 @@ public class SecurityController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AssignRole(Guid userId, string role)
+    public async Task<IActionResult> AssignRole(int userId, string role)
     {
         var user = await _users.FindByIdAsync(userId.ToString());
         if (user != null && await _roles.RoleExistsAsync(role))
@@ -48,7 +48,7 @@ public class SecurityController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RemoveRole(Guid userId, string role)
+    public async Task<IActionResult> RemoveRole(int userId, string role)
     {
         var user = await _users.FindByIdAsync(userId.ToString());
         if (user != null && await _roles.RoleExistsAsync(role))
@@ -61,7 +61,7 @@ public class SecurityController : Controller
 
     public class UserVM
     {
-        public Guid Id { get; set; }
+        public int Id { get; set; }
         public string Email { get; set; } = string.Empty;
         public List<string> Roles { get; set; } = new();
     }

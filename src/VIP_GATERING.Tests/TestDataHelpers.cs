@@ -85,7 +85,7 @@ internal static class TestDataHelpers
         await roleManager.CreateAsync(new ApplicationRole { Name = roleName, NormalizedName = roleName.ToUpperInvariant() });
     }
 
-    private static async Task<ApplicationUser> EnsureUserAsync(UserManager<ApplicationUser> userManager, string userName, string role, Guid? empresaId = null, Guid? empleadoId = null)
+    private static async Task<ApplicationUser> EnsureUserAsync(UserManager<ApplicationUser> userManager, string userName, string role, int? empresaId = null, int? empleadoId = null)
     {
         var user = await userManager.FindByNameAsync(userName);
         if (user == null)

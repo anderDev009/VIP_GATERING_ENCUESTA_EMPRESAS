@@ -6,16 +6,16 @@ namespace VIP_GATERING.Application.Services;
 public interface IMenuService
 {
     Task<Menu> GetOrCreateMenuSemanaSiguienteAsync(CancellationToken ct = default);
-    Task<Menu> GetOrCreateMenuSemanaSiguienteAsync(Guid? empresaId, Guid? sucursalId, CancellationToken ct = default);
+    Task<Menu> GetOrCreateMenuSemanaSiguienteAsync(int? empresaId, int? sucursalId, CancellationToken ct = default);
     Task<Menu> GetOrCreateMenuAsync(DateOnly inicio, DateOnly fin, CancellationToken ct = default);
-    Task<Menu> GetOrCreateMenuAsync(DateOnly inicio, DateOnly fin, Guid? empresaId, Guid? sucursalId, CancellationToken ct = default);
-    Task<Menu?> FindMenuAsync(DateOnly inicio, DateOnly fin, Guid? empresaId, Guid? sucursalId, CancellationToken ct = default);
-    Task<Menu> GetEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, Guid empresaId, Guid? sucursalId, CancellationToken ct = default);
-    Task<Menu?> FindEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, Guid empresaId, Guid? sucursalId, bool requireOpcionesConfiguradas = false, CancellationToken ct = default);
-    Task<IReadOnlyList<OpcionMenu>> ObtenerOpcionesEmpleadoAsync(Guid empleadoId, CancellationToken ct = default);
-    Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, CancellationToken ct = default);
-    Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, Guid sucursalEntregaId, Guid? adicionalOpcionId, CancellationToken ct = default);
-    Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, Guid sucursalEntregaId, Guid? localizacionEntregaId, Guid? adicionalOpcionId, CancellationToken ct = default);
+    Task<Menu> GetOrCreateMenuAsync(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, CancellationToken ct = default);
+    Task<Menu?> FindMenuAsync(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, CancellationToken ct = default);
+    Task<Menu> GetEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, int empresaId, int? sucursalId, CancellationToken ct = default);
+    Task<Menu?> FindEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, int empresaId, int? sucursalId, bool requireOpcionesConfiguradas = false, CancellationToken ct = default);
+    Task<IReadOnlyList<OpcionMenu>> ObtenerOpcionesEmpleadoAsync(int empleadoId, CancellationToken ct = default);
+    Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, CancellationToken ct = default);
+    Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? adicionalOpcionId, CancellationToken ct = default);
+    Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? localizacionEntregaId, int? adicionalOpcionId, CancellationToken ct = default);
 }
 
 public class MenuService : IMenuService
@@ -69,7 +69,7 @@ public class MenuService : IMenuService
         return await GetOrCreateMenuAsync(inicio, fin, ct);
     }
 
-    public async Task<Menu> GetOrCreateMenuSemanaSiguienteAsync(Guid? empresaId, Guid? sucursalId, CancellationToken ct = default)
+    public async Task<Menu> GetOrCreateMenuSemanaSiguienteAsync(int? empresaId, int? sucursalId, CancellationToken ct = default)
     {
         var (inicio, fin) = _fechaSvc.RangoSemanaSiguiente();
         return await GetOrCreateMenuAsync(inicio, fin, empresaId, sucursalId, ct);
@@ -109,7 +109,7 @@ public class MenuService : IMenuService
         return menu;
     }
 
-    private async Task<IReadOnlyList<Horario>> GetHorariosForScopeAsync(Guid? sucursalId, CancellationToken ct)
+    private async Task<IReadOnlyList<Horario>> GetHorariosForScopeAsync(int? sucursalId, CancellationToken ct)
     {
         if (sucursalId == null)
             return await EnsureHorariosAsync(ct);
@@ -121,7 +121,7 @@ public class MenuService : IMenuService
         return activos.Where(h => set.Contains(h.Id)).OrderBy(h => h.Orden).ToList();
     }
 
-    public async Task<Menu> GetOrCreateMenuAsync(DateOnly inicio, DateOnly fin, Guid? empresaId, Guid? sucursalId, CancellationToken ct = default)
+    public async Task<Menu> GetOrCreateMenuAsync(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, CancellationToken ct = default)
     {
         // If sucursal specified, search ONLY by sucursal; else, ONLY by empresa
         Menu? menu = null;
@@ -149,7 +149,7 @@ public class MenuService : IMenuService
         return menu;
     }
 
-    public async Task<Menu?> FindMenuAsync(DateOnly inicio, DateOnly fin, Guid? empresaId, Guid? sucursalId, CancellationToken ct = default)
+    public async Task<Menu?> FindMenuAsync(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, CancellationToken ct = default)
     {
         // Prefer sucursal menu; else fallback to empresa menu
         if (sucursalId != null)
@@ -166,7 +166,7 @@ public class MenuService : IMenuService
         return null;
     }
 
-    public async Task<Menu> GetEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, Guid empresaId, Guid? sucursalId, CancellationToken ct = default)
+    public async Task<Menu> GetEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, int empresaId, int? sucursalId, CancellationToken ct = default)
     {
         // 1) If sucursal menu exists and has options, use it
         if (sucursalId != null)
@@ -191,7 +191,7 @@ public class MenuService : IMenuService
         return await GetOrCreateMenuAsync(inicio, fin, empresaId, null, ct);
     }
 
-    public async Task<Menu?> FindEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, Guid empresaId, Guid? sucursalId, bool requireOpcionesConfiguradas = false, CancellationToken ct = default)
+    public async Task<Menu?> FindEffectiveMenuForSemanaAsync(DateOnly inicio, DateOnly fin, int empresaId, int? sucursalId, bool requireOpcionesConfiguradas = false, CancellationToken ct = default)
     {
         if (sucursalId != null)
         {
@@ -207,14 +207,14 @@ public class MenuService : IMenuService
         return null;
     }
 
-    public async Task<IReadOnlyList<OpcionMenu>> ObtenerOpcionesEmpleadoAsync(Guid empleadoId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<OpcionMenu>> ObtenerOpcionesEmpleadoAsync(int empleadoId, CancellationToken ct = default)
     {
         var menu = await GetOrCreateMenuSemanaSiguienteAsync(ct);
         var lista = await _opcionesMenu.ListAsync(om => om.MenuId == menu.Id, ct);
         return lista.OrderBy(o => o.DiaSemana).ThenBy(o => o.HorarioId).ToList();
     }
 
-    public async Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, CancellationToken ct = default)
+    public async Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, CancellationToken ct = default)
     {
         var empleado = await _empleados.GetByIdAsync(empleadoId, ct);
         if (empleado == null) throw new ArgumentException("Empleado no existe", nameof(empleadoId));
@@ -222,25 +222,25 @@ public class MenuService : IMenuService
         await RegistrarSeleccionAsync(empleadoId, opcionMenuId, seleccion, empleado.SucursalId, null, null, ct);
     }
 
-    public async Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, Guid sucursalEntregaId, Guid? adicionalOpcionId, CancellationToken ct = default)
+    public async Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? adicionalOpcionId, CancellationToken ct = default)
     {
         await RegistrarSeleccionAsync(empleadoId, opcionMenuId, seleccion, sucursalEntregaId, null, adicionalOpcionId, ct);
     }
 
-    public async Task RegistrarSeleccionAsync(Guid empleadoId, Guid opcionMenuId, char seleccion, Guid sucursalEntregaId, Guid? localizacionEntregaId, Guid? adicionalOpcionId, CancellationToken ct = default)
+    public async Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? localizacionEntregaId, int? adicionalOpcionId, CancellationToken ct = default)
     {
         var opcionMenu = await _opcionesMenu.GetByIdAsync(opcionMenuId, ct);
         if (opcionMenu == null) throw new ArgumentException("OpcionMenu no existe", nameof(opcionMenuId));
 
         Localizacion? localizacion = null;
-        if (localizacionEntregaId.HasValue && localizacionEntregaId.Value != Guid.Empty)
+        if (localizacionEntregaId.HasValue && localizacionEntregaId.Value != 0)
         {
             localizacion = await _localizaciones.GetByIdAsync(localizacionEntregaId.Value, ct);
             if (localizacion == null)
                 throw new ArgumentException("Localizacion de entrega invalida", nameof(localizacionEntregaId));
         }
 
-        if (sucursalEntregaId == Guid.Empty)
+        if (sucursalEntregaId == 0)
             throw new ArgumentException("Filial de entrega invalida", nameof(sucursalEntregaId));
 
         // Validar que la filial de entrega esta asignada al empleado (principal o adicional)
@@ -249,7 +249,7 @@ public class MenuService : IMenuService
         var asignadas = await _empleadosSucursales.ListAsync(es => es.EmpleadoId == empleadoId, ct);
         var sucursalesPermitidas = asignadas.Select(a => a.SucursalId).ToHashSet();
         sucursalesPermitidas.Add(empleado.SucursalId);
-        if (sucursalEntregaId == Guid.Empty || !sucursalesPermitidas.Contains(sucursalEntregaId))
+        if (sucursalEntregaId == 0 || !sucursalesPermitidas.Contains(sucursalEntregaId))
             sucursalEntregaId = empleado.SucursalId;
 
         if (localizacion != null)
@@ -317,7 +317,7 @@ public class MenuService : IMenuService
         await _uow.SaveChangesAsync(ct);
     }
 
-    private async Task<bool> TieneOpcionesConfiguradasAsync(Guid menuId, CancellationToken ct)
+    private async Task<bool> TieneOpcionesConfiguradasAsync(int menuId, CancellationToken ct)
     {
         var dias = await _opcionesMenu.ListAsync(d => d.MenuId == menuId, ct);
         if (dias.Count == 0) return false;

@@ -1,15 +1,15 @@
 @model VIP_GATERING.WebUI.Models.PagedResult<VIP_GATERING.Domain.Entities.Empleado>
 @{
-    var empUserIds = (IEnumerable<System.Guid>)(ViewBag.EmpleadoUsuarioIds ?? new List<System.Guid>());
+    var empUserIds = (IEnumerable<int>)(ViewBag.EmpleadoUsuarioIds ?? new List<int>());
 }
 @{
     ViewData["Title"] = "Empleados";
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
     var sucursales = (IEnumerable<VIP_GATERING.Domain.Entities.Sucursal>)ViewBag.Sucursales;
     var localizaciones = (IEnumerable<VIP_GATERING.Domain.Entities.Localizacion>)(ViewBag.Localizaciones ?? new List<VIP_GATERING.Domain.Entities.Localizacion>());
-    Guid? empresaSel = ViewBag.EmpresaId as Guid?;
-    Guid? sucursalSel = ViewBag.SucursalId as Guid?;
-    Guid? localizacionSel = ViewBag.LocalizacionId as Guid?;
+    int? empresaSel = ViewBag.EmpresaId as int?;
+    int? sucursalSel = ViewBag.SucursalId as int?;
+    int? localizacionSel = ViewBag.LocalizacionId as int?;
     string? q = ViewBag.Q as string;
 }
 <div class="flex justify-between items-center mb-4">
@@ -76,10 +76,13 @@
         <tbody class="text-sm">
         @foreach (var e in Model.Items)
         {
+            var displayName = !string.IsNullOrWhiteSpace(e.Nombre)
+                ? e.Nombre
+                : (!string.IsNullOrWhiteSpace(e.Codigo) ? e.Codigo : "Sin nombre");
             <tr class="border-t">
                 <td class="p-2 text-slate-700">@e.Codigo</td>
                 <td class="p-2">
-                    <div class="font-semibold text-slate-900">@e.Nombre</div>
+                    <div class="font-semibold text-slate-900">@displayName</div>
                 </td>
                 <td class="p-2 text-slate-600">@e.Sucursal?.Nombre</td>
                 <td class="p-2 text-slate-600">@e.Sucursal?.Empresa?.Nombre</td>

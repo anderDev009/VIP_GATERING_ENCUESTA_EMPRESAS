@@ -7,8 +7,8 @@ public class DistribucionVM
     public DateOnly Inicio { get; set; }
     public DateOnly Fin { get; set; }
 
-    public Guid? EmpresaId { get; set; }
-    public Guid? SucursalId { get; set; }
+    public int? EmpresaId { get; set; }
+    public int? SucursalId { get; set; }
 
     public IEnumerable<Empresa> Empresas { get; set; } = Enumerable.Empty<Empresa>();
     public IEnumerable<Sucursal> Sucursales { get; set; } = Enumerable.Empty<Sucursal>();
@@ -16,6 +16,7 @@ public class DistribucionVM
     public List<ResumenFilialRow> ResumenFiliales { get; set; } = new();
     public List<DetalleEmpleadoRow> DetalleEmpleados { get; set; } = new();
     public List<DistribucionLocalizacionRow> PorLocalizacion { get; set; } = new();
+    public List<DistribucionCocinaRow> PorLocalizacionCocina { get; set; } = new();
 
     public decimal TotalBase => ResumenFiliales.Sum(r => r.Base);
     public decimal TotalItbis => ResumenFiliales.Sum(r => r.Itbis);
@@ -25,7 +26,7 @@ public class DistribucionVM
 
     public class ResumenFilialRow
     {
-        public Guid FilialId { get; set; }
+        public int FilialId { get; set; }
         public string Filial { get; set; } = string.Empty;
         public decimal Base { get; set; }
         public decimal Itbis { get; set; }
@@ -59,5 +60,18 @@ public class DistribucionVM
         public decimal MontoTotal { get; set; }
         public decimal EmpresaPaga { get; set; }
         public decimal EmpleadoPaga { get; set; }
+    }
+
+    public class DistribucionCocinaRow
+    {
+        public string Localizacion { get; set; } = string.Empty;
+        public int Opcion1 { get; set; }
+        public int Opcion2 { get; set; }
+        public int Opcion3 { get; set; }
+        public int Opcion4 { get; set; }
+        public int Opcion5 { get; set; }
+        public int Adicionales { get; set; }
+        public int Total => Opcion1 + Opcion2 + Opcion3 + Opcion4 + Opcion5 + Adicionales;
+        public string? AdicionalesDetalle { get; set; }
     }
 }

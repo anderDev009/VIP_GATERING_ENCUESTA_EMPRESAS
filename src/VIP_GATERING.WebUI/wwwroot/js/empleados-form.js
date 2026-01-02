@@ -41,7 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
         locSelect.destroy();
         locSelect = null;
       }
-      locMulti.innerHTML = '';
+      while (locMulti.firstChild) {
+        locMulti.removeChild(locMulti.firstChild);
+      }
       allLocOptions.forEach((opt) => {
         if (empresaId && opt.empresa && opt.empresa !== empresaId) return;
         const option = document.createElement('option');
@@ -55,11 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (typeof TomSelect === 'undefined') return;
       locSelect = new TomSelect(locMulti, {
-        plugins: ['remove_button'],
-        maxItems: null,
+        maxItems: 1,
         persist: false,
         create: false,
-        placeholder: 'Selecciona localizaciones...',
+        placeholder: 'Selecciona una localizacion...',
         render: {
           option: (data, escape) => `<div class="ts-option-inner">${escape(data.text)}</div>`,
           item: (data, escape) => `<div class="ts-item-inner">${escape(data.text)}</div>`

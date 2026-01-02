@@ -30,7 +30,7 @@ public class HorariosController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(int id)
     {
         var ent = await _db.Horarios.FindAsync(id);
         if (ent == null) return NotFound();
@@ -39,7 +39,7 @@ public class HorariosController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Horario model)
+    public async Task<IActionResult> Edit(int id, Horario model)
     {
         if (!ModelState.IsValid) return View(model);
         var ent = await _db.Horarios.FindAsync(id);
@@ -51,7 +51,7 @@ public class HorariosController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(int id)
     {
         var ent = await _db.Horarios.FindAsync(id);
         if (ent != null)

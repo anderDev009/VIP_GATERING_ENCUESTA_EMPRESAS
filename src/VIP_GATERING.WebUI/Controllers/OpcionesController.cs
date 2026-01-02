@@ -70,7 +70,7 @@ public class OpcionesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(int id)
     {
         var ent = await _db.Opciones.Include(o => o.Horarios).FirstOrDefaultAsync(o => o.Id == id);
         if (ent == null) return NotFound();
@@ -81,7 +81,7 @@ public class OpcionesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Opcion model, IFormFile? imagen, bool eliminarImagen = false)
+    public async Task<IActionResult> Edit(int id, Opcion model, IFormFile? imagen, bool eliminarImagen = false)
     {
         var selectedHorarios = ParseHorarioIds(Request.Form);
         var ent = await _db.Opciones.FindAsync(id);
@@ -124,7 +124,7 @@ public class OpcionesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    private async Task SetOptionTypeAsync(Guid optionId)
+    private async Task SetOptionTypeAsync(int optionId)
     {
         var esAdicional = await _db.MenusAdicionales.AnyAsync(m => m.OpcionId == optionId);
         ViewBag.EsAdicional = esAdicional;
@@ -132,7 +132,7 @@ public class OpcionesController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(int id)
     {
         var ent = await _db.Opciones.FindAsync(id);
         if (ent != null)
@@ -145,20 +145,20 @@ public class OpcionesController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    private async Task LoadHorariosAsync(IEnumerable<Guid>? selected = null)
+    private async Task LoadHorariosAsync(IEnumerable<int>? selected = null)
     {
         var horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
         ViewBag.Horarios = horarios;
-        ViewBag.HorarioIds = selected?.ToList() ?? new List<Guid>();
+        ViewBag.HorarioIds = selected?.ToList() ?? new List<int>();
     }
 
-    private static List<Guid> ParseHorarioIds(IFormCollection form)
+    private static List<int> ParseHorarioIds(IFormCollection form)
     {
         var values = form["HorarioIds"];
-        var ids = new List<Guid>();
+        var ids = new List<int>();
         foreach (var value in values)
         {
-            if (Guid.TryParse(value, out var id))
+            if (int.TryParse(value, out var id))
                 ids.Add(id);
         }
         return ids.Distinct().ToList();

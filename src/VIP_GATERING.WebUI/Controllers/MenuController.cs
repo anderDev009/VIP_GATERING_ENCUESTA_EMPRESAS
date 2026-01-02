@@ -24,6 +24,8 @@ public class MenuController : Controller
     public MenuController(AppDbContext db, IMenuService menuService, ILogger<MenuController> logger, IMenuCloneService cloneService, ICurrentUserService current, IEncuestaCierreService cierre)
     { _db = db; _menuService = menuService; _logger = logger; _cloneService = cloneService; _current = current; _cierre = cierre; }
 
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(200);
+
     // Sucursales con buscador para administrar menus
     [HttpGet]
     public async Task<IActionResult> Clientes(string? q, int page = 1, int pageSize = 10)
@@ -68,7 +70,7 @@ public class MenuController : Controller
 
     // Listado de sucursales agrupadas por Sucursal (o filtradas por Sucursal)
     [HttpGet]
-    public async Task<IActionResult> Sucursales(Guid? empresaId, string? q)
+    public async Task<IActionResult> Sucursales(int? empresaId, string? q)
     {
         var sucQuery = _db.Sucursales.Include(s => s.Empresa).AsQueryable();
         if (User.IsInRole("Empresa"))
@@ -98,7 +100,7 @@ public class MenuController : Controller
     // GET: copiar menu del cliente a multiples filiales
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> Copiar(Guid empresaId, DateTime? fecha)
+    public async Task<IActionResult> Copiar(int empresaId, DateTime? fecha)
     {
         if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
         var empresa = await _db.Empresas.FirstAsync(e => e.Id == empresaId);
@@ -119,7 +121,7 @@ public class MenuController : Controller
     [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Copiar(Guid empresaId, DateOnly inicio, DateOnly fin, [FromForm] List<Guid> sucursalIds)
+    public async Task<IActionResult> Copiar(int empresaId, DateOnly inicio, DateOnly fin, [FromForm] List<int> sucursalIds)
     {
         if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
         if (sucursalIds == null || sucursalIds.Count == 0)
@@ -135,7 +137,7 @@ public class MenuController : Controller
     // GET: Administrar menu por rango (seleccion de semana)
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> Administrar(DateTime? fecha, Guid? empresaId, Guid? sucursalId, string? alcance)
+    public async Task<IActionResult> Administrar(DateTime? fecha, int? empresaId, int? sucursalId, string? alcance)
     {
         if (User.IsInRole("Empresa"))
         {
@@ -158,12 +160,12 @@ public class MenuController : Controller
 
         // Cargar catÃ¡logos
         var empresas = await _db.Empresas.Select(e => new { e.Id, e.Nombre }).ToListAsync();
-        Guid? empresaSel = empresaId;
+        int? empresaSel = empresaId;
         if (empresaSel == null && sucursalId != null)
         {
             empresaSel = await _db.Sucursales
                 .Where(s => s.Id == sucursalId)
-                .Select(s => (Guid?)s.EmpresaId)
+                .Select(s => (int?)s.EmpresaId)
                 .FirstOrDefaultAsync();
         }
         empresaSel ??= empresas.FirstOrDefault()?.Id;
@@ -180,7 +182,7 @@ public class MenuController : Controller
             ? sucursalesAll.Where(s => s.EmpresaId == empresaSel).ToList()
             : sucursalesAll;
 
-        Guid? sucursalSel = sucursalId;
+        int? sucursalSel = sucursalId;
         if (!string.IsNullOrEmpty(alcance))
         {
             if (alcance.Equals("empresa", StringComparison.OrdinalIgnoreCase)) sucursalSel = null;
@@ -221,7 +223,7 @@ public class MenuController : Controller
         var diasVm = MapDias(diasDb, null);
         var opciones = await _db.Opciones.Include(o => o.Horarios).OrderBy(o => o.Nombre).ToListAsync();
         var horariosActivos = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
-        var horarioIdsPermitidos = new HashSet<Guid>();
+        var horarioIdsPermitidos = new HashSet<int>();
         if (sucursalSel != null)
         {
             var ids = await _db.SucursalesHorarios
@@ -283,7 +285,7 @@ public class MenuController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> VistaPrevia(DateOnly inicio, DateOnly fin, Guid? empresaId, Guid? sucursalId)
+    public async Task<IActionResult> VistaPrevia(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
     {
         if (User.IsInRole("Empresa") && empresaId == null)
             empresaId = _current.EmpresaId;
@@ -304,7 +306,7 @@ public class MenuController : Controller
 
         var empresaLookupId = empresaId ?? menu.EmpresaId;
         if (empresaLookupId == null && menu.SucursalId != null)
-            empresaLookupId = await _db.Sucursales.Where(s => s.Id == menu.SucursalId).Select(s => (Guid?)s.EmpresaId).FirstOrDefaultAsync();
+            empresaLookupId = await _db.Sucursales.Where(s => s.Id == menu.SucursalId).Select(s => (int?)s.EmpresaId).FirstOrDefaultAsync();
 
         var empresaNombre = empresaLookupId != null
             ? await _db.Empresas.Where(e => e.Id == empresaLookupId).Select(e => e.Nombre).FirstOrDefaultAsync()
@@ -375,13 +377,13 @@ public class MenuController : Controller
             var idxs = new HashSet<int>();
             foreach (var k in form.Keys)
             {
-                var mId = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.OpcionMenuId$");
-                var mA = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.A$");
-                var mB = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.B$");
-                var mC = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.C$");
-                var mD = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.D$");
-                var mE = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.E$");
-                var mMax = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.OpcionesMaximas$");
+                var mId = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.OpcionMenuId$", RegexOptions.None, RegexTimeout);
+                var mA = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.A$", RegexOptions.None, RegexTimeout);
+                var mB = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.B$", RegexOptions.None, RegexTimeout);
+                var mC = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.C$", RegexOptions.None, RegexTimeout);
+                var mD = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.D$", RegexOptions.None, RegexTimeout);
+                var mE = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.E$", RegexOptions.None, RegexTimeout);
+                var mMax = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.OpcionesMaximas$", RegexOptions.None, RegexTimeout);
                 if (mId.Success && int.TryParse(mId.Groups[1].Value, out var i1)) idxs.Add(i1);
                 if (mA.Success && int.TryParse(mA.Groups[1].Value, out var i2)) idxs.Add(i2);
                 if (mB.Success && int.TryParse(mB.Groups[1].Value, out var i3)) idxs.Add(i3);
@@ -393,12 +395,12 @@ public class MenuController : Controller
             var dias = new List<DiaEdicion>();
             foreach (var i in idxs.OrderBy(x => x))
             {
-                _ = Guid.TryParse(form[$"Dias[{i}].OpcionMenuId"], out var omId);
-                Guid? ga = Guid.TryParse(form[$"Dias[{i}].A"], out var a) ? a : null;
-                Guid? gb = Guid.TryParse(form[$"Dias[{i}].B"], out var b) ? b : null;
-                Guid? gc = Guid.TryParse(form[$"Dias[{i}].C"], out var c) ? c : null;
-                Guid? gd = Guid.TryParse(form[$"Dias[{i}].D"], out var d) ? d : null;
-                Guid? ge = Guid.TryParse(form[$"Dias[{i}].E"], out var eVal) ? eVal : null;
+                _ = int.TryParse(form[$"Dias[{i}].OpcionMenuId"], out var omId);
+                int? ga = int.TryParse(form[$"Dias[{i}].A"], out var a) ? a : null;
+                int? gb = int.TryParse(form[$"Dias[{i}].B"], out var b) ? b : null;
+                int? gc = int.TryParse(form[$"Dias[{i}].C"], out var c) ? c : null;
+                int? gd = int.TryParse(form[$"Dias[{i}].D"], out var d) ? d : null;
+                int? ge = int.TryParse(form[$"Dias[{i}].E"], out var eVal) ? eVal : null;
                 int max = 3;
                 if (int.TryParse(form[$"Dias[{i}].OpcionesMaximas"], out var maxForm))
                     max = Math.Clamp(maxForm, 1, 5);
@@ -424,13 +426,13 @@ public class MenuController : Controller
             .ToListAsync();
 
         // Si faltan OpcionMenuId, mapeamos por Ã­ndice contra los dÃ­as del menÃº del rango
-        if (model.Dias.Any(d => d.OpcionMenuId == Guid.Empty))
+        if (model.Dias.Any(d => d.OpcionMenuId == 0))
         {
             if (diasDb.Count == model.Dias.Count)
             {
                 for (int i = 0; i < model.Dias.Count; i++)
                 {
-                    if (model.Dias[i].OpcionMenuId == Guid.Empty)
+                    if (model.Dias[i].OpcionMenuId == 0)
                         model.Dias[i].OpcionMenuId = diasDb[i].Id;
                 }
                 _logger.LogInformation("[POST Guardar] OpcionMenuId completados por Ã­ndice.");
@@ -459,8 +461,8 @@ public class MenuController : Controller
                 dia.OpcionIdE = max >= 5 ? d.E : null;
             }
             // Actualizar adicionales fijos del menÃº (se cobran 100% al empleado)
-            var nuevosIds = (model.AdicionalesIds ?? new List<Guid>())
-                .Where(x => x != Guid.Empty)
+            var nuevosIds = (model.AdicionalesIds ?? new List<int>())
+                .Where(x => x != 0)
                 .Distinct()
                 .ToHashSet();
             var actuales = await _db.MenusAdicionales.Where(a => a.MenuId == menuDb.Id).ToListAsync();
@@ -487,7 +489,7 @@ public class MenuController : Controller
     [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CerrarEncuesta(DateOnly inicio, Guid? empresaId, Guid? sucursalId)
+    public async Task<IActionResult> CerrarEncuesta(DateOnly inicio, int? empresaId, int? sucursalId)
     {
         var fin = inicio.AddDays(4);
         var menu = await _menuService.GetOrCreateMenuAsync(inicio, fin, empresaId, sucursalId);
@@ -502,7 +504,7 @@ public class MenuController : Controller
     [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ReabrirEncuesta(DateOnly inicio, Guid? empresaId, Guid? sucursalId)
+    public async Task<IActionResult> ReabrirEncuesta(DateOnly inicio, int? empresaId, int? sucursalId)
     {
         var fin = inicio.AddDays(4);
         var menu = await _menuService.GetOrCreateMenuAsync(inicio, fin, empresaId, sucursalId);
@@ -517,7 +519,7 @@ public class MenuController : Controller
     [Authorize(Roles = "Admin,Empresa")]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EliminarEncuesta(DateOnly inicio, Guid? empresaId, Guid? sucursalId)
+    public async Task<IActionResult> EliminarEncuesta(DateOnly inicio, int? empresaId, int? sucursalId)
     {
         var fin = inicio.AddDays(4);
         // Seguridad: empresa solo en su alcance
@@ -554,7 +556,7 @@ public class MenuController : Controller
     private static List<DiaEdicion> MapDias(IEnumerable<OpcionMenu> diasDb, IEnumerable<DiaEdicion>? overrides)
     {
         var overrideDict = overrides?
-            .Where(d => d.OpcionMenuId != Guid.Empty)
+            .Where(d => d.OpcionMenuId != 0)
             .ToDictionary(d => d.OpcionMenuId, d => d);
 
         var list = new List<DiaEdicion>();

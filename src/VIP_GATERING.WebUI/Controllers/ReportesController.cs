@@ -27,7 +27,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> ItemsSemana(Guid? empresaId = null, Guid? sucursalId = null)
+    public async Task<IActionResult> ItemsSemana(int? empresaId = null, int? sucursalId = null)
     {
         var (inicio, fin) = GetDefaultReportRange(_fechas.Hoy());
 
@@ -55,7 +55,7 @@ public class ReportesController : Controller
 
         var hoy = _fechas.Hoy();
         var respuestas = await baseQuery.ToListAsync();
-        var itemsRaw = new List<(Guid OpcionId, string Nombre, decimal Costo, decimal PrecioEmpleado)>();
+        var itemsRaw = new List<(int OpcionId, string Nombre, decimal Costo, decimal PrecioEmpleado)>();
         foreach (var r in respuestas)
         {
             if (r.OpcionMenu == null || r.Empleado == null) continue;
@@ -108,7 +108,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> Selecciones(Guid? empresaId = null, Guid? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> Selecciones(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
         // Empresa solo puede ver su propia data
         if (User.IsInRole("Empresa"))
@@ -191,10 +191,11 @@ public class ReportesController : Controller
             })
             .ToList();
 
-        var detalleRaw = new List<(Guid EmpleadoId, string EmpleadoNombre, Guid SucursalId, string SucursalNombre, decimal Costo, decimal Precio)>();
+        var detalleRaw = new List<(int EmpleadoId, string EmpleadoNombre, int SucursalId, string SucursalNombre, decimal Costo, decimal Precio)>();
         foreach (var r in respuestasVisible)
         {
             if (r.OpcionMenu == null || r.Empleado == null) continue;
+            var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
             var suc = r.SucursalEntrega ?? r.Empleado.Sucursal;
             var sucEmpleado = r.Empleado.Sucursal;
             var empresaEmpleado = sucEmpleado?.Empresa;
@@ -205,14 +206,14 @@ public class ReportesController : Controller
             {
                 var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, sucEmpleado, empresaEmpleado);
                 var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
-                detalleRaw.Add((r.Empleado.Id, r.Empleado.Nombre, suc.Id, suc.Nombre, opcion.Costo, precio));
+                detalleRaw.Add((r.Empleado.Id, empleadoNombre, suc.Id, suc.Nombre, opcion.Costo, precio));
             }
 
             if (r.AdicionalOpcionId != null && r.AdicionalOpcion != null)
             {
                 var adicional = r.AdicionalOpcion;
                 var precio = adicional.Precio ?? adicional.Costo;
-                detalleRaw.Add((r.Empleado.Id, r.Empleado.Nombre, suc.Id, suc.Nombre, adicional.Costo, precio));
+                detalleRaw.Add((r.Empleado.Id, empleadoNombre, suc.Id, suc.Nombre, adicional.Costo, precio));
             }
         }
 
@@ -304,7 +305,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> TotalesEmpleados(Guid? empresaId = null, Guid? sucursalId = null)
+    public async Task<IActionResult> TotalesEmpleados(int? empresaId = null, int? sucursalId = null)
     {
         if (User.IsInRole("Empresa"))
         {
@@ -345,10 +346,11 @@ public class ReportesController : Controller
                 && ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana) <= hoy)
             .ToList();
 
-        var rowsRaw = new List<(Guid EmpleadoId, string EmpleadoNombre, decimal Costo, decimal Precio)>();
+        var rowsRaw = new List<(int EmpleadoId, string EmpleadoNombre, decimal Costo, decimal Precio)>();
         foreach (var r in respuestas)
         {
             if (r.OpcionMenu == null || r.Empleado == null) continue;
+            var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
             var sucEmpleado = r.Empleado.Sucursal;
             var empresaEmpleado = sucEmpleado?.Empresa;
             if (sucEmpleado == null || empresaEmpleado == null) continue;
@@ -358,14 +360,14 @@ public class ReportesController : Controller
             {
                 var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, sucEmpleado, empresaEmpleado);
                 var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
-                rowsRaw.Add((r.Empleado.Id, r.Empleado.Nombre, opcion.Costo, precio));
+                rowsRaw.Add((r.Empleado.Id, empleadoNombre, opcion.Costo, precio));
             }
 
             if (r.AdicionalOpcionId != null && r.AdicionalOpcion != null)
             {
                 var adicional = r.AdicionalOpcion;
                 var precio = adicional.Precio ?? adicional.Costo;
-                rowsRaw.Add((r.Empleado.Id, r.Empleado.Nombre, adicional.Costo, precio));
+                rowsRaw.Add((r.Empleado.Id, empleadoNombre, adicional.Costo, precio));
             }
         }
 
@@ -406,7 +408,7 @@ public class ReportesController : Controller
             .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
             .FirstOrDefaultAsync(e => e.Id == empleadoId);
         if (empleadoDatos == null || empleadoDatos.Sucursal?.Empresa == null) return Forbid();
-        var empleadoNombre = empleadoDatos.Nombre;
+        var empleadoNombre = GetEmpleadoDisplayName(empleadoDatos);
         var empleadoCodigo = empleadoDatos.Codigo;
 
         var hoy = _fechas.Hoy();
@@ -498,7 +500,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> Seleccionados(Guid? empresaId = null, Guid? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> Seleccionados(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
         if (User.IsInRole("Empresa"))
         {
@@ -543,10 +545,11 @@ public class ReportesController : Controller
             })
             .ToList();
 
-        var detalleRaw = new List<(Guid EmpleadoId, string EmpleadoNombre, Guid SucursalId, string SucursalNombre, decimal Costo, decimal Precio)>();
+        var detalleRaw = new List<(int EmpleadoId, string EmpleadoNombre, int SucursalId, string SucursalNombre, decimal Costo, decimal Precio)>();
         foreach (var r in pendientes)
         {
             if (r.OpcionMenu == null || r.Empleado == null) continue;
+            var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
             var sucEntrega = r.SucursalEntrega ?? r.Empleado.Sucursal;
             var sucEmpleado = r.Empleado.Sucursal;
             var empresaEmpleado = sucEmpleado?.Empresa;
@@ -557,14 +560,14 @@ public class ReportesController : Controller
             {
                 var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, sucEmpleado, empresaEmpleado);
                 var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
-                detalleRaw.Add((r.Empleado.Id, r.Empleado.Nombre, sucEntrega.Id, sucEntrega.Nombre, opcion.Costo, precio));
+                detalleRaw.Add((r.Empleado.Id, empleadoNombre, sucEntrega.Id, sucEntrega.Nombre, opcion.Costo, precio));
             }
 
             if (r.AdicionalOpcionId != null && r.AdicionalOpcion != null)
             {
                 var adicional = r.AdicionalOpcion;
                 var precio = adicional.Precio ?? adicional.Costo;
-                detalleRaw.Add((r.Empleado.Id, r.Empleado.Nombre, sucEntrega.Id, sucEntrega.Nombre, adicional.Costo, precio));
+                detalleRaw.Add((r.Empleado.Id, empleadoNombre, sucEntrega.Id, sucEntrega.Nombre, adicional.Costo, precio));
             }
         }
 
@@ -616,7 +619,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> Distribucion(Guid? empresaId = null, Guid? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> Distribucion(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
         DateOnly inicio;
         DateOnly fin;
@@ -680,7 +683,7 @@ public class ReportesController : Controller
             .ToList();
 
         const decimal itbisRate = 0.18m;
-        var items = new List<(DateOnly Fecha, Guid FilialId, string Filial, Guid EmpleadoId, string Empleado, string Tanda, string Opcion, string Seleccion, string Localizacion, decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado)>();
+        var items = new List<(DateOnly Fecha, int FilialId, string Filial, int EmpleadoId, string Empleado, string Tanda, string Opcion, string Seleccion, string Localizacion, decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado)>();
 
         foreach (var r in respuestas)
         {
@@ -694,7 +697,7 @@ public class ReportesController : Controller
             var tanda = r.OpcionMenu.Horario?.Nombre ?? "Sin horario";
             var filial = sucursalEntrega.Nombre;
             var filialId = sucursalEntrega.Id;
-            var empleadoNombre = r.Empleado.Nombre;
+            var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
             var empleadoId = r.Empleado.Id;
             var localizacion = r.LocalizacionEntrega?.Nombre ?? "Sin asignar";
 
@@ -783,6 +786,57 @@ public class ReportesController : Controller
             .ThenBy(r => r.Opcion)
             .ToList();
 
+        var porLocalizacionCocina = items
+            .GroupBy(i => i.Localizacion)
+            .Select(g =>
+            {
+                var adicionalesDetalle = g
+                    .Where(i => i.Seleccion == "Adicional")
+                    .Select(i => i.Opcion.StartsWith("Adicional:", StringComparison.OrdinalIgnoreCase)
+                        ? i.Opcion.Replace("Adicional:", string.Empty).Trim()
+                        : i.Opcion)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(n => n)
+                    .ToList();
+
+                var row = new DistribucionVM.DistribucionCocinaRow
+                {
+                    Localizacion = g.Key
+                };
+
+                foreach (var item in g)
+                {
+                    if (item.Seleccion == "Adicional")
+                    {
+                        row.Adicionales += 1;
+                        continue;
+                    }
+
+                    if (item.Seleccion.StartsWith("Opcion", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parts = item.Seleccion.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length > 1 && int.TryParse(parts[1], out var idx))
+                        {
+                            switch (idx)
+                            {
+                                case 1: row.Opcion1 += 1; break;
+                                case 2: row.Opcion2 += 1; break;
+                                case 3: row.Opcion3 += 1; break;
+                                case 4: row.Opcion4 += 1; break;
+                                case 5: row.Opcion5 += 1; break;
+                            }
+                        }
+                    }
+                }
+
+                if (adicionalesDetalle.Count > 0)
+                    row.AdicionalesDetalle = string.Join(", ", adicionalesDetalle);
+
+                return row;
+            })
+            .OrderBy(r => r.Localizacion)
+            .ToList();
+
         var vm = new DistribucionVM
         {
             Inicio = inicio,
@@ -793,14 +847,15 @@ public class ReportesController : Controller
             Sucursales = sucursales,
             ResumenFiliales = resumen,
             DetalleEmpleados = detalle,
-            PorLocalizacion = porLocalizacion
+            PorLocalizacion = porLocalizacion,
+            PorLocalizacionCocina = porLocalizacionCocina
         };
         return View(vm);
     }
 
     [Authorize(Roles = "Admin,Empresa")]
     [HttpGet]
-    public async Task<IActionResult> TotalesEmpleadosPdf(Guid? empresaId = null, Guid? sucursalId = null)
+    public async Task<IActionResult> TotalesEmpleadosPdf(int? empresaId = null, int? sucursalId = null)
     {
         var result = await TotalesEmpleados(empresaId, sucursalId) as ViewResult;
         var vm = (TotalesEmpleadosVM)result!.Model!;
@@ -866,7 +921,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> ItemsSemanaPdf(Guid? empresaId = null, Guid? sucursalId = null)
+    public async Task<IActionResult> ItemsSemanaPdf(int? empresaId = null, int? sucursalId = null)
     {
         var result = await ItemsSemana(empresaId, sucursalId) as ViewResult;
         var vm = (ItemsSemanaVM)result!.Model!;
@@ -933,7 +988,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> SeleccionesPdf(Guid? empresaId = null, Guid? sucursalId = null)
+    public async Task<IActionResult> SeleccionesPdf(int? empresaId = null, int? sucursalId = null)
     {
         var result = await Selecciones(empresaId, sucursalId) as ViewResult;
         var vm = (SeleccionesVM)result!.Model!;
@@ -1070,7 +1125,7 @@ public class ReportesController : Controller
         };
     }
 
-    private IQueryable<RespuestaFormulario> AplicarFiltrosEmpresaSucursal(IQueryable<RespuestaFormulario> query, Guid? empresaId, Guid? sucursalId)
+    private IQueryable<RespuestaFormulario> AplicarFiltrosEmpresaSucursal(IQueryable<RespuestaFormulario> query, int? empresaId, int? sucursalId)
     {
         if (empresaId != null)
         {
@@ -1123,4 +1178,11 @@ public class ReportesController : Controller
         'E' => "Opcion 5",
         _ => "Opcion"
     };
+
+    private static string GetEmpleadoDisplayName(Empleado empleado)
+    {
+        if (!string.IsNullOrWhiteSpace(empleado.Nombre)) return empleado.Nombre;
+        if (!string.IsNullOrWhiteSpace(empleado.Codigo)) return empleado.Codigo;
+        return "Sin nombre";
+    }
 }

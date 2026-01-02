@@ -29,7 +29,7 @@ public class AccountController : Controller
         var user = await _userManager.FindByNameAsync(model.UserName);
         if (user != null)
         {
-            var res = await _signInManager.PasswordSignInAsync(user, model.Password, isPersistent: true, lockoutOnFailure: true);
+            var res = await _signInManager.PasswordSignInAsync(user, model.Password, isPersistent: false, lockoutOnFailure: true);
             if (res.Succeeded)
             {
                 var claims = await _userManager.GetClaimsAsync(user);

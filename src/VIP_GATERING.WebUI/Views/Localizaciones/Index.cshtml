@@ -3,8 +3,8 @@
     ViewData["Title"] = "Localizaciones";
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
     var sucursales = (IEnumerable<VIP_GATERING.Domain.Entities.Sucursal>)ViewBag.Sucursales;
-    Guid? empresaSel = ViewBag.EmpresaId as Guid?;
-    Guid? sucursalSel = ViewBag.SucursalId as Guid?;
+    int? empresaSel = ViewBag.EmpresaId as int?;
+    int? sucursalSel = ViewBag.SucursalId as int?;
 }
 @section Breadcrumb{<div class="text-sm text-slate-500 mb-4">Inicio / Administracion / Localizaciones</div>}
 <div class="flex justify-between items-center mb-4">

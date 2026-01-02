@@ -5,7 +5,7 @@ using VIP_GATERING.Infrastructure.Identity;
 
 namespace VIP_GATERING.Infrastructure.Data;
 
-public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>
+public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, int>
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 

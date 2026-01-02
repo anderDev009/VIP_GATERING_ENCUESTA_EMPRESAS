@@ -55,7 +55,7 @@ public static class IdentitySeeder
             await users.SetLockoutEndDateAsync(user, null);
         }
 
-        async Task<ApplicationUser> EnsureUser(string userName, string role, Guid? empresaId = null, Guid? empleadoId = null, string? legacyEmail = null)
+        async Task<ApplicationUser> EnsureUser(string userName, string role, int? empresaId = null, int? empleadoId = null, string? legacyEmail = null)
         {
             var user = await users.FindByNameAsync(userName);
             if (user == null && !string.IsNullOrWhiteSpace(legacyEmail))
@@ -137,7 +137,7 @@ public static class IdentitySeeder
         }
     }
 
-    private static string BuildUserName(string filialNombre, string? empleadoCodigo, Guid empleadoId)
+    private static string BuildUserName(string filialNombre, string? empleadoCodigo, int empleadoId)
     {
         var filial = ToTitleToken(filialNombre);
         var codigo = ToToken(empleadoCodigo);

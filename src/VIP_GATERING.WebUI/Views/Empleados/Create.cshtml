@@ -4,7 +4,7 @@
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
     var sucursales = (IEnumerable<VIP_GATERING.Domain.Entities.Sucursal>)ViewBag.Sucursales;
     var localizaciones = (IEnumerable<VIP_GATERING.Domain.Entities.Localizacion>)(ViewBag.Localizaciones ?? new List<VIP_GATERING.Domain.Entities.Localizacion>());
-    var localizacionesAsignadasIds = (IEnumerable<Guid>)(ViewBag.LocalizacionesAsignadasIds ?? new List<Guid>());
+    var localizacionAsignadaId = ViewBag.LocalizacionAsignadaId as int?;
     var empresaLookup = empresas.ToDictionary(e => e.Id, e => e.Nombre);
     var usaPersonalizado = Model.SubsidioTipo != null || Model.SubsidioValor != null;
     var subsidioTipo = Model.SubsidioTipo ?? VIP_GATERING.Domain.Entities.SubsidioTipo.Porcentaje;
@@ -33,17 +33,19 @@
         </select>
     </div>
     <div>
-        <label class="block text-sm">Localizaciones de entrega (opcional)</label>
-        <select name="localizacionesAsignadas" multiple class="w-full" id="selLocalizacionesAsignadas">
+        <label class="block text-sm">Localizacion por defecto (opcional)</label>
+        <select name="localizacionAsignadaId" class="w-full" id="selLocalizacionesAsignadas">
+            <option value="">-- Sin localizacion --</option>
             @foreach (var l in localizaciones)
             {
-                var selected = localizacionesAsignadasIds.Contains(l.Id);
+                var selected = localizacionAsignadaId.HasValue && localizacionAsignadaId.Value == l.Id;
                 var empNombre = l.Sucursal != null && empresaLookup.TryGetValue(l.Sucursal.EmpresaId, out var empName) ? empName : string.Empty;
-                var etiqueta = string.IsNullOrWhiteSpace(empNombre) ? l.Nombre : $"{empNombre} - {l.Nombre}";
+                var sucNombre = l.Sucursal?.Nombre ?? string.Empty;
+                var etiqueta = string.IsNullOrWhiteSpace(sucNombre) ? l.Nombre : $"{sucNombre} - {l.Nombre}";
                 <option value="@l.Id" data-sucursal="@l.SucursalId" data-empresa="@(l.Sucursal?.EmpresaId)" selected="@(selected ? "selected" : null)">@etiqueta</option>
             }
         </select>
-        <div class="text-xs text-slate-500 mt-1">Si el empleado tiene localizaciones asignadas, solo podra elegir entre ellas.</div>
+        <div class="text-xs text-slate-500 mt-1">Se usara como sugerida al entrar al menu, pero el empleado podra cambiarla.</div>
     </div>
     <div>
         <label class="block text-sm">Estado</label>

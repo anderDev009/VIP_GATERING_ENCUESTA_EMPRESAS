@@ -38,7 +38,7 @@
         <button type="submit" class="btn-primary">Filtrar</button>
         <a class="btn-outline" asp-action="Distribucion">Limpiar</a>
     </div>
-    <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3">
+    <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3" id="reportes-totales">
         <div class="text-sm text-slate-600">Total base: <span class="font-semibold">@Model.TotalBase.ToString("C")</span></div>
         <div class="text-sm text-slate-600">ITBIS: <span class="font-semibold">@Model.TotalItbis.ToString("C")</span></div>
         <div class="text-sm text-slate-600">Total general: <span class="font-semibold">@Model.TotalGeneral.ToString("C")</span></div>
@@ -54,6 +54,7 @@
         <button type="button" class="tab-pill is-active" data-tab-target="tab-resumen">Resumen por filial</button>
         <button type="button" class="tab-pill" data-tab-target="tab-detalle">Detalle por empleado</button>
         <button type="button" class="tab-pill" data-tab-target="tab-localizacion">Distribucion por localizacion</button>
+        <button type="button" class="tab-pill" data-tab-target="tab-localizacion-cocina">Localizacion (cocina)</button>
     </div>
 </div>
 
@@ -158,6 +159,57 @@
             </tr>
         }
         </tbody>
+    </table>
+</div>
+
+<div id="tab-localizacion-cocina" class="tab-panel space-y-3" data-tab-panel>
+    <table>
+        <thead>
+        <tr>
+            <th>Localizacion</th>
+            <th>Opcion 1</th>
+            <th>Opcion 2</th>
+            <th>Opcion 3</th>
+            <th>Opcion 4</th>
+            <th>Opcion 5</th>
+            <th>Adicionales</th>
+            <th>Total</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.PorLocalizacionCocina)
+        {
+            <tr>
+                <td>@r.Localizacion</td>
+                <td class="text-right">@r.Opcion1</td>
+                <td class="text-right">@r.Opcion2</td>
+                <td class="text-right">@r.Opcion3</td>
+                <td class="text-right">@r.Opcion4</td>
+                <td class="text-right">@r.Opcion5</td>
+                <td class="text-right">@r.Adicionales</td>
+                <td class="text-right">@r.Total</td>
+            </tr>
+            @if (!string.IsNullOrWhiteSpace(r.AdicionalesDetalle))
+            {
+                <tr>
+                    <td class="text-sm font-semibold">Adicionales</td>
+                    <td colspan="7" class="text-sm text-slate-600">@r.AdicionalesDetalle</td>
+                </tr>
+            }
+        }
+        </tbody>
+        <tfoot>
+        <tr>
+            <th>Total</th>
+            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion1)</th>
+            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion2)</th>
+            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion3)</th>
+            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion4)</th>
+            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion5)</th>
+            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Adicionales)</th>
+            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Total)</th>
+        </tr>
+        </tfoot>
     </table>
 </div>
 

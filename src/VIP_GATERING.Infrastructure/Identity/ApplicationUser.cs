@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Identity;
 
 namespace VIP_GATERING.Infrastructure.Identity;
 
-public class ApplicationUser : IdentityUser<Guid>
+public class ApplicationUser : IdentityUser<int>
 {
-    public Guid? EmpleadoId { get; set; }
-    public Guid? EmpresaId { get; set; }
+    public int? EmpleadoId { get; set; }
+    public int? EmpresaId { get; set; }
 }

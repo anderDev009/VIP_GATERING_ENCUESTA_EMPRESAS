@@ -61,7 +61,7 @@ public class OptionImageService : IOptionImageService
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         var folder = Path.Combine(_env.WebRootPath, "uploads", "opciones");
         Directory.CreateDirectory(folder);
-        var name = $"{Guid.NewGuid():N}{ext}";
+        var name = $"{0:N}{ext}";
         var dest = Path.Combine(folder, name);
         await using (var stream = new FileStream(dest, FileMode.Create))
         {

@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = "Nuevo plato";
     var horarios = ViewBag.Horarios as List<VIP_GATERING.Domain.Entities.Horario> ?? new();
-    var seleccionados = ViewBag.HorarioIds as List<Guid> ?? new();
+    var seleccionados = ViewBag.HorarioIds as List<int> ?? new();
 }
 <h1 class="text-2xl font-semibold mb-4 max-w-lg mx-auto">Nuevo plato</h1>
 

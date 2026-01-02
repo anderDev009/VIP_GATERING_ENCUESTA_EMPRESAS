@@ -4,8 +4,8 @@ public class MenuPreviewVM
 {
     public DateOnly FechaInicio { get; set; }
     public DateOnly FechaTermino { get; set; }
-    public Guid? EmpresaId { get; set; }
-    public Guid? SucursalId { get; set; }
+    public int? EmpresaId { get; set; }
+    public int? SucursalId { get; set; }
     public string? EmpresaNombre { get; set; }
     public string? FilialNombre { get; set; }
     public string OrigenScope { get; set; } = "Empresa";

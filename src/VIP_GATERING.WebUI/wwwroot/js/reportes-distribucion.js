@@ -1,6 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
   const distribucionTabs = document.querySelectorAll('.tab-pill');
+  const totales = document.getElementById('reportes-totales');
   if (!distribucionTabs.length) return;
+
+  const syncTotales = (target) => {
+    if (!totales) return;
+    const hide = target === 'tab-localizacion-cocina';
+    totales.classList.toggle('hidden', hide);
+  };
 
   distribucionTabs.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -11,7 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (target) {
         const panel = document.getElementById(target);
         if (panel) panel.classList.add('is-active');
+        syncTotales(target);
       }
     });
   });
+
+  const active = document.querySelector('.tab-pill.is-active');
+  syncTotales(active ? active.getAttribute('data-tab-target') : '');
 });

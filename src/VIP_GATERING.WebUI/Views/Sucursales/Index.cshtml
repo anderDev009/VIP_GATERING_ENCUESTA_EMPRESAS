@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = "Filiales";
     var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)ViewBag.Empresas;
-    Guid? empresaSel = ViewBag.EmpresaId as Guid?;
+    int? empresaSel = ViewBag.EmpresaId as int?;
 }
 @section Breadcrumb{<div class="text-sm text-slate-500 mb-4">Inicio / Administracion / Filiales</div>}
 <div class="flex justify-between items-center mb-4">

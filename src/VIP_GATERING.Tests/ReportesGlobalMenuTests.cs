@@ -129,10 +129,10 @@ public class ReportesGlobalMenuTests
 
     private sealed class EmptyCurrentUserService : ICurrentUserService
     {
-        public Guid? UserId => null;
-        public Guid? EmpleadoId => null;
-        public Guid? EmpresaId => null;
-        public Guid? SucursalId => null;
-        public Task SetUsuarioAsync(Guid usuarioId) => Task.CompletedTask;
+        public int? UserId => null;
+        public int? EmpleadoId => null;
+        public int? EmpresaId => null;
+        public int? SucursalId => null;
+        public Task SetUsuarioAsync(int usuarioId) => Task.CompletedTask;
     }
 }

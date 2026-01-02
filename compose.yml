@@ -1,0 +1,36 @@
+services:
+  vipcatering:
+    image: postgres:16-alpine
+    container_name: vipcatering-db
+    environment:
+      POSTGRES_DB: vipcatering
+      POSTGRES_USER: vipcatering
+      POSTGRES_PASSWORD: vipcatering
+    ports:
+      - "5432:5432"
+    volumes:
+      - vipcatering_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vipcatering -d vipcatering"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vipcatering-web
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=vipcatering;Database=vipcatering;Username=vipcatering;Password=vipcatering
+      IDENTITY_DEFAULT_PASSWORD: "ChangeMe123!ChangeMe123!"
+    ports:
+      - "8080:8080"
+    depends_on:
+      vipcatering:
+        condition: service_healthy
+
+volumes:
+  vipcatering_data:

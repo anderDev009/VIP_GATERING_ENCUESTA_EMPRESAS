@@ -4,13 +4,13 @@ namespace VIP_GATERING.Domain.Entities;
 
 public class Localizacion
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
     public string Nombre { get; set; } = string.Empty;
 
-    public Guid SucursalId { get; set; }
+    public int SucursalId { get; set; }
     public Sucursal? Sucursal { get; set; }
 
-    public Guid EmpresaId { get; set; }
+    public int EmpresaId { get; set; }
     public Empresa? Empresa { get; set; }
 
     [Required]

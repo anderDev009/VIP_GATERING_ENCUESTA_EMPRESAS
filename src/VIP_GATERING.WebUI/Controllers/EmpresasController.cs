@@ -39,7 +39,7 @@ public class EmpresasController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    public async Task<IActionResult> Edit(Guid id)
+    public async Task<IActionResult> Edit(int id)
     {
         var ent = await _db.Empresas.FindAsync(id);
         if (ent == null) return NotFound();
@@ -48,7 +48,7 @@ public class EmpresasController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(Guid id, Empresa model)
+    public async Task<IActionResult> Edit(int id, Empresa model)
     {
         if (!ModelState.IsValid) return View(model);
         var ent = await _db.Empresas.FindAsync(id);
@@ -68,7 +68,7 @@ public class EmpresasController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(int id)
     {
         var ent = await _db.Empresas.FindAsync(id);
         if (ent != null)

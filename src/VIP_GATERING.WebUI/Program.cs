@@ -37,7 +37,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     var isDev = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");
     options.Cookie.SecurePolicy = isDev ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
     options.Cookie.HttpOnly = true;
-    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SameSite = isDev ? SameSiteMode.Lax : SameSiteMode.Strict;
     options.Cookie.Name = "VIPGATERING.AUTH";
 });
 builder.Services.AddApplication();
@@ -60,6 +60,27 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        var headers = context.Response.Headers;
+        headers["X-Frame-Options"] = "SAMEORIGIN";
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()";
+        headers["Content-Security-Policy"] =
+            "default-src 'self'; " +
+            "img-src 'self' data: blob:; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "script-src 'self'; " +
+            "font-src 'self' data:; " +
+            "object-src 'none'; " +
+            "frame-ancestors 'self';";
+        return Task.CompletedTask;
+    });
+    await next();
+});
 app.UseStaticFiles();
 
 app.UseRouting();

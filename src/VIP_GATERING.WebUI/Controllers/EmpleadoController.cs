@@ -23,7 +23,7 @@ public class EmpleadoController : Controller
     public EmpleadoController(IMenuService menuService, AppDbContext db, ICurrentUserService current, IEncuestaCierreService cierre, ISubsidioService subsidios, IMenuEdicionService menuEdicion, IMenuConfiguracionService menuConfig, IFechaServicio fechas)
     { _menuService = menuService; _db = db; _current = current; _cierre = cierre; _subsidios = subsidios; _menuEdicion = menuEdicion; _menuConfig = menuConfig; _fechas = fechas; }
 
-    public async Task<IActionResult> MiSemana(string? semana, Guid? localizacionId, Guid? sucursalId)
+    public async Task<IActionResult> MiSemana(string? semana, int? localizacionId, int? sucursalId)
     {
         var empleadoId = _current.EmpleadoId;
         if (empleadoId == null) return RedirectToAction("Login", "Account");
@@ -70,59 +70,61 @@ public class EmpleadoController : Controller
                 EmpresaValor = s.Empresa!.SubsidioValor
             })
             .FirstAsync();
+        var empleadoNombre = !string.IsNullOrWhiteSpace(empleadoDatos.Nombre)
+            ? empleadoDatos.Nombre
+            : (!string.IsNullOrWhiteSpace(empleadoDatos.Codigo) ? empleadoDatos.Codigo : "Sin nombre");
 
         var sucursalPrincipalId = sucursalDependencia.Id;
-        var sucursalesPermitidas = new HashSet<Guid> { sucursalPrincipalId };
-        var localizacionesAsignadasIds = await _db.EmpleadosLocalizaciones
+        var empresaId = sucursalDependencia.EmpresaId;
+        var sucursalesEmpresa = await _db.Sucursales
+            .AsNoTracking()
+            .Where(s => s.EmpresaId == empresaId)
+            .Select(s => new { s.Id, s.Nombre })
+            .ToListAsync();
+        var sucursalesPermitidas = sucursalesEmpresa.Select(s => s.Id).ToHashSet();
+        if (sucursalesPermitidas.Count == 0) sucursalesPermitidas.Add(sucursalPrincipalId);
+
+        var localizacionDefectoId = await _db.EmpleadosLocalizaciones
             .AsNoTracking()
             .Where(el => el.EmpleadoId == empleadoId)
-            .Select(el => el.LocalizacionId)
-            .ToListAsync();
-        var tieneLocalizacionesAsignadas = localizacionesAsignadasIds.Count > 0;
+            .Select(el => (int?)el.LocalizacionId)
+            .FirstOrDefaultAsync();
 
         var localizacionesRaw = await _db.Localizaciones
             .AsNoTracking()
-            .Where(l => l.SucursalId == sucursalPrincipalId)
-            .Select(l => new { l.Id, l.Nombre, l.SucursalId })
+            .Include(l => l.Sucursal)
+            .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId)
+            .Select(l => new { l.Id, l.Nombre, l.SucursalId, SucursalNombre = l.Sucursal!.Nombre })
             .ToListAsync();
-        if (localizacionesAsignadasIds.Count > 0)
-        {
-            localizacionesRaw = localizacionesRaw.Where(l => localizacionesAsignadasIds.Contains(l.Id)).ToList();
-        }
 
-        var sucursalesEntregaMap = new Dictionary<Guid, string>
-        {
-            [sucursalPrincipalId] = sucursalDependencia.Nombre
-        };
+        var sucursalesEntregaMap = sucursalesEmpresa.ToDictionary(s => s.Id, s => s.Nombre);
 
         var localizacionesEntregaInfo = localizacionesRaw
-            .GroupBy(l => l.Nombre.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
             .Select(l => new
             {
                 l.Id,
                 l.Nombre,
                 l.SucursalId,
                 SucursalNombre = sucursalesEntregaMap.TryGetValue(l.SucursalId, out var sucNombre) ? sucNombre : string.Empty,
-                Etiqueta = l.Nombre
+                Etiqueta = string.IsNullOrWhiteSpace(l.SucursalNombre) ? l.Nombre : $"{l.SucursalNombre} - {l.Nombre}"
             })
             .ToList();
 
         var localizacionesEntregaDisponibles = localizacionesEntregaInfo
-            .OrderBy(l => l.Nombre)
-            .Select(l => new ValueTuple<Guid, string>(l.Id, l.Etiqueta))
+            .OrderBy(l => l.Etiqueta)
+            .Select(l => new ValueTuple<int, string>(l.Id, l.Etiqueta))
             .ToList();
 
-        Guid? localizacionEntregaId = localizacionId;
-        if (!localizacionEntregaId.HasValue || localizacionEntregaId.Value == Guid.Empty)
+        int? localizacionEntregaId = localizacionId ?? localizacionDefectoId;
+        if (!localizacionEntregaId.HasValue || localizacionEntregaId.Value == 0)
         {
             localizacionEntregaId = localizacionesEntregaInfo
-                .OrderBy(l => l.Nombre)
-                .Select(l => (Guid?)l.Id)
+                .OrderBy(l => l.Etiqueta)
+                .Select(l => (int?)l.Id)
                 .FirstOrDefault();
         }
         if (localizacionEntregaId.HasValue && !localizacionesEntregaInfo.Any(l => l.Id == localizacionEntregaId.Value))
-            localizacionEntregaId = localizacionesEntregaInfo.OrderBy(l => l.Nombre).Select(l => (Guid?)l.Id).FirstOrDefault();
+            localizacionEntregaId = localizacionesEntregaInfo.OrderBy(l => l.Etiqueta).Select(l => (int?)l.Id).FirstOrDefault();
 
         var localizacionEntrega = localizacionesEntregaInfo.FirstOrDefault(l => l.Id == localizacionEntregaId);
         var sucursalEntregaId = localizacionEntrega?.SucursalId ?? empleadoDatos.SucursalPrincipalId;
@@ -161,7 +163,7 @@ public class EmpleadoController : Controller
                 MenuDisponible = false,
                 FechaInicio = inicioActual,
                 FechaTermino = finActual,
-                EmpleadoNombre = empleadoDatos.Nombre,
+                EmpleadoNombre = empleadoNombre,
                 EmpleadoCodigo = empleadoDatos.Codigo,
                 EmpresaNombre = sucursalDependencia.EmpresaNombre,
                 SucursalNombre = sucursalDependencia.Nombre,
@@ -192,7 +194,7 @@ public class EmpleadoController : Controller
 
         if (bloqueoSemana != null)
         {
-            if (bloqueoSemana.LocalizacionEntregaId != null && bloqueoSemana.LocalizacionEntregaId.Value != Guid.Empty)
+            if (bloqueoSemana.LocalizacionEntregaId != null && bloqueoSemana.LocalizacionEntregaId.Value != 0)
             {
                 if (localizacionEntregaId != bloqueoSemana.LocalizacionEntregaId)
                 {
@@ -203,7 +205,7 @@ public class EmpleadoController : Controller
                 }
                 localizacionEntregaId = bloqueoSemana.LocalizacionEntregaId;
             }
-            else if (bloqueoSemana.SucursalEntregaId != Guid.Empty)
+            else if (bloqueoSemana.SucursalEntregaId != 0)
             {
                 var localizacionBloqueada = localizacionesEntregaInfo.FirstOrDefault(l => l.SucursalId == bloqueoSemana.SucursalEntregaId);
                 if (localizacionBloqueada != null && localizacionEntregaId != localizacionBloqueada.Id)
@@ -341,7 +343,7 @@ public class EmpleadoController : Controller
             BloqueadoPorEstado = noHabilitado,
             MensajeBloqueo = mensajeBloqueo,
             NotaVentana = notaVentana,
-            EmpleadoNombre = empleadoDatos.Nombre,
+            EmpleadoNombre = empleadoNombre,
             EmpleadoCodigo = empleadoDatos.Codigo,
             EsJefe = empleadoDatos.EsJefe,
             RespuestasCount = respuestas.Count,
@@ -411,28 +413,44 @@ public class EmpleadoController : Controller
             .Select(e => new { e.SucursalId })
             .FirstAsync();
         var sucursalPrincipalIdPost = empleado.SucursalId;
-        var sucursalesPermitidasSet = new HashSet<Guid> { sucursalPrincipalIdPost };
+        var empresaId = await _db.Sucursales
+            .AsNoTracking()
+            .Where(s => s.Id == sucursalPrincipalIdPost)
+            .Select(s => s.EmpresaId)
+            .FirstAsync();
+        var sucursalesPermitidasSet = (await _db.Sucursales
+            .AsNoTracking()
+            .Where(s => s.EmpresaId == empresaId)
+            .Select(s => s.Id)
+            .ToListAsync())
+            .ToHashSet();
+        if (sucursalesPermitidasSet.Count == 0) sucursalesPermitidasSet.Add(sucursalPrincipalIdPost);
 
-        Guid? localizacionEntregaId = model.LocalizacionEntregaId;
-        var localizacionesAsignadas = await _db.EmpleadosLocalizaciones
+        int? localizacionEntregaId = model.LocalizacionEntregaId;
+        var localizacionDefectoId = await _db.EmpleadosLocalizaciones
             .AsNoTracking()
             .Where(el => el.EmpleadoId == empleadoId)
-            .Select(el => el.LocalizacionId)
-            .ToListAsync();
-        if (!localizacionEntregaId.HasValue || localizacionEntregaId == Guid.Empty)
+            .Select(el => (int?)el.LocalizacionId)
+            .FirstOrDefaultAsync();
+        if (!localizacionEntregaId.HasValue || localizacionEntregaId == 0)
         {
-            var baseQuery = _db.Localizaciones
-                .AsNoTracking()
-                .Where(l => l.SucursalId == sucursalPrincipalIdPost);
-            if (localizacionesAsignadas.Count > 0)
-                baseQuery = baseQuery.Where(l => localizacionesAsignadas.Contains(l.Id));
-            localizacionEntregaId = await baseQuery
-                .OrderBy(l => l.Nombre)
-                .Select(l => (Guid?)l.Id)
-                .FirstOrDefaultAsync();
+            if (localizacionDefectoId.HasValue)
+            {
+                localizacionEntregaId = localizacionDefectoId;
+            }
+            else
+            {
+                localizacionEntregaId = await _db.Localizaciones
+                    .AsNoTracking()
+                    .Include(l => l.Sucursal)
+                    .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId)
+                    .OrderBy(l => l.Nombre)
+                    .Select(l => (int?)l.Id)
+                    .FirstOrDefaultAsync();
+            }
         }
         Localizacion? localizacionEntrega = null;
-        if (localizacionEntregaId.HasValue && localizacionEntregaId.Value != Guid.Empty)
+        if (localizacionEntregaId.HasValue && localizacionEntregaId.Value != 0)
         {
             localizacionEntrega = await _db.Localizaciones
                 .AsNoTracking()
@@ -446,7 +464,7 @@ public class EmpleadoController : Controller
         }
 
         var sucursalEntregaId = localizacionEntrega?.SucursalId ?? model.SucursalEntregaId;
-        if (sucursalEntregaId == Guid.Empty)
+        if (sucursalEntregaId == 0)
             sucursalEntregaId = empleado.SucursalId;
         if (!sucursalesPermitidasSet.Contains(sucursalEntregaId))
         {
@@ -454,22 +472,14 @@ public class EmpleadoController : Controller
             return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
         }
 
-        if (localizacionesAsignadas.Count > 0)
+        if (localizacionEntregaId == null || localizacionEntregaId == 0)
         {
-            if (localizacionEntregaId == null || localizacionEntregaId == Guid.Empty)
-            {
-                TempData["Error"] = "Selecciona una localizacion de entrega.";
-                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
-            }
-            if (!localizacionesAsignadas.Contains(localizacionEntregaId.Value))
-            {
-                TempData["Error"] = "Localizacion de entrega no permitida.";
-                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
-            }
+            TempData["Error"] = "Selecciona una localizacion de entrega.";
+            return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
         }
-        if (localizacionEntrega != null && localizacionEntrega.SucursalId != sucursalPrincipalIdPost)
+        if (localizacionEntrega != null && localizacionEntrega.Sucursal != null && localizacionEntrega.Sucursal.EmpresaId != empresaId)
         {
-            TempData["Error"] = "Localizacion de entrega no pertenece a la filial.";
+            TempData["Error"] = "Localizacion de entrega no pertenece a la empresa.";
             return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
         }
 
@@ -495,9 +505,9 @@ public class EmpleadoController : Controller
                 return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = bloqueoSemana.LocalizacionEntregaId });
             }
 
-            if (bloqueoSemana.LocalizacionEntregaId != null && bloqueoSemana.LocalizacionEntregaId.Value != Guid.Empty)
+            if (bloqueoSemana.LocalizacionEntregaId != null && bloqueoSemana.LocalizacionEntregaId.Value != 0)
             {
-                if (localizacionEntregaId == null || localizacionEntregaId == Guid.Empty)
+                if (localizacionEntregaId == null || localizacionEntregaId == 0)
                 {
                     localizacionEntregaId = bloqueoSemana.LocalizacionEntregaId;
                 }
@@ -507,7 +517,7 @@ public class EmpleadoController : Controller
                     return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = bloqueoSemana.LocalizacionEntregaId });
                 }
             }
-            else if (bloqueoSemana.SucursalEntregaId != Guid.Empty && bloqueoSemana.SucursalEntregaId != sucursalEntregaId)
+            else if (bloqueoSemana.SucursalEntregaId != 0 && bloqueoSemana.SucursalEntregaId != sucursalEntregaId)
             {
                 TempData["Error"] = "Ya tienes selecciones registradas para esta semana en otra filial. Borra todas tus selecciones antes de cambiar.";
                 return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });

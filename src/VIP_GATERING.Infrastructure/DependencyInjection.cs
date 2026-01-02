@@ -13,10 +13,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection") ?? "Data Source=app.db";
+        var connectionString = configuration.GetConnectionString("DefaultConnection") ?? "Host=localhost;Database=vipcatering;Username=vipcatering;Password=vipcatering";
         services.AddDbContext<AppDbContext>(opts =>
         {
-            opts.UseSqlite(connectionString);
+            opts.UseNpgsql(connectionString);
         });
 
         services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));

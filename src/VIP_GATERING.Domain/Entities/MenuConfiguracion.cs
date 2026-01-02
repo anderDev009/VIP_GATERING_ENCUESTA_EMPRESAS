@@ -5,7 +5,7 @@ namespace VIP_GATERING.Domain.Entities;
 /// </summary>
 public class MenuConfiguracion
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
 
     /// <summary>
     /// Permite o no la edición de la semana en curso.

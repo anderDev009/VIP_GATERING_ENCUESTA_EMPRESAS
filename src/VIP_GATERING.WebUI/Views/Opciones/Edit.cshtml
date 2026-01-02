@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = "Editar plato";
     var horarios = ViewBag.Horarios as List<VIP_GATERING.Domain.Entities.Horario> ?? new();
-    var seleccionados = ViewBag.HorarioIds as List<Guid> ?? new();
+    var seleccionados = ViewBag.HorarioIds as List<int> ?? new();
     var esAdicional = (bool?)(ViewBag.EsAdicional) ?? false;
     var tipoEtiqueta = esAdicional ? "Adicional (100% empleado)" : "Plato principal";
 }

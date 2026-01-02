@@ -2,7 +2,7 @@ namespace VIP_GATERING.Domain.Entities;
 
 public class Sucursal
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
     public string Nombre { get; set; } = string.Empty;
     public string? Direccion { get; set; }
     public bool Borrado { get; set; } = false;
@@ -10,7 +10,7 @@ public class Sucursal
     public SubsidioTipo? SubsidioTipo { get; set; }
     public decimal? SubsidioValor { get; set; }
 
-    public Guid EmpresaId { get; set; }
+    public int EmpresaId { get; set; }
     public Empresa? Empresa { get; set; }
 
     public ICollection<Empleado> Empleados { get; set; } = new List<Empleado>();

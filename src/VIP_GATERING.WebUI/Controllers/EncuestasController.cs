@@ -20,7 +20,7 @@ public class EncuestasController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Anular(Guid empleadoId)
+    public async Task<IActionResult> Anular(int empleadoId)
     {
         // Seguridad: si es Sucursal, solo sobre su propia sucursal
         if (User.IsInRole("Sucursal"))

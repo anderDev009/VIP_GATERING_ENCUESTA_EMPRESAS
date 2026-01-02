@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.IO;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -15,7 +16,7 @@ public class TestWebAppFactory : WebApplicationFactory<VIP_GATERING.WebUI.Progra
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        var dbPath = $"Data Source=test_{Guid.NewGuid():N}.db";
+        var dbPath = $"Data Source=test_{Path.GetRandomFileName()}.db";
         builder.UseEnvironment("Testing");
         builder.ConfigureAppConfiguration((context, config) =>
         {

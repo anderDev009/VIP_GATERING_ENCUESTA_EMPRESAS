@@ -3,7 +3,7 @@
 namespace VIP_GATERING.Application.Services;
 
 public record MenuEdicionResultado(
-    IReadOnlyDictionary<Guid, bool> EdicionPorOpcion,
+    IReadOnlyDictionary<int, bool> EdicionPorOpcion,
     bool TieneVentanaActiva,
     bool Cerrado,
     string? MensajeBloqueo,

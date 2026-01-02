@@ -7,8 +7,8 @@ public class SeleccionesVM
     public DateOnly Inicio { get; set; }
     public DateOnly Fin { get; set; }
 
-    public Guid? EmpresaId { get; set; }
-    public Guid? SucursalId { get; set; }
+    public int? EmpresaId { get; set; }
+    public int? SucursalId { get; set; }
 
     public IEnumerable<Empresa> Empresas { get; set; } = Enumerable.Empty<Empresa>();
     public IEnumerable<Sucursal> Sucursales { get; set; } = Enumerable.Empty<Sucursal>();
@@ -24,7 +24,7 @@ public class SeleccionesVM
 
     public class SucursalResumen
     {
-        public Guid SucursalId { get; set; }
+        public int SucursalId { get; set; }
         public string Sucursal { get; set; } = string.Empty;
         public int Cantidad { get; set; }
         public decimal TotalCosto { get; set; }
@@ -34,9 +34,9 @@ public class SeleccionesVM
 
     public class EmpleadoResumen
     {
-        public Guid EmpleadoId { get; set; }
+        public int EmpleadoId { get; set; }
         public string Empleado { get; set; } = string.Empty;
-        public Guid SucursalId { get; set; }
+        public int SucursalId { get; set; }
         public string Sucursal { get; set; } = string.Empty;
         public int Cantidad { get; set; }
         public decimal TotalCosto { get; set; }
