@@ -40,12 +40,18 @@
         <a asp-action="Index" class="btn-outline">Limpiar</a>
     </div>
 </form>
+<div class="flex gap-2 mb-4">
+    <a class="btn-outline" asp-action="ExportExcel" asp-route-empresaId="@ViewBag.EmpresaId" asp-route-q="@ViewBag.Q">Exportar Excel</a>
+    <a class="btn-outline" asp-action="ExportCsv" asp-route-empresaId="@ViewBag.EmpresaId" asp-route-q="@ViewBag.Q">Exportar CSV</a>
+    <a class="btn-outline" asp-action="ExportPdf" asp-route-empresaId="@ViewBag.EmpresaId" asp-route-q="@ViewBag.Q">Exportar PDF</a>
+</div>
 
 <div class="overflow-x-auto">
     <table class="min-w-full bg-white border rounded">
         <thead class="bg-slate-100">
             <tr>
                 <th class="text-left p-2">Filial</th>
+                <th class="text-left p-2">RNC</th>
                 <th class="text-left p-2">Empresa</th>
                 <th class="p-2">Acciones</th>
             </tr>
@@ -55,6 +61,7 @@
         {
             <tr class="border-t">
                 <td class="p-2">@s.Nombre</td>
+                <td class="p-2">@(!string.IsNullOrWhiteSpace(s.Rnc) ? s.Rnc : "-")</td>
                 <td class="p-2">@s.Empresa?.Nombre</td>
                 <td class="p-2 text-right">
                     <div class="flex justify-end gap-2">

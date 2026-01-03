@@ -38,6 +38,60 @@ public class OpcionesController : Controller
         return View("IndexClean", paged);
     }
 
+    [Authorize(Roles = "Admin,Monitor")]
+    [HttpGet]
+    public async Task<IActionResult> ExportCsv(string? q)
+    {
+        var opciones = await BuildExportQuery(q).OrderBy(o => o.Nombre).ToListAsync();
+        var headers = new[] { "Codigo", "Nombre", "Descripcion", "Costo", "Precio" };
+        var rows = opciones.Select(o => (IReadOnlyList<string>)new[]
+        {
+            o.Codigo ?? string.Empty,
+            o.Nombre ?? string.Empty,
+            o.Descripcion ?? string.Empty,
+            o.Costo.ToString("0.00"),
+            (o.Precio ?? 0m).ToString("0.00")
+        }).ToList();
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", "platos.csv");
+    }
+
+    [Authorize(Roles = "Admin,Monitor")]
+    [HttpGet]
+    public async Task<IActionResult> ExportExcel(string? q)
+    {
+        var opciones = await BuildExportQuery(q).OrderBy(o => o.Nombre).ToListAsync();
+        var headers = new[] { "Codigo", "Nombre", "Descripcion", "Costo", "Precio" };
+        var rows = opciones.Select(o => (IReadOnlyList<string>)new[]
+        {
+            o.Codigo ?? string.Empty,
+            o.Nombre ?? string.Empty,
+            o.Descripcion ?? string.Empty,
+            o.Costo.ToString("0.00"),
+            (o.Precio ?? 0m).ToString("0.00")
+        }).ToList();
+        var bytes = ExportHelper.BuildExcel("Platos", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "platos.xlsx");
+    }
+
+    [Authorize(Roles = "Admin,Monitor")]
+    [HttpGet]
+    public async Task<IActionResult> ExportPdf(string? q)
+    {
+        var opciones = await BuildExportQuery(q).OrderBy(o => o.Nombre).ToListAsync();
+        var headers = new[] { "Codigo", "Nombre", "Descripcion", "Costo", "Precio" };
+        var rows = opciones.Select(o => (IReadOnlyList<string>)new[]
+        {
+            o.Codigo ?? string.Empty,
+            o.Nombre ?? string.Empty,
+            o.Descripcion ?? string.Empty,
+            o.Costo.ToString("0.00"),
+            (o.Precio ?? 0m).ToString("0.00")
+        }).ToList();
+        var pdf = ExportHelper.BuildPdf("Platos", headers, rows);
+        return File(pdf, "application/pdf", "platos.pdf");
+    }
+
     public async Task<IActionResult> Create()
     {
         await LoadHorariosAsync();
@@ -59,6 +113,7 @@ public class OpcionesController : Controller
             await LoadHorariosAsync(selectedHorarios);
             return View(model);
         }
+        model.LlevaItbis = true;
         model.EsSubsidiado = true;
         model.ImagenUrl = await _imageService.SaveAsync(imagen, null);
         await _db.Opciones.AddAsync(model);
@@ -108,7 +163,7 @@ public class OpcionesController : Controller
             ent.ImagenUrl = await _imageService.SaveAsync(imagen, ent.ImagenUrl);
         }
         ent.Codigo = model.Codigo; ent.Nombre = model.Nombre; ent.Descripcion = model.Descripcion; ent.Costo = model.Costo;
-        ent.Precio = model.Precio; ent.EsSubsidiado = true; ent.LlevaItbis = model.LlevaItbis;
+        ent.Precio = model.Precio; ent.EsSubsidiado = true; ent.LlevaItbis = true;
 
         var actuales = await _db.OpcionesHorarios.Where(oh => oh.OpcionId == ent.Id).ToListAsync();
         var actualesSet = actuales.Select(oh => oh.HorarioId).ToHashSet();
@@ -162,5 +217,20 @@ public class OpcionesController : Controller
                 ids.Add(id);
         }
         return ids.Distinct().ToList();
+    }
+
+    private IQueryable<Opcion> BuildExportQuery(string? q)
+    {
+        var query = _db.Opciones.Where(o => !o.Borrado).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var ql = q.ToLower();
+            query = query.Where(o =>
+                o.Nombre.ToLower().Contains(ql)
+                || (o.Descripcion != null && o.Descripcion.ToLower().Contains(ql))
+                || (o.Codigo != null && o.Codigo.ToLower().Contains(ql))
+            );
+        }
+        return query;
     }
 }

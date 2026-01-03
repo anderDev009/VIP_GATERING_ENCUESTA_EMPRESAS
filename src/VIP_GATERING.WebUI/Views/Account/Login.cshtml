@@ -17,7 +17,7 @@
         <div asp-validation-summary="ModelOnly" class="text-red-600 text-sm mb-2"></div>
         <div class="login-field">
             <label asp-for="UserName" class="login-label">Usuario</label>
-            <input asp-for="UserName" type="text" class="login-input" autocomplete="username" placeholder="empresa_codigo" />
+            <input asp-for="UserName" type="text" class="login-input" autocomplete="username" placeholder="codigo" />
             <span asp-validation-for="UserName" class="text-red-600 text-sm"></span>
         </div>
         <div class="login-field">
@@ -30,9 +30,6 @@
         </div>
         <div class="login-note">Contrasena minima: 6 caracteres.</div>
         <button class="btn-primary login-submit">Entrar</button>
-        <div class="login-footer">
-            Formato de usuario: <strong>empresa_codigo</strong>. Contrasena inicial: el mismo usuario.
-        </div>
     </form>
 </div>
 

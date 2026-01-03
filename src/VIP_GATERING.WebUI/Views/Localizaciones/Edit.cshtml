@@ -32,8 +32,12 @@
         <span asp-validation-for="EmpresaId" class="text-rose-600 text-xs"></span>
     </div>
     <div>
-        <label class="block text-sm">Dirección</label>
-        <input asp-for="Direccion" class="w-full border rounded p-2" />
+        <label class="block text-sm">RNC</label>
+        <input asp-for="Rnc" class="w-full border rounded p-2" />
+    </div>
+    <div>
+        <label class="block text-sm">Direccion</label>
+        <textarea asp-for="Direccion" rows="3" class="w-full border rounded p-2"></textarea>
         <span asp-validation-for="Direccion" class="text-rose-600 text-xs"></span>
     </div>
     <div>
@@ -47,3 +51,4 @@
     </div>
 
 </form>
+

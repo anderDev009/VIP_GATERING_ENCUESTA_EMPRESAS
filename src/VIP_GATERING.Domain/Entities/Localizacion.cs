@@ -13,6 +13,8 @@ public class Localizacion
     public int EmpresaId { get; set; }
     public Empresa? Empresa { get; set; }
 
+    public string? Rnc { get; set; }
+
     [Required]
     public string Direccion { get; set; } = string.Empty;
 

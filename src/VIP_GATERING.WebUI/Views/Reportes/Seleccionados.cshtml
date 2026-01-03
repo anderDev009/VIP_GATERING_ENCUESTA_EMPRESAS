@@ -38,9 +38,23 @@
             }
         </select>
     </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Empleado</label>
+        <select name="empleadoId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="">Todos</option>
+            @foreach (var e in Model.Empleados)
+            {
+                var nombre = !string.IsNullOrWhiteSpace(e.Nombre) ? e.Nombre : e.Codigo;
+                <option value="@e.Id" selected="@(Model.EmpleadoId == e.Id ? "selected" : null)">@nombre</option>
+            }
+        </select>
+    </div>
             <div class="flex gap-3 md:col-span-4">
                 <button type="submit" class="btn-primary">Filtrar</button>
                 <a class="btn-outline" asp-action="Seleccionados">Limpiar</a>
+                <a class="btn-outline" asp-action="SeleccionadosExcel" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar Excel</a>
+                <a class="btn-outline" asp-action="SeleccionadosCsv" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar CSV</a>
+                <a class="btn-outline" asp-action="SeleccionadosPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar PDF</a>
     </div>
     <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3">
         <div class="text-sm text-slate-600">Total costo</div>

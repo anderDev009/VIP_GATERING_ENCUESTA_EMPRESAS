@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using VIP_GATERING.Domain.Entities;
 using VIP_GATERING.Infrastructure.Data;
 using VIP_GATERING.WebUI.Models;
+using VIP_GATERING.WebUI.Services;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
@@ -24,6 +25,68 @@ public class EmpresasController : Controller
         var paged = await query.OrderBy(e => e.Nombre).Select(e=>e).ToPagedResultAsync(page, pageSize);
         ViewBag.Q = q;
         return View(paged);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportCsv(string? q)
+    {
+        var empresas = await BuildExportQuery(q).OrderBy(e => e.Nombre).ToListAsync();
+        var headers = new[] { "Empresa", "RNC", "Contacto", "Telefono", "Direccion" };
+        var rows = empresas.Select(e => (IReadOnlyList<string>)new[]
+        {
+            e.Nombre,
+            e.Rnc ?? string.Empty,
+            e.ContactoNombre,
+            e.ContactoTelefono,
+            e.Direccion
+        }).ToList();
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", "empresas.csv");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportExcel(string? q)
+    {
+        var empresas = await BuildExportQuery(q).OrderBy(e => e.Nombre).ToListAsync();
+        var headers = new[] { "Empresa", "RNC", "Contacto", "Telefono", "Direccion" };
+        var rows = empresas.Select(e => (IReadOnlyList<string>)new[]
+        {
+            e.Nombre,
+            e.Rnc ?? string.Empty,
+            e.ContactoNombre,
+            e.ContactoTelefono,
+            e.Direccion
+        }).ToList();
+        var bytes = ExportHelper.BuildExcel("Empresas", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "empresas.xlsx");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportPdf(string? q)
+    {
+        var empresas = await BuildExportQuery(q).OrderBy(e => e.Nombre).ToListAsync();
+        var headers = new[] { "Empresa", "RNC", "Contacto", "Telefono", "Direccion" };
+        var rows = empresas.Select(e => (IReadOnlyList<string>)new[]
+        {
+            e.Nombre,
+            e.Rnc ?? string.Empty,
+            e.ContactoNombre,
+            e.ContactoTelefono,
+            e.Direccion
+        }).ToList();
+        var pdf = ExportHelper.BuildPdf("Empresas", headers, rows);
+        return File(pdf, "application/pdf", "empresas.pdf");
+    }
+
+    private IQueryable<Empresa> BuildExportQuery(string? q)
+    {
+        var query = _db.Empresas.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var ql = q.ToLower();
+            query = query.Where(e => e.Nombre.ToLower().Contains(ql) || (e.Rnc != null && e.Rnc.ToLower().Contains(ql)));
+        }
+        return query;
     }
 
     public IActionResult Create() => View(new Empresa());

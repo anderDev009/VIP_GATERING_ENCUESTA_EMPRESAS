@@ -9,9 +9,11 @@ public class TotalesEmpleadosVM
 
     public int? EmpresaId { get; set; }
     public int? SucursalId { get; set; }
+    public int? EmpleadoId { get; set; }
 
     public IEnumerable<Empresa> Empresas { get; set; } = Enumerable.Empty<Empresa>();
     public IEnumerable<Sucursal> Sucursales { get; set; } = Enumerable.Empty<Sucursal>();
+    public IEnumerable<Empleado> Empleados { get; set; } = Enumerable.Empty<Empleado>();
 
     public List<Row> Filas { get; set; } = new();
 

@@ -260,6 +260,7 @@ public static class SeedData
         await EnsureDemoLocalizacionesAsync(db);
         await EnsureDemoSucursalHorariosAsync(db);
         await EnsureDemoEmployeesAsync(db);
+        await EnsureExcelMenuProductosAsync(db);
         await EnsureDemoMenusAndResponsesAsync(db);
     }
 
@@ -665,6 +666,196 @@ public static class SeedData
         public string? Descripcion { get; set; }
         public decimal? Precio { get; set; }
         public string? Categoria { get; set; }
+    }
+
+    private static readonly SeedProducto[] ExcelProductosSemana20260105 = new[]
+    {
+        new SeedProducto(null, "Arepa porcion", "Arepa porcion", 55.08m, "Adicional", "R0002048"),
+        new SeedProducto(null, "Chocolate caliente", "Chocolate caliente", 63.55m, "Adicional", "R0002049"),
+        new SeedProducto(null, "Croissant", "Croissant", 94.91m, "Adicional", "R0003628"),
+        new SeedProducto(null, "Empanada", "Empanada", 60.34m, "Adicional", "R0002184"),
+        new SeedProducto(null, "Refresco 16 onz", "Refresco 16 onz", 46.61m, "Adicional", "10117"),
+        new SeedProducto(null, "Vivere+ compaña", "Vivere+ compaña", 175.00m, "Adicional", "R0003514"),
+        new SeedProducto(null, "Vaso de jugo", "Vaso de jugo", 61.01m, "Adicional", "90035"),
+        new SeedProducto("P0001", "Arroz Blanco + Habichuela Giras guisadas + Filete de Pechuga con Salsa Curry + Ens de Tomates al cilantro + Panes variados", "Arroz Blanco + Habichuela Giras guisadas + Filete de Pechuga con Salsa Curry + Ens de Tomates al cilantro", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0002", "Arroz con maiz y tocineta + Chuleta ahumada con salsa criolla + Ens de tomates al cilantro + Panes variados", "Arroz con maiz y tocineta + Chuleta ahumada con salsa criolla + Ens de tomates al cilantro + Panes variados", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0003", "Mangu de platano verde +Filete de pechuga con salsa de curry + Ens de tomates al cilantro + Panes variados", "Mangu de platano verde +Filete de pechuga con salsa de curry + Ens de tomates al cilantro + Panes variados", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0004", "Arroz blanco + Guandules guisados + Pollo guisado al vino + Ensalada de pasta + Frito maduro", "Arroz blanco + Guandules guisados + Pollo guisado al vino + Ensalada de pasta + Frito maduro", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0005", "Moro de habichuela  giras + Pollo guisado al vino + Ensalada de pasta + Frito maduro", "Moro de habichuela  giras + Pollo guisado al vino + Ensalada de pasta + Frito maduro", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0006", "Pure de yuca gratinado +Filete de  mero crocante + Frito maduro", "Pure de yuca gratinado +Filete de  mero crocante + Frito maduro", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0007", "Arroz blanco + Habichuela  Rojas guisadas + Pollo asado al limon +Ensalada de repollo variados + Arepita de maiz", "Arroz blanco + Habichuela  Rojas guisadas + Pollo asado al limon +Ensalada de repollo variados + Arepita de maiz", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0008", "Moro de habichuela negras + Escalopines de cerdo con vegetales + Ensalada de repollo variados + Arepita de maiz", "Moro de habichuela negras + Escalopines de cerdo con vegetales + Ensalada de repollo variados + Arepita de maiz", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0009", "Mangu de guineito + Pollo asado al limon + Ensalada de repollo variados + Arepitas de maiz", "Mangu de guineito + Pollo asado al limon + Ensalada de repollo variados + Arepitas de maiz", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0010", "Arros blanco + Lentejas guisadas + Pollo horneado con wasakaka + Enslada cesar + Arepita de maiz", "Arros blanco + Lentejas guisadas + pollo horneado con wasakaka + Enslada cesar + Arepita de maiz", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0011", "Arroz con fideos  y platano maduro + Chuleta ahumada con salsa criolla + Enslada cesar + Arepita de maiz", "Arroz con fideos  y platano maduro + Chuleta ahumada con salsa criolla + Enslada cesar + Arepita de maiz", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0012", "Mangu de platano + Pollo horneado con wasakaka + Enslada cesar + Arepita de maiz", "Mangu de platano + Pollo horneado con wasakaka + Enslada cesar + Arepita de maiz", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0013", "Arroz blanco + Habichuela  Negras guisadas + Pechurina en salsa rosada + Ensalada hervida + Yaniquequito", "Arroz blanco + Habichuela  Negras guisadas + Pechurina en salsa rosada + Ensalada hervida + Yaniquequito", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0014", "Arroz con vegetales + Escalopines de cerdo con salsa de hierbas + Ensalada hervida + Yaniquequito", "Arroz con vegetales + Escalopines de cerdo con salsa de hierbas + Ensalada hervida + Yaniquequito", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0015", "Mangu de guineito + Pechurina en salsa rosada + Ensalada hervida + Yaniquequito", "Mangu de guineito + Pechurina en salsa rosada + Ensalada hervida + Yaniquequito", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0016", "Arroz blanco + Habichuela  Rojas guisadas + Pollo asado +Ensalada de pasta Mexicana  + Frito maduro", "Arroz blanco + Habichuela  Rojas guisadas + Pollo asado +Ensalada de pasta Mexicana  + Frito maduro", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0017", "Moro de guandules + Pollo asado + Ensalada de pasta mexicana + Frito maduro", "Moro de guandules + Pollo asado + Ensalada de pasta mexicana + Frito maduro", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0018", "Mangu de maduro gratinado + Bastones de mero + Enslada de pasta Mexicana + Frito maduro", "Mangu de maduro gratinado + Bastones de mero + Enslada de pasta Mexicana + Frito maduro", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0019", "Arroz Blanco + Habichuela Giras guisadas + Filete de Pechuga a la plancha encebollada + Ensalada Verde fresca + Yuquita frita", "Arroz Blanco + Habichuela Giras guisadas + Filete de Pechuga a la plancha encebollada + Ensalada Verde fresca + Yuquita frita", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0020", "Arroz tres delicias + Ropa vieja a la criolla con vegetales + Ensalada Verde Fresca + Yuquita frita", "Arroz tres delicias + Ropa vieja a la criolla con vegetales + Ensalada Verde Fresca + Yuquita frita", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0021", "Hamburguesas + Papas fritas", "Hamburguesas + Papas fritas", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0022", "Ensalada", "Ensalada", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0023", "Chiken cesar wraps + jugo", "Chiken cesar wraps + jugo", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0024", "Mozzarella Capresa + jugo", "Mozzarella Capresa + jugo", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0025", "Ham am cheese (jamon y queso) + jugo", "Ham am cheese (jamon y queso) + jugo", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0026", "Baguette integral de pavo y mozzarella", "Baguette integral de pavo y mozzarella", 240.00m, "Almuerzo", null),
+        new SeedProducto("P0027", "sand. Pavo y  pastrami + Jugo", "sand. Pavo y  pastrami + Jugo", 240.00m, "Almuerzo", null)
+    };
+
+    private sealed record SeedProducto(string? Codigo, string Nombre, string Descripcion, decimal Precio, string Categoria, string? CodigoDyn);
+
+    private static async Task EnsureExcelMenuProductosAsync(AppDbContext db)
+    {
+        var almuerzoHorario = await db.Horarios.FirstOrDefaultAsync(h => h.Nombre == "Almuerzo");
+        if (almuerzoHorario == null)
+            return;
+
+        var adicionales = new List<Opcion>();
+        var almuerzos = new List<Opcion>();
+
+        foreach (var prod in ExcelProductosSemana20260105)
+        {
+            var codigo = string.IsNullOrWhiteSpace(prod.Codigo) ? prod.CodigoDyn : prod.Codigo;
+            var nombre = prod.Nombre.Trim();
+            var descripcion = string.IsNullOrWhiteSpace(prod.Descripcion) ? nombre : prod.Descripcion.Trim();
+            Opcion? opcion = null;
+            if (!string.IsNullOrWhiteSpace(codigo))
+                opcion = await db.Opciones.FirstOrDefaultAsync(o => o.Codigo == codigo);
+            if (opcion == null)
+                opcion = await db.Opciones.FirstOrDefaultAsync(o => o.Nombre == nombre);
+
+            if (opcion == null)
+            {
+                opcion = new Opcion
+                {
+                    Codigo = codigo,
+                    Nombre = nombre,
+                    Descripcion = descripcion,
+                    Costo = prod.Precio,
+                    Precio = prod.Precio,
+                    EsSubsidiado = true,
+                    LlevaItbis = true
+                };
+                db.Opciones.Add(opcion);
+            }
+            else
+            {
+                opcion.Codigo = codigo;
+                opcion.Nombre = nombre;
+                opcion.Descripcion = descripcion;
+                opcion.Costo = prod.Precio;
+                opcion.Precio = prod.Precio;
+                opcion.EsSubsidiado = true;
+                opcion.LlevaItbis = true;
+            }
+
+            if (string.Equals(prod.Categoria, "Adicional", StringComparison.OrdinalIgnoreCase))
+                adicionales.Add(opcion);
+            else if (string.Equals(prod.Categoria, "Almuerzo", StringComparison.OrdinalIgnoreCase))
+                almuerzos.Add(opcion);
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
+
+        foreach (var opcion in almuerzos)
+        {
+            var existe = await db.OpcionesHorarios.AnyAsync(oh => oh.OpcionId == opcion.Id && oh.HorarioId == almuerzoHorario.Id);
+            if (!existe)
+                db.OpcionesHorarios.Add(new OpcionHorario { OpcionId = opcion.Id, HorarioId = almuerzoHorario.Id });
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
+
+        var sucursales = await db.Sucursales.ToListAsync();
+        if (!sucursales.Any())
+            return;
+
+        var week1Start = new DateOnly(2026, 1, 5);
+        var week2Start = week1Start.AddDays(7);
+        var weekStarts = new[] { week1Start, week2Start };
+        var dayList = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday };
+
+        var almuerzoSeq = almuerzos.ToList();
+        if (almuerzoSeq.Count == 0)
+            return;
+
+        var index = 0;
+        List<(DayOfWeek day, int aId, int bId, int cId)> BuildWeekPlan()
+        {
+            var plan = new List<(DayOfWeek day, int aId, int bId, int cId)>();
+            foreach (var day in dayList)
+            {
+                var a = almuerzoSeq[index % almuerzoSeq.Count]; index++;
+                var b = almuerzoSeq[index % almuerzoSeq.Count]; index++;
+                var c = almuerzoSeq[index % almuerzoSeq.Count]; index++;
+                plan.Add((day, a.Id, b.Id, c.Id));
+            }
+            return plan;
+        }
+
+        foreach (var weekStart in weekStarts)
+        {
+            var weekEnd = weekStart.AddDays(4);
+            var weekPlan = BuildWeekPlan();
+            foreach (var suc in sucursales)
+            {
+                var menu = await db.Menus
+                    .Include(m => m.OpcionesPorDia)
+                    .FirstOrDefaultAsync(m => m.SucursalId == suc.Id && m.FechaInicio == weekStart && m.FechaTermino == weekEnd);
+                if (menu == null)
+                {
+                    menu = new Menu
+                    {
+                        FechaInicio = weekStart,
+                        FechaTermino = weekEnd,
+                        EmpresaId = suc.EmpresaId,
+                        SucursalId = suc.Id,
+                        OpcionesPorDia = new List<OpcionMenu>()
+                    };
+                    db.Menus.Add(menu);
+                }
+
+                var existentes = menu.OpcionesPorDia.Where(o => o.HorarioId == almuerzoHorario.Id).ToList();
+                if (existentes.Count > 0)
+                    db.OpcionesMenu.RemoveRange(existentes);
+
+                foreach (var row in weekPlan)
+                {
+                    menu.OpcionesPorDia.Add(new OpcionMenu
+                    {
+                        Menu = menu,
+                        DiaSemana = row.day,
+                        HorarioId = almuerzoHorario.Id,
+                        OpcionIdA = row.aId,
+                        OpcionIdB = row.bId,
+                        OpcionIdC = row.cId,
+                        OpcionesMaximas = 3
+                    });
+                }
+
+                var adicionalesExistentes = await db.MenusAdicionales.Where(a => a.MenuId == menu.Id).ToListAsync();
+                if (adicionalesExistentes.Count > 0)
+                    db.MenusAdicionales.RemoveRange(adicionalesExistentes);
+
+                foreach (var adicional in adicionales)
+                {
+                    db.MenusAdicionales.Add(new MenuAdicional
+                    {
+                        Menu = menu,
+                        OpcionId = adicional.Id
+                    });
+                }
+            }
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
     }
 }
 

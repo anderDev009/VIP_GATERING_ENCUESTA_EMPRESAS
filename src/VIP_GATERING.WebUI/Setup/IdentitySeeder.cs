@@ -23,7 +23,7 @@ public static class IdentitySeeder
             await db.Database.MigrateAsync();
         }
 
-        // Roles: Admin, Empresa, Empleado, Sucursal, Monitor
+        // Roles: Admin, Empresa, Empleado, Sucursal, Monitor, RRHH
         async Task EnsureRole(string name)
         {
             if (await roles.FindByNameAsync(name) == null)
@@ -38,6 +38,7 @@ public static class IdentitySeeder
         await EnsureRole("Empleado");
         await EnsureRole("Sucursal");
         await EnsureRole("Monitor");
+        await EnsureRole("RRHH");
 
         // Users
         async Task EnsurePasswordAsync(ApplicationUser user, string expectedPassword)

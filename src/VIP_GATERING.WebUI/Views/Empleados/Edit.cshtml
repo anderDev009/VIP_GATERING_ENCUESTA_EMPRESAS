@@ -15,6 +15,7 @@
 <form asp-action="Edit" method="post" class="space-y-4 card max-w-lg mx-auto">
     @Html.AntiForgeryToken()
     <input type="hidden" asp-for="Id" />
+    <div class="text-red-700 text-sm">@Html.ValidationSummary()</div>
     <div>
         <label class="block text-sm">Empresa</label>
         <select class="w-full border rounded p-2" id="selEmpresa">
@@ -138,7 +139,7 @@
                 <div class="text-sm text-slate-700">Usuario sugerido: <strong>@usuarioSugerido</strong></div>
                 <button class="btn-primary">Crear usuario</button>
             </form>
-            <div class="text-xs text-slate-500 mt-2">Se asigna el usuario con formato empresa_codigo y la contrasena inicial es el mismo usuario. Se pedira cambio al iniciar sesion.</div>
+            <div class="text-xs text-slate-500 mt-2">Se asigna el usuario con el codigo del empleado y la contrasena inicial es el mismo usuario. Se pedira cambio al iniciar sesion.</div>
         }
     </div>
 }

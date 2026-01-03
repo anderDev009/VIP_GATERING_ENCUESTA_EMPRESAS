@@ -43,6 +43,72 @@ public class SucursalesController : Controller
         return View(paged);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> ExportCsv(int? empresaId, string? q)
+    {
+        var sucursales = await BuildExportQuery(empresaId, q).OrderBy(s => s.Nombre).ToListAsync();
+        var headers = new[] { "Filial", "RNC", "Empresa", "Direccion" };
+        var rows = sucursales.Select(s => (IReadOnlyList<string>)new[]
+        {
+            s.Nombre,
+            s.Rnc ?? string.Empty,
+            s.Empresa?.Nombre ?? string.Empty,
+            s.Direccion ?? string.Empty
+        }).ToList();
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", "filiales.csv");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportExcel(int? empresaId, string? q)
+    {
+        var sucursales = await BuildExportQuery(empresaId, q).OrderBy(s => s.Nombre).ToListAsync();
+        var headers = new[] { "Filial", "RNC", "Empresa", "Direccion" };
+        var rows = sucursales.Select(s => (IReadOnlyList<string>)new[]
+        {
+            s.Nombre,
+            s.Rnc ?? string.Empty,
+            s.Empresa?.Nombre ?? string.Empty,
+            s.Direccion ?? string.Empty
+        }).ToList();
+        var bytes = ExportHelper.BuildExcel("Filiales", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "filiales.xlsx");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportPdf(int? empresaId, string? q)
+    {
+        var sucursales = await BuildExportQuery(empresaId, q).OrderBy(s => s.Nombre).ToListAsync();
+        var headers = new[] { "Filial", "RNC", "Empresa", "Direccion" };
+        var rows = sucursales.Select(s => (IReadOnlyList<string>)new[]
+        {
+            s.Nombre,
+            s.Rnc ?? string.Empty,
+            s.Empresa?.Nombre ?? string.Empty,
+            s.Direccion ?? string.Empty
+        }).ToList();
+        var pdf = ExportHelper.BuildPdf("Filiales", headers, rows);
+        return File(pdf, "application/pdf", "filiales.pdf");
+    }
+
+    private IQueryable<Sucursal> BuildExportQuery(int? empresaId, string? q)
+    {
+        var query = _db.Sucursales.Include(s => s.Empresa).Where(s => !s.Borrado).AsQueryable();
+        if (User.IsInRole("Empresa"))
+        {
+            var currentEmpresaId = _current.EmpresaId;
+            if (currentEmpresaId != null)
+                query = query.Where(s => s.EmpresaId == currentEmpresaId);
+        }
+        if (empresaId != null) query = query.Where(s => s.EmpresaId == empresaId);
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var ql = q.ToLower();
+            query = query.Where(s => s.Nombre.ToLower().Contains(ql) || s.Empresa!.Nombre.ToLower().Contains(ql));
+        }
+        return query;
+    }
+
     public async Task<IActionResult> Create()
     {
         var empresas = _db.Empresas.AsQueryable();

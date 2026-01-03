@@ -118,6 +118,69 @@ public class EmpleadosController : Controller
         return View(paged);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> ExportCsv(int? empresaId, int? sucursalId, int? localizacionId, string? q)
+    {
+        var empleados = await BuildExportQuery(empresaId, sucursalId, localizacionId, q)
+            .OrderBy(e => e.Nombre ?? e.Codigo)
+            .ToListAsync();
+        var headers = new[] { "Codigo", "Nombre", "Empresa", "Filial", "Estado", "Subsidio", "Localizacion" };
+        var rows = empleados.Select(e => (IReadOnlyList<string>)new[]
+        {
+            e.Codigo ?? string.Empty,
+            e.Nombre ?? string.Empty,
+            e.Sucursal?.Empresa?.Nombre ?? string.Empty,
+            e.Sucursal?.Nombre ?? string.Empty,
+            e.Estado.ToString(),
+            e.EsSubsidiado ? "Si" : "No",
+            e.LocalizacionesAsignadas.FirstOrDefault()?.Localizacion?.Nombre ?? string.Empty
+        }).ToList();
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", "empleados.csv");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportExcel(int? empresaId, int? sucursalId, int? localizacionId, string? q)
+    {
+        var empleados = await BuildExportQuery(empresaId, sucursalId, localizacionId, q)
+            .OrderBy(e => e.Nombre ?? e.Codigo)
+            .ToListAsync();
+        var headers = new[] { "Codigo", "Nombre", "Empresa", "Filial", "Estado", "Subsidio", "Localizacion" };
+        var rows = empleados.Select(e => (IReadOnlyList<string>)new[]
+        {
+            e.Codigo ?? string.Empty,
+            e.Nombre ?? string.Empty,
+            e.Sucursal?.Empresa?.Nombre ?? string.Empty,
+            e.Sucursal?.Nombre ?? string.Empty,
+            e.Estado.ToString(),
+            e.EsSubsidiado ? "Si" : "No",
+            e.LocalizacionesAsignadas.FirstOrDefault()?.Localizacion?.Nombre ?? string.Empty
+        }).ToList();
+        var bytes = ExportHelper.BuildExcel("Empleados", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "empleados.xlsx");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportPdf(int? empresaId, int? sucursalId, int? localizacionId, string? q)
+    {
+        var empleados = await BuildExportQuery(empresaId, sucursalId, localizacionId, q)
+            .OrderBy(e => e.Nombre ?? e.Codigo)
+            .ToListAsync();
+        var headers = new[] { "Codigo", "Nombre", "Empresa", "Filial", "Estado", "Subsidio", "Localizacion" };
+        var rows = empleados.Select(e => (IReadOnlyList<string>)new[]
+        {
+            e.Codigo ?? string.Empty,
+            e.Nombre ?? string.Empty,
+            e.Sucursal?.Empresa?.Nombre ?? string.Empty,
+            e.Sucursal?.Nombre ?? string.Empty,
+            e.Estado.ToString(),
+            e.EsSubsidiado ? "Si" : "No",
+            e.LocalizacionesAsignadas.FirstOrDefault()?.Localizacion?.Nombre ?? string.Empty
+        }).ToList();
+        var pdf = ExportHelper.BuildPdf("Empleados", headers, rows);
+        return File(pdf, "application/pdf", "empleados.pdf");
+    }
+
     public async Task<IActionResult> Create()
     {
         var empresas = _db.Empresas.AsQueryable();
@@ -140,6 +203,7 @@ public class EmpleadosController : Controller
         var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
         ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
         ViewBag.LocalizacionAsignadaId = null;
+        ViewBag.EmpresaId = User.IsInRole("Empresa") ? _currentUser.EmpresaId : null;
         return View(new Empleado());
     }
 
@@ -166,6 +230,9 @@ public class EmpleadosController : Controller
             var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
             ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
             ViewBag.LocalizacionAsignadaId = localizacionAsignadaId;
+            ViewBag.EmpresaId = model.SucursalId != 0
+                ? await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => (int?)s.EmpresaId).FirstOrDefaultAsync()
+                : null;
             return View(model);
         }
         if (string.IsNullOrWhiteSpace(model.Codigo))
@@ -184,6 +251,7 @@ public class EmpleadosController : Controller
             ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en la misma empresa.");
             return await ReturnInvalidAsync();
         }
+        model.Estado = EmpleadoEstado.Habilitado;
 
         var localizacionId = localizacionAsignadaId.HasValue && localizacionAsignadaId.Value != 0
             ? localizacionAsignadaId.Value
@@ -225,8 +293,25 @@ public class EmpleadosController : Controller
             });
             await _db.SaveChangesAsync();
         }
-        TempData["Success"] = "Empleado creado.";
-        return RedirectToAction(nameof(Index), new { sucursalId = model.SucursalId });
+        var empresas = _db.Empresas.AsQueryable();
+        var sucursales = _db.Sucursales.AsQueryable();
+        var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
+        if (User.IsInRole("Empresa"))
+        {
+            var empresaId = _currentUser.EmpresaId;
+            empresas = empresas.Where(e => e.Id == empresaId);
+            sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
+            if (empresaId != null)
+                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+        }
+        ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
+        ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
+        var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
+        ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
+        ViewBag.LocalizacionAsignadaId = null;
+        ViewBag.EmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => (int?)s.EmpresaId).FirstOrDefaultAsync();
+        ViewBag.SuccessMessage = "Empleado agregado con exito.";
+        return View(new Empleado { SucursalId = model.SucursalId, EsSubsidiado = true, Codigo = null, Nombre = null });
     }
 
     public async Task<IActionResult> Edit(int id)
@@ -295,6 +380,14 @@ public class EmpleadosController : Controller
             var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
             ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
             ViewBag.LocalizacionAsignadaId = localizacionAsignadaId;
+            var user = await _db.Set<ApplicationUser>().FirstOrDefaultAsync(u => u.EmpleadoId == model.Id);
+            ViewBag.UsuarioExiste = user != null;
+            ViewBag.UsuarioNombre = user?.UserName;
+            var empresaNombre = await _db.Sucursales
+                .Where(s => s.Id == model.SucursalId)
+                .Select(s => s.Empresa != null ? s.Empresa.Nombre : "Empresa")
+                .FirstOrDefaultAsync() ?? "Empresa";
+            ViewBag.UsuarioSugerido = BuildUserName(empresaNombre, model.Codigo, model.Id);
             return View(model);
         }
         if (!ModelState.IsValid)
@@ -307,12 +400,15 @@ public class EmpleadosController : Controller
             var newSucEmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
             if (empresaId == null || newSucEmpresaId != empresaId) return Forbid();
         }
-        if (!string.IsNullOrWhiteSpace(model.Codigo) && await CodigoEmpleadoEnUsoAsync(model.Codigo, model.SucursalId, ent.Id))
+        var codigoNuevo = model.Codigo?.Trim();
+        var codigoAnterior = ent.Codigo?.Trim();
+        var codigoCambio = !string.Equals(codigoAnterior, codigoNuevo, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(codigoNuevo) && await CodigoEmpleadoEnUsoAsync(codigoNuevo, model.SucursalId, ent.Id))
         {
             ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en la misma empresa.");
             return await ReturnInvalidAsync();
         }
-        ent.Codigo = model.Codigo;
+        ent.Codigo = codigoNuevo;
         ent.Nombre = model.Nombre;
         ent.SucursalId = model.SucursalId;
         ent.Estado = model.Estado;
@@ -356,6 +452,26 @@ public class EmpleadosController : Controller
         }
 
         await _db.SaveChangesAsync();
+        if (codigoCambio)
+        {
+            var user = await _db.Set<ApplicationUser>().FirstOrDefaultAsync(u => u.EmpleadoId == ent.Id);
+            if (user != null)
+            {
+                var empresaNombre = await _db.Sucursales
+                    .Where(s => s.Id == ent.SucursalId)
+                    .Select(s => s.Empresa != null ? s.Empresa.Nombre : "Empresa")
+                    .FirstOrDefaultAsync() ?? "Empresa";
+                var nuevoUsuario = BuildUserName(empresaNombre, ent.Codigo, ent.Id);
+                if (!string.Equals(user.UserName, nuevoUsuario, StringComparison.OrdinalIgnoreCase))
+                {
+                    user.UserName = nuevoUsuario;
+                    user.NormalizedUserName = _userManager.NormalizeName(nuevoUsuario);
+                    var updateRes = await _userManager.UpdateAsync(user);
+                    if (!updateRes.Succeeded)
+                        TempData["Error"] = "No se pudo actualizar el nombre de usuario del empleado.";
+                }
+            }
+        }
         TempData["Success"] = "Empleado actualizado.";
         return RedirectToAction(nameof(Index), new { sucursalId = model.SucursalId });
     }
@@ -402,6 +518,38 @@ public class EmpleadosController : Controller
             resultado.Add(elegido);
         }
         return resultado;
+    }
+
+    private IQueryable<Empleado> BuildExportQuery(int? empresaId, int? sucursalId, int? localizacionId, string? q)
+    {
+        var query = _db.Empleados
+            .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
+            .Include(e => e.LocalizacionesAsignadas).ThenInclude(l => l.Localizacion)
+            .Where(e => !e.Borrado)
+            .AsQueryable();
+
+        if (User.IsInRole("Empresa"))
+        {
+            var currentEmpresaId = _currentUser.EmpresaId;
+            if (currentEmpresaId != null)
+                query = query.Where(e => e.Sucursal!.EmpresaId == currentEmpresaId);
+        }
+        if (empresaId != null) query = query.Where(e => e.Sucursal!.EmpresaId == empresaId);
+        if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId);
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var ql = q.ToLower();
+            query = query.Where(e =>
+                (e.Nombre != null && e.Nombre.ToLower().Contains(ql))
+                || (e.Codigo != null && e.Codigo.ToLower().Contains(ql)));
+        }
+
+        if (localizacionId != null)
+        {
+            query = query.Where(e => e.LocalizacionesAsignadas.Any(l => l.LocalizacionId == localizacionId));
+        }
+
+        return query;
     }
 
     // Atajo: simular sesion del usuario del empleado y abrir "Mi semana"
@@ -738,13 +886,11 @@ public class EmpleadosController : Controller
 
     private static string BuildUserName(string empresaNombre, string? empleadoCodigo, int empleadoId)
     {
-        var empresa = ToTitleToken(empresaNombre);
         var codigo = ToToken(empleadoCodigo);
         if (string.IsNullOrWhiteSpace(codigo))
             codigo = empleadoId.ToString().PadLeft(6, '0');
 
-        var baseUser = $"{empresa}_{codigo}";
-        return EnsurePasswordCompliance(baseUser);
+        return EnsurePasswordCompliance(codigo);
     }
 
     private static string BuildDefaultPassword(string? sucursalNombre, string codigo, int empleadoId)

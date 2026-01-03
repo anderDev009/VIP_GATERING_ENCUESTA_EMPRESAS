@@ -27,7 +27,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> ItemsSemana(int? empresaId = null, int? sucursalId = null)
+    public async Task<IActionResult> ItemsSemana(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
     {
         var (inicio, fin) = GetDefaultReportRange(_fechas.Hoy());
 
@@ -35,6 +35,7 @@ public class ReportesController : Controller
         var sucursales = await _db.Sucursales
             .OrderBy(s => s.Nombre)
             .ToListAsync();
+        var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
@@ -52,6 +53,8 @@ public class ReportesController : Controller
                 && r.OpcionMenu.Menu.FechaTermino <= fin);
 
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
+        if (empleadoId != null)
+            baseQuery = baseQuery.Where(r => r.EmpleadoId == empleadoId);
 
         var hoy = _fechas.Hoy();
         var respuestas = await baseQuery.ToListAsync();
@@ -99,8 +102,10 @@ public class ReportesController : Controller
             Fin = fin,
             EmpresaId = empresaId,
             SucursalId = sucursalId,
+            EmpleadoId = empleadoId,
             Empresas = empresas,
             Sucursales = sucursales,
+            Empleados = empleados,
             Items = items
         };
         return View(vm);
@@ -108,7 +113,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> Selecciones(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> Selecciones(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
         // Empresa solo puede ver su propia data
         if (User.IsInRole("Empresa"))
@@ -122,6 +127,7 @@ public class ReportesController : Controller
             if (_current.EmpresaId == null) return Forbid();
             empresaId = _current.EmpresaId;
             sucursalId = _current.SucursalId;
+            empleadoId = _current.EmpleadoId;
         }
 
         var isEmpleado = User.IsInRole("Empleado");
@@ -161,6 +167,7 @@ public class ReportesController : Controller
         if (isEmpleado && sucursalId != null)
             sucursalesBase = sucursalesBase.Where(s => s.Id == sucursalId);
         var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
+        var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
@@ -178,6 +185,8 @@ public class ReportesController : Controller
                 && r.OpcionMenu.Menu.FechaTermino >= inicio);
 
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
+        if (empleadoId != null)
+            baseQuery = baseQuery.Where(r => r.EmpleadoId == empleadoId);
 
         var hoy = _fechas.Hoy();
         var respuestas = await baseQuery.ToListAsync();
@@ -291,8 +300,10 @@ public class ReportesController : Controller
             Fin = fin,
             EmpresaId = empresaId,
             SucursalId = sucursalId,
+            EmpleadoId = empleadoId,
             Empresas = empresas,
             Sucursales = sucursales,
+            Empleados = empleados,
             TotalRespuestas = detalle.Sum(d => d.Cantidad),
             TotalCosto = detalle.Sum(d => d.TotalCosto),
             TotalPrecio = detalle.Sum(d => d.TotalPrecio),
@@ -305,7 +316,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> TotalesEmpleados(int? empresaId = null, int? sucursalId = null)
+    public async Task<IActionResult> TotalesEmpleados(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
     {
         if (User.IsInRole("Empresa"))
         {
@@ -321,6 +332,7 @@ public class ReportesController : Controller
         if (empresaId != null)
             sucursalesBase = sucursalesBase.Where(s => s.EmpresaId == empresaId);
         var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
+        var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
@@ -338,6 +350,8 @@ public class ReportesController : Controller
                 && r.OpcionMenu.Menu.FechaTermino >= inicio);
 
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
+        if (empleadoId != null)
+            baseQuery = baseQuery.Where(r => r.EmpleadoId == empleadoId);
 
         var hoy = _fechas.Hoy();
         var respuestas = await baseQuery.ToListAsync();
@@ -390,8 +404,10 @@ public class ReportesController : Controller
             Fin = fin,
             EmpresaId = empresaId,
             SucursalId = sucursalId,
+            EmpleadoId = empleadoId,
             Empresas = empresas,
             Sucursales = sucursales,
+            Empleados = empleados,
             Filas = rows
         };
         return View(vm);
@@ -500,13 +516,20 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> Seleccionados(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> Seleccionados(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
         if (User.IsInRole("Empresa"))
         {
             if (_current.EmpresaId == null) return Forbid();
             if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
             empresaId = _current.EmpresaId;
+        }
+        else if (User.IsInRole("Empleado"))
+        {
+            if (_current.EmpresaId == null) return Forbid();
+            empresaId = _current.EmpresaId;
+            sucursalId = _current.SucursalId;
+            empleadoId = _current.EmpleadoId;
         }
 
         var (inicio, fin) = _fechas.RangoSemanaSiguiente();
@@ -516,6 +539,7 @@ public class ReportesController : Controller
         if (empresaId != null)
             sucursalesBase = sucursalesBase.Where(s => s.EmpresaId == empresaId);
         var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
+        var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
@@ -533,6 +557,8 @@ public class ReportesController : Controller
                 && r.OpcionMenu.Menu.FechaTermino >= inicio);
 
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
+        if (empleadoId != null)
+            baseQuery = baseQuery.Where(r => r.EmpleadoId == empleadoId);
 
         var hoy = _fechas.Hoy();
         var respuestas = await baseQuery.ToListAsync();
@@ -606,8 +632,10 @@ public class ReportesController : Controller
             Fin = fin,
             EmpresaId = empresaId,
             SucursalId = sucursalId,
+            EmpleadoId = empleadoId,
             Empresas = empresas,
             Sucursales = sucursales,
+            Empleados = empleados,
             TotalRespuestas = detalle.Sum(d => d.Cantidad),
             TotalCosto = detalle.Sum(d => d.TotalCosto),
             TotalPrecio = detalle.Sum(d => d.TotalPrecio),
@@ -619,7 +647,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> Distribucion(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> Distribucion(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
         DateOnly inicio;
         DateOnly fin;
@@ -652,6 +680,7 @@ public class ReportesController : Controller
         if (empresaId != null)
             sucursalesBase = sucursalesBase.Where(s => s.EmpresaId == empresaId);
         var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
+        var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
@@ -671,6 +700,8 @@ public class ReportesController : Controller
                 && r.OpcionMenu.Menu.FechaTermino >= inicio);
 
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
+        if (empleadoId != null)
+            baseQuery = baseQuery.Where(r => r.EmpleadoId == empleadoId);
 
         var respuestas = await baseQuery.ToListAsync();
         respuestas = respuestas
@@ -698,7 +729,7 @@ public class ReportesController : Controller
             var filial = sucursalEntrega.Nombre;
             var filialId = sucursalEntrega.Id;
             var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
-            var empleadoId = r.Empleado.Id;
+            var empleadoIdRow = r.Empleado.Id;
             var localizacion = r.LocalizacionEntrega?.Nombre ?? "Sin asignar";
 
             void AddItem(Opcion opcion, string nombre, string seleccionLabel, bool aplicaSubsidio)
@@ -721,7 +752,7 @@ public class ReportesController : Controller
                 var itbisEmpleado = Math.Round(itbis * ratio, 2);
                 var itbisEmpresa = itbis - itbisEmpleado;
 
-                items.Add((fechaDia, filialId, filial, empleadoId, empleadoNombre, tanda, nombre, seleccionLabel, localizacion, basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado));
+                items.Add((fechaDia, filialId, filial, empleadoIdRow, empleadoNombre, tanda, nombre, seleccionLabel, localizacion, basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado));
             }
 
             var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
@@ -843,8 +874,10 @@ public class ReportesController : Controller
             Fin = fin,
             EmpresaId = empresaId,
             SucursalId = sucursalId,
+            EmpleadoId = empleadoId,
             Empresas = empresas,
             Sucursales = sucursales,
+            Empleados = empleados,
             ResumenFiliales = resumen,
             DetalleEmpleados = detalle,
             PorLocalizacion = porLocalizacion,
@@ -855,9 +888,79 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,Empresa")]
     [HttpGet]
-    public async Task<IActionResult> TotalesEmpleadosPdf(int? empresaId = null, int? sucursalId = null)
+    public async Task<IActionResult> TotalesEmpleadosCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
     {
-        var result = await TotalesEmpleados(empresaId, sucursalId) as ViewResult;
+        var result = await TotalesEmpleados(empresaId, sucursalId, empleadoId) as ViewResult;
+        var vm = (TotalesEmpleadosVM)result!.Model!;
+        var isAdmin = User.IsInRole("Admin");
+
+        var headers = new List<string> { "Empleado", "Selecciones", "Costo" };
+        if (isAdmin)
+        {
+            headers.Add("Consumo");
+            headers.Add("Beneficio");
+        }
+
+        var rows = vm.Filas.Select(r =>
+        {
+            var row = new List<string>
+            {
+                r.Empleado,
+                r.Cantidad.ToString(),
+                r.TotalCosto.ToString("C")
+            };
+            if (isAdmin)
+            {
+                row.Add(r.TotalPrecio.ToString("C"));
+                row.Add(r.TotalBeneficio.ToString("C"));
+            }
+            return (IReadOnlyList<string>)row;
+        }).ToList();
+
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", $"totales-empleados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
+    }
+
+    [Authorize(Roles = "Admin,Empresa")]
+    [HttpGet]
+    public async Task<IActionResult> TotalesEmpleadosExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
+    {
+        var result = await TotalesEmpleados(empresaId, sucursalId, empleadoId) as ViewResult;
+        var vm = (TotalesEmpleadosVM)result!.Model!;
+        var isAdmin = User.IsInRole("Admin");
+
+        var headers = new List<string> { "Empleado", "Selecciones", "Costo" };
+        if (isAdmin)
+        {
+            headers.Add("Consumo");
+            headers.Add("Beneficio");
+        }
+
+        var rows = vm.Filas.Select(r =>
+        {
+            var row = new List<string>
+            {
+                r.Empleado,
+                r.Cantidad.ToString(),
+                r.TotalCosto.ToString("C")
+            };
+            if (isAdmin)
+            {
+                row.Add(r.TotalPrecio.ToString("C"));
+                row.Add(r.TotalBeneficio.ToString("C"));
+            }
+            return (IReadOnlyList<string>)row;
+        }).ToList();
+
+        var bytes = ExportHelper.BuildExcel("Totales empleados", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"totales-empleados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Roles = "Admin,Empresa")]
+    [HttpGet]
+    public async Task<IActionResult> TotalesEmpleadosPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
+    {
+        var result = await TotalesEmpleados(empresaId, sucursalId, empleadoId) as ViewResult;
         var vm = (TotalesEmpleadosVM)result!.Model!;
         var isAdmin = User.IsInRole("Admin");
 
@@ -921,9 +1024,57 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> ItemsSemanaPdf(int? empresaId = null, int? sucursalId = null)
+    public async Task<IActionResult> ItemsSemanaCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
     {
-        var result = await ItemsSemana(empresaId, sucursalId) as ViewResult;
+        var result = await ItemsSemana(empresaId, sucursalId, empleadoId) as ViewResult;
+        var vm = (ItemsSemanaVM)result!.Model!;
+
+        var headers = new[] { "Item", "Costo unitario", "Precio unitario", "Beneficio unitario", "Cantidad", "Total costo", "Total precio", "Beneficio total" };
+        var rows = vm.Items.Select(r => (IReadOnlyList<string>)new[]
+        {
+            r.Nombre,
+            r.CostoUnitario.ToString("C"),
+            r.PrecioUnitario.ToString("C"),
+            r.BeneficioUnitario.ToString("C"),
+            r.Cantidad.ToString(),
+            r.TotalCosto.ToString("C"),
+            r.TotalPrecio.ToString("C"),
+            r.TotalBeneficio.ToString("C")
+        }).ToList();
+
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", $"items-semana-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> ItemsSemanaExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
+    {
+        var result = await ItemsSemana(empresaId, sucursalId, empleadoId) as ViewResult;
+        var vm = (ItemsSemanaVM)result!.Model!;
+
+        var headers = new[] { "Item", "Costo unitario", "Precio unitario", "Beneficio unitario", "Cantidad", "Total costo", "Total precio", "Beneficio total" };
+        var rows = vm.Items.Select(r => (IReadOnlyList<string>)new[]
+        {
+            r.Nombre,
+            r.CostoUnitario.ToString("C"),
+            r.PrecioUnitario.ToString("C"),
+            r.BeneficioUnitario.ToString("C"),
+            r.Cantidad.ToString(),
+            r.TotalCosto.ToString("C"),
+            r.TotalPrecio.ToString("C"),
+            r.TotalBeneficio.ToString("C")
+        }).ToList();
+
+        var bytes = ExportHelper.BuildExcel("Items semana", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"items-semana-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> ItemsSemanaPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
+    {
+        var result = await ItemsSemana(empresaId, sucursalId, empleadoId) as ViewResult;
         var vm = (ItemsSemanaVM)result!.Model!;
 
         QuestPDF.Settings.License = LicenseType.Community;
@@ -988,9 +1139,97 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,Empresa,Empleado")]
     [HttpGet]
-    public async Task<IActionResult> SeleccionesPdf(int? empresaId = null, int? sucursalId = null)
+    public async Task<IActionResult> SeleccionesCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        var result = await Selecciones(empresaId, sucursalId) as ViewResult;
+        var result = await Selecciones(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var vm = (SeleccionesVM)result!.Model!;
+        var isEmpleado = User.IsInRole("Empleado");
+        var isAdmin = User.IsInRole("Admin");
+
+        IReadOnlyList<string> headers;
+        List<IReadOnlyList<string>> rows;
+        if (isEmpleado)
+        {
+            headers = new[] { "Fecha", "Dia", "Opcion", "Precio", "Localizacion" };
+            rows = vm.SeleccionesEmpleado.Select(r => (IReadOnlyList<string>)new[]
+            {
+                r.Fecha.ToString("yyyy-MM-dd"),
+                r.DiaNombre,
+                r.OpcionNombre,
+                r.Precio.ToString("C"),
+                r.Localizacion
+            }).ToList();
+        }
+        else
+        {
+            headers = isAdmin
+                ? new[] { "Empleado", "Filial", "Selecciones", "Costo", "Consumo", "Beneficio" }
+                : new[] { "Empleado", "Filial", "Selecciones", "Costo" };
+            rows = vm.PorEmpleado.Select(r =>
+            {
+                var row = new List<string> { r.Empleado, r.Sucursal, r.Cantidad.ToString(), r.TotalCosto.ToString("C") };
+                if (isAdmin)
+                {
+                    row.Add(r.TotalPrecio.ToString("C"));
+                    row.Add(r.TotalBeneficio.ToString("C"));
+                }
+                return (IReadOnlyList<string>)row;
+            }).ToList();
+        }
+
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", $"selecciones-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
+    }
+
+    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [HttpGet]
+    public async Task<IActionResult> SeleccionesExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await Selecciones(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var vm = (SeleccionesVM)result!.Model!;
+        var isEmpleado = User.IsInRole("Empleado");
+        var isAdmin = User.IsInRole("Admin");
+
+        IReadOnlyList<string> headers;
+        List<IReadOnlyList<string>> rows;
+        if (isEmpleado)
+        {
+            headers = new[] { "Fecha", "Dia", "Opcion", "Precio", "Localizacion" };
+            rows = vm.SeleccionesEmpleado.Select(r => (IReadOnlyList<string>)new[]
+            {
+                r.Fecha.ToString("yyyy-MM-dd"),
+                r.DiaNombre,
+                r.OpcionNombre,
+                r.Precio.ToString("C"),
+                r.Localizacion
+            }).ToList();
+        }
+        else
+        {
+            headers = isAdmin
+                ? new[] { "Empleado", "Filial", "Selecciones", "Costo", "Consumo", "Beneficio" }
+                : new[] { "Empleado", "Filial", "Selecciones", "Costo" };
+            rows = vm.PorEmpleado.Select(r =>
+            {
+                var row = new List<string> { r.Empleado, r.Sucursal, r.Cantidad.ToString(), r.TotalCosto.ToString("C") };
+                if (isAdmin)
+                {
+                    row.Add(r.TotalPrecio.ToString("C"));
+                    row.Add(r.TotalBeneficio.ToString("C"));
+                }
+                return (IReadOnlyList<string>)row;
+            }).ToList();
+        }
+
+        var bytes = ExportHelper.BuildExcel("Selecciones", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"selecciones-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [HttpGet]
+    public async Task<IActionResult> SeleccionesPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await Selecciones(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
         var vm = (SeleccionesVM)result!.Model!;
         var isAdmin = User.IsInRole("Admin");
 
@@ -1111,6 +1350,279 @@ public class ReportesController : Controller
         return File(pdf, "application/pdf", $"selecciones-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
     }
 
+    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [HttpGet]
+    public async Task<IActionResult> SeleccionadosCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await Seleccionados(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var vm = (SeleccionesVM)result!.Model!;
+        var isEmpleado = User.IsInRole("Empleado");
+        var isAdmin = User.IsInRole("Admin");
+
+        IReadOnlyList<string> headers;
+        List<IReadOnlyList<string>> rows;
+        if (isEmpleado)
+        {
+            headers = new[] { "Fecha", "Dia", "Opcion", "Precio", "Localizacion" };
+            rows = vm.SeleccionesEmpleado.Select(r => (IReadOnlyList<string>)new[]
+            {
+                r.Fecha.ToString("yyyy-MM-dd"),
+                r.DiaNombre,
+                r.OpcionNombre,
+                r.Precio.ToString("C"),
+                r.Localizacion
+            }).ToList();
+        }
+        else
+        {
+            headers = isAdmin
+                ? new[] { "Empleado", "Filial", "Selecciones", "Costo", "Consumo", "Beneficio" }
+                : new[] { "Empleado", "Filial", "Selecciones", "Costo" };
+            rows = vm.PorEmpleado.Select(r =>
+            {
+                var row = new List<string> { r.Empleado, r.Sucursal, r.Cantidad.ToString(), r.TotalCosto.ToString("C") };
+                if (isAdmin)
+                {
+                    row.Add(r.TotalPrecio.ToString("C"));
+                    row.Add(r.TotalBeneficio.ToString("C"));
+                }
+                return (IReadOnlyList<string>)row;
+            }).ToList();
+        }
+
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", $"seleccionados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
+    }
+
+    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [HttpGet]
+    public async Task<IActionResult> SeleccionadosExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await Seleccionados(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var vm = (SeleccionesVM)result!.Model!;
+        var isEmpleado = User.IsInRole("Empleado");
+        var isAdmin = User.IsInRole("Admin");
+
+        IReadOnlyList<string> headers;
+        List<IReadOnlyList<string>> rows;
+        if (isEmpleado)
+        {
+            headers = new[] { "Fecha", "Dia", "Opcion", "Precio", "Localizacion" };
+            rows = vm.SeleccionesEmpleado.Select(r => (IReadOnlyList<string>)new[]
+            {
+                r.Fecha.ToString("yyyy-MM-dd"),
+                r.DiaNombre,
+                r.OpcionNombre,
+                r.Precio.ToString("C"),
+                r.Localizacion
+            }).ToList();
+        }
+        else
+        {
+            headers = isAdmin
+                ? new[] { "Empleado", "Filial", "Selecciones", "Costo", "Consumo", "Beneficio" }
+                : new[] { "Empleado", "Filial", "Selecciones", "Costo" };
+            rows = vm.PorEmpleado.Select(r =>
+            {
+                var row = new List<string> { r.Empleado, r.Sucursal, r.Cantidad.ToString(), r.TotalCosto.ToString("C") };
+                if (isAdmin)
+                {
+                    row.Add(r.TotalPrecio.ToString("C"));
+                    row.Add(r.TotalBeneficio.ToString("C"));
+                }
+                return (IReadOnlyList<string>)row;
+            }).ToList();
+        }
+
+        var bytes = ExportHelper.BuildExcel("Seleccionados", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"seleccionados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [HttpGet]
+    public async Task<IActionResult> SeleccionadosPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await Seleccionados(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var vm = (SeleccionesVM)result!.Model!;
+        var isEmpleado = User.IsInRole("Empleado");
+        var isAdmin = User.IsInRole("Admin");
+
+        IReadOnlyList<string> headers;
+        List<IReadOnlyList<string>> rows;
+        if (isEmpleado)
+        {
+            headers = new[] { "Fecha", "Dia", "Opcion", "Precio", "Localizacion" };
+            rows = vm.SeleccionesEmpleado.Select(r => (IReadOnlyList<string>)new[]
+            {
+                r.Fecha.ToString("yyyy-MM-dd"),
+                r.DiaNombre,
+                r.OpcionNombre,
+                r.Precio.ToString("C"),
+                r.Localizacion
+            }).ToList();
+        }
+        else
+        {
+            headers = isAdmin
+                ? new[] { "Empleado", "Filial", "Selecciones", "Costo", "Consumo", "Beneficio" }
+                : new[] { "Empleado", "Filial", "Selecciones", "Costo" };
+            rows = vm.PorEmpleado.Select(r =>
+            {
+                var row = new List<string> { r.Empleado, r.Sucursal, r.Cantidad.ToString(), r.TotalCosto.ToString("C") };
+                if (isAdmin)
+                {
+                    row.Add(r.TotalPrecio.ToString("C"));
+                    row.Add(r.TotalBeneficio.ToString("C"));
+                }
+                return (IReadOnlyList<string>)row;
+            }).ToList();
+        }
+
+        var pdf = ExportHelper.BuildPdf($"Seleccionados {vm.Inicio:yyyy-MM-dd} a {vm.Fin:yyyy-MM-dd}", headers, rows);
+        return File(pdf, "application/pdf", $"seleccionados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> DistribucionCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await Distribucion(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var vm = (DistribucionVM)result!.Model!;
+
+        var headers = new[]
+        {
+            "Fecha","Filial","Empleado","Tanda","Opcion","Seleccion","Cantidad","Monto total","Empresa paga","Empleado paga","ITBIS empresa","ITBIS empleado"
+        };
+        var rows = vm.DetalleEmpleados.Select(r => (IReadOnlyList<string>)new[]
+        {
+            r.Fecha.ToString("yyyy-MM-dd"),
+            r.Filial,
+            r.Empleado,
+            r.Tanda,
+            r.Opcion,
+            r.Seleccion,
+            r.Cantidad.ToString(),
+            r.MontoTotal.ToString("C"),
+            r.EmpresaPaga.ToString("C"),
+            r.EmpleadoPaga.ToString("C"),
+            r.ItbisEmpresa.ToString("C"),
+            r.ItbisEmpleado.ToString("C")
+        }).ToList();
+
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", $"distribucion-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> DistribucionExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await Distribucion(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var vm = (DistribucionVM)result!.Model!;
+
+        var headers = new[]
+        {
+            "Fecha","Filial","Empleado","Tanda","Opcion","Seleccion","Cantidad","Monto total","Empresa paga","Empleado paga","ITBIS empresa","ITBIS empleado"
+        };
+        var rows = vm.DetalleEmpleados.Select(r => (IReadOnlyList<string>)new[]
+        {
+            r.Fecha.ToString("yyyy-MM-dd"),
+            r.Filial,
+            r.Empleado,
+            r.Tanda,
+            r.Opcion,
+            r.Seleccion,
+            r.Cantidad.ToString(),
+            r.MontoTotal.ToString("C"),
+            r.EmpresaPaga.ToString("C"),
+            r.EmpleadoPaga.ToString("C"),
+            r.ItbisEmpresa.ToString("C"),
+            r.ItbisEmpleado.ToString("C")
+        }).ToList();
+
+        var bytes = ExportHelper.BuildExcel("Distribucion", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"distribucion-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> DistribucionPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null, string? vista = null)
+    {
+        var result = await Distribucion(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var vm = (DistribucionVM)result!.Model!;
+
+        var export = BuildDistribucionExport(vm, vista);
+        var title = $"{export.Title} {vm.Inicio:yyyy-MM-dd} a {vm.Fin:yyyy-MM-dd}";
+        var pdf = ExportHelper.BuildPdf(title, export.Headers, export.Rows);
+        return File(pdf, "application/pdf", $"distribucion-{export.Suffix}-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
+    }
+
+    [Authorize(Roles = "Empleado")]
+    [HttpGet]
+    public async Task<IActionResult> EstadoCuentaCsv(DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await EstadoCuenta(desde, hasta) as ViewResult;
+        var vm = (EstadoCuentaEmpleadoVM)result!.Model!;
+
+        var headers = new[] { "Fecha", "Dia", "Horario", "Seleccion", "Opcion", "Precio empleado" };
+        var rows = vm.Movimientos.Select(r => (IReadOnlyList<string>)new[]
+        {
+            r.Fecha.ToString("yyyy-MM-dd"),
+            r.DiaNombre,
+            r.Horario ?? string.Empty,
+            r.Seleccion,
+            r.OpcionNombre ?? string.Empty,
+            r.PrecioEmpleado.ToString("C")
+        }).ToList();
+
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", $"estado-cuenta-{vm.Desde:yyyyMMdd}-{vm.Hasta:yyyyMMdd}.csv");
+    }
+
+    [Authorize(Roles = "Empleado")]
+    [HttpGet]
+    public async Task<IActionResult> EstadoCuentaExcel(DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await EstadoCuenta(desde, hasta) as ViewResult;
+        var vm = (EstadoCuentaEmpleadoVM)result!.Model!;
+
+        var headers = new[] { "Fecha", "Dia", "Horario", "Seleccion", "Opcion", "Precio empleado" };
+        var rows = vm.Movimientos.Select(r => (IReadOnlyList<string>)new[]
+        {
+            r.Fecha.ToString("yyyy-MM-dd"),
+            r.DiaNombre,
+            r.Horario ?? string.Empty,
+            r.Seleccion,
+            r.OpcionNombre ?? string.Empty,
+            r.PrecioEmpleado.ToString("C")
+        }).ToList();
+
+        var bytes = ExportHelper.BuildExcel("Estado cuenta", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"estado-cuenta-{vm.Desde:yyyyMMdd}-{vm.Hasta:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Roles = "Empleado")]
+    [HttpGet]
+    public async Task<IActionResult> EstadoCuentaPdf(DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        var result = await EstadoCuenta(desde, hasta) as ViewResult;
+        var vm = (EstadoCuentaEmpleadoVM)result!.Model!;
+
+        var headers = new[] { "Fecha", "Dia", "Horario", "Seleccion", "Opcion", "Precio empleado" };
+        var rows = vm.Movimientos.Select(r => (IReadOnlyList<string>)new[]
+        {
+            r.Fecha.ToString("yyyy-MM-dd"),
+            r.DiaNombre,
+            r.Horario ?? string.Empty,
+            r.Seleccion,
+            r.OpcionNombre ?? string.Empty,
+            r.PrecioEmpleado.ToString("C")
+        }).ToList();
+
+        var pdf = ExportHelper.BuildPdf($"Estado de cuenta {vm.Desde:yyyy-MM-dd} a {vm.Hasta:yyyy-MM-dd}", headers, rows);
+        return File(pdf, "application/pdf", $"estado-cuenta-{vm.Desde:yyyyMMdd}-{vm.Hasta:yyyyMMdd}.pdf");
+    }
+
     private static Opcion? GetOpcionSeleccionada(OpcionMenu opcionMenu, char seleccion)
     {
         var max = opcionMenu.OpcionesMaximas == 0 ? 3 : Math.Clamp(opcionMenu.OpcionesMaximas, 1, 5);
@@ -1142,6 +1654,19 @@ public class ReportesController : Controller
         }
 
         return query;
+    }
+
+    private async Task<List<Empleado>> ObtenerEmpleadosFiltroAsync(int? empresaId, int? sucursalId)
+    {
+        var query = _db.Empleados
+            .Include(e => e.Sucursal)
+            .Where(e => !e.Borrado)
+            .AsQueryable();
+        if (empresaId != null)
+            query = query.Where(e => e.Sucursal != null && e.Sucursal.EmpresaId == empresaId);
+        if (sucursalId != null)
+            query = query.Where(e => e.SucursalId == sucursalId);
+        return await query.OrderBy(e => e.Nombre ?? e.Codigo).ToListAsync();
     }
 
     private SubsidioContext BuildSubsidioContext(bool opcionSubsidiada, Empleado empleado, Sucursal sucursal, Empresa empresa) =>
@@ -1184,5 +1709,75 @@ public class ReportesController : Controller
         if (!string.IsNullOrWhiteSpace(empleado.Nombre)) return empleado.Nombre;
         if (!string.IsNullOrWhiteSpace(empleado.Codigo)) return empleado.Codigo;
         return "Sin nombre";
+    }
+
+    private static (string Title, string Suffix, IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows) BuildDistribucionExport(DistribucionVM vm, string? vista)
+    {
+        var normalized = string.IsNullOrWhiteSpace(vista) ? "resumen" : vista.Trim().ToLowerInvariant();
+        switch (normalized)
+        {
+            case "detalle":
+                return ("Distribucion detalle por empleado", "detalle", new[]
+                {
+                    "Fecha","Filial","Empleado","Tanda","Opcion","Seleccion","Cantidad","Monto total","Empresa paga","Empleado paga","ITBIS empresa","ITBIS empleado"
+                }, vm.DetalleEmpleados.Select(r => (IReadOnlyList<string>)new[]
+                {
+                    r.Fecha.ToString("yyyy-MM-dd"),
+                    r.Filial,
+                    r.Empleado,
+                    r.Tanda,
+                    r.Opcion,
+                    r.Seleccion,
+                    r.Cantidad.ToString(),
+                    r.MontoTotal.ToString("C"),
+                    r.EmpresaPaga.ToString("C"),
+                    r.EmpleadoPaga.ToString("C"),
+                    r.ItbisEmpresa.ToString("C"),
+                    r.ItbisEmpleado.ToString("C")
+                }).ToList());
+            case "localizacion":
+                return ("Distribucion por localizacion", "localizacion", new[]
+                {
+                    "Localizacion","Opcion","Seleccion","Cantidad","Monto total","Empresa paga","Empleado paga"
+                }, vm.PorLocalizacion.Select(r => (IReadOnlyList<string>)new[]
+                {
+                    r.Localizacion,
+                    r.Opcion,
+                    r.Seleccion,
+                    r.Cantidad.ToString(),
+                    r.MontoTotal.ToString("C"),
+                    r.EmpresaPaga.ToString("C"),
+                    r.EmpleadoPaga.ToString("C")
+                }).ToList());
+            case "cocina":
+                return ("Localizacion (cocina)", "cocina", new[]
+                {
+                    "Localizacion","Opcion 1","Opcion 2","Opcion 3","Opcion 4","Opcion 5","Adicionales","Total","Adicionales detalle"
+                }, vm.PorLocalizacionCocina.Select(r => (IReadOnlyList<string>)new[]
+                {
+                    r.Localizacion,
+                    r.Opcion1.ToString(),
+                    r.Opcion2.ToString(),
+                    r.Opcion3.ToString(),
+                    r.Opcion4.ToString(),
+                    r.Opcion5.ToString(),
+                    r.Adicionales.ToString(),
+                    r.Total.ToString(),
+                    r.AdicionalesDetalle ?? string.Empty
+                }).ToList());
+            default:
+                return ("Distribucion resumen por filial", "resumen", new[]
+                {
+                    "Filial","Base","ITBIS","Total","Empresa paga","Empleado paga"
+                }, vm.ResumenFiliales.Select(r => (IReadOnlyList<string>)new[]
+                {
+                    r.Filial,
+                    r.Base.ToString("C"),
+                    r.Itbis.ToString("C"),
+                    r.Total.ToString("C"),
+                    r.EmpresaPaga.ToString("C"),
+                    r.EmpleadoPaga.ToString("C")
+                }).ToList());
+        }
     }
 }

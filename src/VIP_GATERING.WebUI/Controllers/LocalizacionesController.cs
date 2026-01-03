@@ -8,7 +8,7 @@ using VIP_GATERING.WebUI.Services;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
-[Authorize(Roles = "Admin,Empresa")]
+[Authorize(Roles = "Admin,Empresa,RRHH")]
 public class LocalizacionesController : Controller
 {
     private readonly AppDbContext _db;
@@ -54,6 +54,90 @@ public class LocalizacionesController : Controller
         ViewBag.SucursalId = sucursalId;
         ViewBag.Q = q;
         return View(paged);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportCsv(int? empresaId, int? sucursalId, string? q)
+    {
+        var localizaciones = await BuildExportQuery(empresaId, sucursalId, q).OrderBy(l => l.Nombre).ToListAsync();
+        var headers = new[] { "Localizacion", "RNC", "Empresa", "Filial", "Direccion", "Notas" };
+        var rows = localizaciones.Select(l => (IReadOnlyList<string>)new[]
+        {
+            l.Nombre,
+            l.Rnc ?? string.Empty,
+            l.Empresa?.Nombre ?? string.Empty,
+            l.Sucursal?.Nombre ?? string.Empty,
+            l.Direccion,
+            l.IndicacionesEntrega
+        }).ToList();
+        var bytes = ExportHelper.BuildCsv(headers, rows);
+        return File(bytes, "text/csv", "localizaciones.csv");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportExcel(int? empresaId, int? sucursalId, string? q)
+    {
+        var localizaciones = await BuildExportQuery(empresaId, sucursalId, q).OrderBy(l => l.Nombre).ToListAsync();
+        var headers = new[] { "Localizacion", "RNC", "Empresa", "Filial", "Direccion", "Notas" };
+        var rows = localizaciones.Select(l => (IReadOnlyList<string>)new[]
+        {
+            l.Nombre,
+            l.Rnc ?? string.Empty,
+            l.Empresa?.Nombre ?? string.Empty,
+            l.Sucursal?.Nombre ?? string.Empty,
+            l.Direccion,
+            l.IndicacionesEntrega
+        }).ToList();
+        var bytes = ExportHelper.BuildExcel("Localizaciones", headers, rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "localizaciones.xlsx");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportPdf(int? empresaId, int? sucursalId, string? q)
+    {
+        var localizaciones = await BuildExportQuery(empresaId, sucursalId, q).OrderBy(l => l.Nombre).ToListAsync();
+        var headers = new[] { "Localizacion", "RNC", "Empresa", "Filial", "Direccion", "Notas" };
+        var rows = localizaciones.Select(l => (IReadOnlyList<string>)new[]
+        {
+            l.Nombre,
+            l.Rnc ?? string.Empty,
+            l.Empresa?.Nombre ?? string.Empty,
+            l.Sucursal?.Nombre ?? string.Empty,
+            l.Direccion,
+            l.IndicacionesEntrega
+        }).ToList();
+        var pdf = ExportHelper.BuildPdf("Localizaciones", headers, rows);
+        return File(pdf, "application/pdf", "localizaciones.pdf");
+    }
+
+    private IQueryable<Localizacion> BuildExportQuery(int? empresaId, int? sucursalId, string? q)
+    {
+        var query = _db.Localizaciones
+            .Include(l => l.Empresa)
+            .Include(l => l.Sucursal).ThenInclude(s => s!.Empresa)
+            .AsQueryable();
+
+        if (User.IsInRole("Empresa") && _current.EmpresaId != null)
+        {
+            var currentEmpresaId = _current.EmpresaId;
+            query = query.Where(l => l.EmpresaId == currentEmpresaId);
+        }
+
+        if (empresaId != null)
+            query = query.Where(l => l.EmpresaId == empresaId);
+        if (sucursalId != null)
+            query = query.Where(l => l.SucursalId == sucursalId);
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var ql = q.ToLower();
+            query = query.Where(l =>
+                l.Nombre.ToLower().Contains(ql) ||
+                (l.Sucursal != null && l.Sucursal.Nombre.ToLower().Contains(ql)) ||
+                (l.Sucursal != null && l.Sucursal.Empresa != null && l.Sucursal.Empresa.Nombre.ToLower().Contains(ql)));
+        }
+
+        return query;
     }
 
     public async Task<IActionResult> Create()
@@ -163,6 +247,7 @@ public class LocalizacionesController : Controller
         ent.Nombre = model.Nombre;
         ent.EmpresaId = model.EmpresaId;
         ent.SucursalId = sucursal.Id;
+        ent.Rnc = model.Rnc;
         ent.Direccion = model.Direccion;
         ent.IndicacionesEntrega = model.IndicacionesEntrega;
         await _db.SaveChangesAsync();

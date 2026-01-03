@@ -31,10 +31,23 @@
                 }
             </select>
         </div>
+        <div class="control-field md:col-span-2">
+            <label>Empleado</label>
+            <select name="empleadoId">
+                <option value="">Todos</option>
+                @foreach (var e in Model.Empleados)
+                {
+                    var nombre = !string.IsNullOrWhiteSpace(e.Nombre) ? e.Nombre : e.Codigo;
+                    <option value="@e.Id" selected="@(Model.EmpleadoId == e.Id ? "selected" : null)">@nombre</option>
+                }
+            </select>
+        </div>
         <div class="flex gap-3 md:col-span-4">
             <button type="submit" class="btn-primary">Filtrar</button>
             <a class="btn-outline" asp-action="TotalesEmpleados">Limpiar</a>
-            <a class="btn-outline" asp-action="TotalesEmpleadosPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId">Exportar PDF</a>
+            <a class="btn-outline" asp-action="TotalesEmpleadosExcel" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId">Exportar Excel</a>
+            <a class="btn-outline" asp-action="TotalesEmpleadosCsv" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId">Exportar CSV</a>
+            <a class="btn-outline" asp-action="TotalesEmpleadosPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId">Exportar PDF</a>
         </div>
         <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3">
             <div class="text-sm text-slate-600">Total costo</div>
