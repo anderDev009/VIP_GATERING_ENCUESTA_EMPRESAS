@@ -292,7 +292,6 @@ public class EmpleadosController : Controller
         await _db.SaveChangesAsync();
         var codigoUsuario = model.Codigo?.Trim();
         string? passwordMessage = null;
-        bool showPasswordModal = false;
         if (!string.IsNullOrWhiteSpace(codigoUsuario))
         {
             var result = await TryCreateIdentityUsuarioAsync(model.Id, codigoUsuario, model.SucursalId);
@@ -300,14 +299,10 @@ public class EmpleadosController : Controller
             {
                 passwordMessage = result.Error;
             }
-            else if (result.RequiresManualPassword)
-            {
-                passwordMessage = "El usuario se creo sin contrasena automatica. Asignala ahora.";
-                showPasswordModal = true;
-            }
             else
             {
-                passwordMessage = "Contrasena inicial creada con el mismo codigo.";
+                var defaultPassword = BuildDefaultPassword(null, codigoUsuario, model.Id);
+                passwordMessage = $"Contrasena inicial creada automaticamente: {defaultPassword}.";
             }
         }
         if (localizacionId.HasValue)
@@ -338,8 +333,7 @@ public class EmpleadosController : Controller
         ViewBag.EmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => (int?)s.EmpresaId).FirstOrDefaultAsync();
         ViewBag.SuccessMessage = "Empleado agregado con exito.";
         ViewBag.PasswordMessage = passwordMessage;
-        ViewBag.ShowPasswordModal = showPasswordModal;
-        ViewBag.PasswordEmpleadoId = model.Id;
+        ViewBag.ShowPasswordModal = false;
         ModelState.Clear();
         return View(new Empleado { SucursalId = model.SucursalId, EsSubsidiado = true, Codigo = null, Nombre = null });
     }
@@ -739,14 +733,8 @@ public class EmpleadosController : Controller
         var resultMessage = await TryCreateIdentityUsuarioAsync(empleado.Id, codigo, empleado.SucursalId);
         if (string.IsNullOrEmpty(resultMessage.Error))
         {
-            if (resultMessage.RequiresManualPassword)
-            {
-                TempData["Success"] = $"Usuario creado automaticamente ({codigo}). Asigna una contrasena en el mantenimiento.";
-            }
-            else
-            {
-                TempData["Success"] = $"Usuario creado automaticamente ({codigo}). La contrasena inicial es {codigo}.";
-            }
+            var defaultPassword = BuildDefaultPassword(null, codigo, empleado.Id);
+            TempData["Success"] = $"Usuario creado automaticamente ({codigo}). La contrasena inicial es {defaultPassword}.";
         }
         else
         {
@@ -880,24 +868,15 @@ public class EmpleadosController : Controller
             EmpresaId = empresaId
         };
 
-        var requiresManualPassword = username.Length != 6;
-        IdentityResult result;
-        if (requiresManualPassword)
-        {
-            result = await _userManager.CreateAsync(usuario);
-        }
-        else
-        {
-            var password = username;
-            result = await _userManager.CreateAsync(usuario, password);
-        }
+        var password = BuildDefaultPassword(null, username, empleadoId);
+        var result = await _userManager.CreateAsync(usuario, password);
         if (!result.Succeeded)
             return ($"No se pudo crear el usuario: {string.Join("; ", result.Errors.Select(e => e.Description))}", false);
 
         if (!await _userManager.IsInRoleAsync(usuario, "Empleado"))
             await _userManager.AddToRoleAsync(usuario, "Empleado");
 
-        return (null, requiresManualPassword);
+        return (null, false);
     }
 
     private async Task<string?> ValidatePasswordAsync(ApplicationUser user, string newPassword)
@@ -942,12 +921,13 @@ public class EmpleadosController : Controller
 
     private static string BuildDefaultPassword(string? sucursalNombre, string codigo, int empleadoId)
     {
-        var sucursalToken = string.IsNullOrWhiteSpace(sucursalNombre) ? "Sucursal" : ToToken(sucursalNombre);
         var codigoToken = ToToken(codigo);
         if (string.IsNullOrWhiteSpace(codigoToken))
             codigoToken = empleadoId.ToString().PadLeft(6, '0');
-
-        return $"{sucursalToken}_{codigoToken}";
+        var password = $"UNI{codigoToken}@";
+        if (password.Length < 6)
+            password = password.PadRight(6, '0');
+        return password;
     }
 
     private static string ToTitleToken(string value)
