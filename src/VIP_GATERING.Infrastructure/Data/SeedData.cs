@@ -45,6 +45,10 @@ public static class SeedData
             await db.SaveChangesAsync();
         }
 
+        // Evitar reinsertar data si ya existe una empresa (seed solo una vez).
+        if (await db.Empresas.AnyAsync())
+            return;
+
         var etlData = LoadMenuEtlData(contentRootPath);
         var defaultPrecioDesayuno = etlData?.Empresas?.Select(x => x.PrecioDesayuno).FirstOrDefault(x => x.HasValue);
         var defaultPrecioAlmuerzo = etlData?.Empresas?.Select(x => x.PrecioAlmuerzo).FirstOrDefault(x => x.HasValue);

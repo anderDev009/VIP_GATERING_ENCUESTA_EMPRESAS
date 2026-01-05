@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -250,6 +251,8 @@ public class EmpleadosController : Controller
         }
         if (string.IsNullOrWhiteSpace(model.Codigo))
             ModelState.AddModelError(string.Empty, "Por favor ingresa el codigo del empleado.");
+        else
+            ValidateCodigoEmpleado(model.Codigo, ModelState);
         if (!ModelState.IsValid)
             return await ReturnInvalidAsync();
         // Seguridad: Empresa solo puede crear en sus sucursales
@@ -427,6 +430,8 @@ public class EmpleadosController : Controller
         var codigoNuevo = model.Codigo?.Trim();
         var codigoAnterior = ent.Codigo?.Trim();
         var codigoCambio = !string.Equals(codigoAnterior, codigoNuevo, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(codigoNuevo))
+            ValidateCodigoEmpleado(codigoNuevo, ModelState);
         if (!string.IsNullOrWhiteSpace(codigoNuevo) && await CodigoEmpleadoEnUsoAsync(codigoNuevo, model.SucursalId, ent.Id))
         {
             ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en la misma empresa.");
@@ -907,6 +912,15 @@ public class EmpleadosController : Controller
         if (excluirEmpleadoId.HasValue)
             query = query.Where(e => e.Id != excluirEmpleadoId.Value);
         return await query.AnyAsync();
+    }
+
+    private static void ValidateCodigoEmpleado(string codigo, ModelStateDictionary modelState)
+    {
+        var trimmed = codigo.Trim();
+        if (trimmed.Length < 3)
+            modelState.AddModelError("Codigo", "El codigo debe tener al menos 3 caracteres.");
+        if (!trimmed.All(char.IsLetterOrDigit))
+            modelState.AddModelError("Codigo", "El codigo solo puede contener letras y numeros sin espacios ni simbolos.");
     }
 
 
