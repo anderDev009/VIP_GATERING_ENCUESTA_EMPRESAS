@@ -117,7 +117,8 @@ public class EmpleadoController : Controller
             .AsNoTracking()
             .Include(l => l.Sucursal)
             .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
-        if (localizacionesAsignadasIds.Count > 0)
+        if (localizacionesAsignadasIds.Count > 0
+            && !string.Equals(sucursalDependencia.EmpresaNombre, "GRUPO UNIVERSAL", StringComparison.OrdinalIgnoreCase))
             localizacionesQuery = localizacionesQuery.Where(l => localizacionesAsignadasIds.Contains(l.Id));
         var localizacionesRaw = await localizacionesQuery.ToListAsync();
 
@@ -497,7 +498,13 @@ public class EmpleadoController : Controller
         Localizacion? localizacionEntrega = null;
         if (localizacionEntregaId.HasValue && localizacionEntregaId.Value != 0)
         {
-            if (localizacionesAsignadasIds.Count > 0 && !localizacionesAsignadasIds.Contains(localizacionEntregaId.Value))
+            var empresaNombre = await _db.Empresas
+                .AsNoTracking()
+                .Where(e => e.Id == empresaId)
+                .Select(e => e.Nombre)
+                .FirstOrDefaultAsync();
+            var esGrupoUniversal = string.Equals(empresaNombre, "GRUPO UNIVERSAL", StringComparison.OrdinalIgnoreCase);
+            if (!esGrupoUniversal && localizacionesAsignadasIds.Count > 0 && !localizacionesAsignadasIds.Contains(localizacionEntregaId.Value))
             {
                 TempData["Error"] = "Localizacion de entrega no permitida.";
                 return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });

@@ -45,15 +45,17 @@ public static class SeedData
             await db.SaveChangesAsync();
         }
 
+        var etlData = LoadMenuEtlData(contentRootPath);
+
         // Evitar reinsertar data si ya existe una empresa (seed solo una vez),
-        // pero permitir sembrar menus puntuales.
+        // pero permitir sembrar localizaciones ETL y menus puntuales.
         if (await db.Empresas.AnyAsync())
         {
+            if (etlData != null)
+                await EnsureEtlLocalizacionesAsync(db, etlData);
             await EnsureMenuSemana20260112Async(db);
             return;
         }
-
-        var etlData = LoadMenuEtlData(contentRootPath);
         var defaultPrecioDesayuno = etlData?.Empresas?.Select(x => x.PrecioDesayuno).FirstOrDefault(x => x.HasValue);
         var defaultPrecioAlmuerzo = etlData?.Empresas?.Select(x => x.PrecioAlmuerzo).FirstOrDefault(x => x.HasValue);
         var defaultPrecioCena = etlData?.Empresas?.Select(x => x.PrecioCena).FirstOrDefault(x => x.HasValue);
@@ -122,50 +124,8 @@ public static class SeedData
         }
 
         // Localizaciones por empresa (desde ETL si existe)
-        if (etlData?.Localizaciones != null && etlData.Localizaciones.Count > 0)
-        {
-            var nombresLoc = etlData.Localizaciones
-                .Select(l => l?.Trim())
-                .Where(l => !string.IsNullOrWhiteSpace(l))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (nombresLoc.Count > 0)
-            {
-                var sucursales = await db.Sucursales
-                    .AsNoTracking()
-                    .Select(s => new { s.Id, s.EmpresaId, s.Nombre })
-                    .ToListAsync();
-                var existentes = await db.Localizaciones
-                    .AsNoTracking()
-                    .Select(l => new { l.SucursalId, l.EmpresaId, l.Nombre })
-                    .ToListAsync();
-                var existentesSet = new HashSet<string>(
-                    existentes.Select(e => $"{e.SucursalId:N}|{e.EmpresaId:N}|{e.Nombre}"),
-                    StringComparer.OrdinalIgnoreCase);
-
-                foreach (var suc in sucursales)
-                {
-                    if (suc.Id == 0) continue;
-                    foreach (var nombre in nombresLoc)
-                    {
-                        var key = $"{suc.Id:N}|{suc.EmpresaId:N}|{nombre}";
-                        if (existentesSet.Contains(key)) continue;
-                        var sucursalNombre = string.IsNullOrWhiteSpace(suc.Nombre) ? "filial" : suc.Nombre;
-                        db.Localizaciones.Add(new Localizacion
-                        {
-                            Nombre = nombre,
-                            EmpresaId = suc.EmpresaId,
-                            SucursalId = suc.Id,
-                            Direccion = $"Direccion de {sucursalNombre}",
-                            IndicacionesEntrega = $"Entrega en {nombre}"
-                        });
-                        existentesSet.Add(key);
-                    }
-                }
-                await db.SaveChangesAsync();
-            }
-        }
+        if (etlData != null)
+            await EnsureEtlLocalizacionesAsync(db, etlData);
 
         if (etlData?.Productos != null && etlData.Productos.Count > 0)
         {
@@ -432,6 +392,55 @@ public static class SeedData
             }
             if (db.ChangeTracker.HasChanges())
                 await db.SaveChangesAsync();
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureEtlLocalizacionesAsync(AppDbContext db, MenuEtlData etlData)
+    {
+        if (etlData.Localizaciones == null || etlData.Localizaciones.Count == 0)
+            return;
+
+        var nombresLoc = etlData.Localizaciones
+            .Select(l => l?.Trim())
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (nombresLoc.Count == 0)
+            return;
+
+        var sucursales = await db.Sucursales
+            .AsNoTracking()
+            .Select(s => new { s.Id, s.EmpresaId, s.Nombre })
+            .ToListAsync();
+        var existentes = await db.Localizaciones
+            .AsNoTracking()
+            .Select(l => new { l.SucursalId, l.EmpresaId, l.Nombre })
+            .ToListAsync();
+        var existentesSet = new HashSet<string>(
+            existentes.Select(e => $"{e.SucursalId:N}|{e.EmpresaId:N}|{e.Nombre}"),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var suc in sucursales)
+        {
+            if (suc.Id == 0) continue;
+            foreach (var nombre in nombresLoc)
+            {
+                var key = $"{suc.Id:N}|{suc.EmpresaId:N}|{nombre}";
+                if (existentesSet.Contains(key)) continue;
+                var sucursalNombre = string.IsNullOrWhiteSpace(suc.Nombre) ? "filial" : suc.Nombre;
+                db.Localizaciones.Add(new Localizacion
+                {
+                    Nombre = nombre,
+                    EmpresaId = suc.EmpresaId,
+                    SucursalId = suc.Id,
+                    Direccion = $"Direccion de {sucursalNombre}",
+                    IndicacionesEntrega = $"Entrega en {nombre}"
+                });
+                existentesSet.Add(key);
+            }
         }
 
         if (db.ChangeTracker.HasChanges())
