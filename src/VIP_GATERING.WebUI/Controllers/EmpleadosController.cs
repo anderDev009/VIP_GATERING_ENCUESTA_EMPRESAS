@@ -181,30 +181,43 @@ public class EmpleadosController : Controller
         return File(pdf, "application/pdf", "empleados.pdf");
     }
 
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> Create(int? empresaId = null, int? sucursalId = null)
     {
         var empresas = _db.Empresas.AsQueryable();
         var sucursales = _db.Sucursales.AsQueryable();
         if (User.IsInRole("Empresa"))
         {
-            var empresaId = _currentUser.EmpresaId;
-            empresas = empresas.Where(e => e.Id == empresaId);
+            var currentEmpresaId = _currentUser.EmpresaId;
+            empresas = empresas.Where(e => e.Id == currentEmpresaId);
+            sucursales = sucursales.Where(s => s.EmpresaId == currentEmpresaId);
+        }
+        if (!User.IsInRole("Empresa") && empresaId != null)
+        {
             sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
+        }
+        if (!User.IsInRole("Empresa") && sucursalId != null && empresaId == null)
+        {
+            empresaId = await _db.Sucursales
+                .Where(s => s.Id == sucursalId)
+                .Select(s => (int?)s.EmpresaId)
+                .FirstOrDefaultAsync();
+            if (empresaId != null)
+                sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
         }
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
         var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
         if (User.IsInRole("Empresa"))
         {
-            var empresaId = _currentUser.EmpresaId;
-            if (empresaId != null)
-                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+            var currentEmpresaId = _currentUser.EmpresaId;
+            if (currentEmpresaId != null)
+                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == currentEmpresaId);
         }
         var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
         ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
         ViewBag.LocalizacionAsignadaId = null;
-        ViewBag.EmpresaId = User.IsInRole("Empresa") ? _currentUser.EmpresaId : null;
-        return View(new Empleado());
+        ViewBag.EmpresaId = User.IsInRole("Empresa") ? _currentUser.EmpresaId : empresaId;
+        return View(new Empleado { SucursalId = sucursalId ?? 0, EsSubsidiado = true });
     }
 
     [HttpPost]
@@ -248,7 +261,7 @@ public class EmpleadosController : Controller
         }
         if (!string.IsNullOrWhiteSpace(model.Codigo) && await CodigoEmpleadoEnUsoAsync(model.Codigo, model.SucursalId))
         {
-            ModelState.AddModelError("Codigo", "Ya existe un empleado con ese codigo en la misma empresa.");
+            ModelState.AddModelError("Codigo", "No se puede agregar un empleado con ese codigo porque ya existe en la empresa.");
             return await ReturnInvalidAsync();
         }
         model.Estado = EmpleadoEstado.Habilitado;
@@ -279,21 +292,23 @@ public class EmpleadosController : Controller
         await _db.SaveChangesAsync();
         var codigoUsuario = model.Codigo?.Trim();
         string? passwordMessage = null;
-        if (!string.IsNullOrWhiteSpace(codigoUsuario) && codigoUsuario.Length == 6)
+        bool showPasswordModal = false;
+        if (!string.IsNullOrWhiteSpace(codigoUsuario))
         {
-            var autoUserError = await TryCreateIdentityUsuarioAsync(model.Id, codigoUsuario, model.SucursalId);
-            if (!string.IsNullOrEmpty(autoUserError))
+            var result = await TryCreateIdentityUsuarioAsync(model.Id, codigoUsuario, model.SucursalId);
+            if (!string.IsNullOrEmpty(result.Error))
             {
-                passwordMessage = autoUserError;
+                passwordMessage = result.Error;
+            }
+            else if (result.RequiresManualPassword)
+            {
+                passwordMessage = "El usuario se creo sin contrasena automatica. Asignala ahora.";
+                showPasswordModal = true;
             }
             else
             {
                 passwordMessage = "Contrasena inicial creada con el mismo codigo.";
             }
-        }
-        else
-        {
-            passwordMessage = "No se genero contrasena automatica. Asignala en el mantenimiento del empleado.";
         }
         if (localizacionId.HasValue)
         {
@@ -323,6 +338,8 @@ public class EmpleadosController : Controller
         ViewBag.EmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => (int?)s.EmpresaId).FirstOrDefaultAsync();
         ViewBag.SuccessMessage = "Empleado agregado con exito.";
         ViewBag.PasswordMessage = passwordMessage;
+        ViewBag.ShowPasswordModal = showPasswordModal;
+        ViewBag.PasswordEmpleadoId = model.Id;
         ModelState.Clear();
         return View(new Empleado { SucursalId = model.SucursalId, EsSubsidiado = true, Codigo = null, Nombre = null });
     }
@@ -708,8 +725,8 @@ public class EmpleadosController : Controller
         if (empleado == null) return NotFound();
         if (User.IsInRole("Empresa"))
         {
-            var empresaId = _currentUser.EmpresaId;
-            if (empresaId == null || empleado.Sucursal!.EmpresaId != empresaId) return Forbid();
+            var currentEmpresaId = _currentUser.EmpresaId;
+            if (currentEmpresaId == null || empleado.Sucursal!.EmpresaId != currentEmpresaId) return Forbid();
         }
 
         var codigo = empleado.Codigo?.Trim();
@@ -720,16 +737,20 @@ public class EmpleadosController : Controller
         }
 
         var resultMessage = await TryCreateIdentityUsuarioAsync(empleado.Id, codigo, empleado.SucursalId);
-        if (string.IsNullOrEmpty(resultMessage))
+        if (string.IsNullOrEmpty(resultMessage.Error))
         {
-            var defaultPassword = codigo.Length == 6
-                ? codigo
-                : BuildDefaultPassword(empleado.Sucursal?.Nombre, codigo, empleado.Id);
-            TempData["Success"] = $"Usuario creado automaticamente ({codigo}). La contrasena inicial es {defaultPassword}.";
+            if (resultMessage.RequiresManualPassword)
+            {
+                TempData["Success"] = $"Usuario creado automaticamente ({codigo}). Asigna una contrasena en el mantenimiento.";
+            }
+            else
+            {
+                TempData["Success"] = $"Usuario creado automaticamente ({codigo}). La contrasena inicial es {codigo}.";
+            }
         }
         else
         {
-            TempData["Error"] = resultMessage;
+            TempData["Error"] = resultMessage.Error;
         }
         return RedirectToAction(nameof(Edit), new { id });
     }
@@ -737,14 +758,14 @@ public class EmpleadosController : Controller
     // Reset de contrasena (Admin o Empresa sobre su empleado)
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ResetPassword(int id, string newPassword, string confirmPassword)
+    public async Task<IActionResult> ResetPassword(int id, string newPassword, string confirmPassword, bool stayOnCreate = false, int? empresaId = null, int? sucursalId = null)
     {
         var empleado = await _db.Empleados.Include(e => e.Sucursal).FirstOrDefaultAsync(e => e.Id == id);
         if (empleado == null) return NotFound();
         if (User.IsInRole("Empresa"))
         {
-            var empresaId = _currentUser.EmpresaId;
-            if (empresaId == null || empleado.Sucursal!.EmpresaId != empresaId) return Forbid();
+            var currentEmpresaId = _currentUser.EmpresaId;
+            if (currentEmpresaId == null || empleado.Sucursal!.EmpresaId != currentEmpresaId) return Forbid();
         }
         if (string.IsNullOrWhiteSpace(newPassword))
         {
@@ -790,7 +811,9 @@ public class EmpleadosController : Controller
         if (mc == null)
             await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("must_change_password", "1"));
         await _userManager.UpdateAsync(user);
-        TempData["Success"] = "Contrasena reiniciada. Se pedira cambio al iniciar sesion.";
+        TempData["Success"] = "Contrasena asignada. Se pedira cambio al iniciar sesion.";
+        if (stayOnCreate)
+            return RedirectToAction(nameof(Create), new { empresaId, sucursalId });
         return RedirectToAction(nameof(Edit), new { id });
     }
 
@@ -830,17 +853,17 @@ public class EmpleadosController : Controller
         }
     }
 
-    private async Task<string?> TryCreateIdentityUsuarioAsync(int empleadoId, string username, int sucursalId)
+    private async Task<(string? Error, bool RequiresManualPassword)> TryCreateIdentityUsuarioAsync(int empleadoId, string username, int sucursalId)
     {
         if (string.IsNullOrWhiteSpace(username))
-            return "El codigo es requerido para crear el usuario.";
+            return ("El codigo es requerido para crear el usuario.", false);
         username = username.Trim();
 
         if (await _db.Set<ApplicationUser>().AnyAsync(u => u.EmpleadoId == empleadoId))
-            return "El empleado ya tiene un usuario asignado.";
+            return ("El empleado ya tiene un usuario asignado.", false);
 
         if (await _userManager.FindByNameAsync(username) != null)
-            return $"Ya existe un usuario con el codigo {username}.";
+            return ($"Ya existe un usuario con el codigo {username}.", false);
 
         var sucursalData = await _db.Sucursales
             .Where(s => s.Id == sucursalId)
@@ -857,17 +880,24 @@ public class EmpleadosController : Controller
             EmpresaId = empresaId
         };
 
-        var password = username.Length == 6
-            ? username
-            : BuildDefaultPassword(sucursalNombre, username, empleadoId);
-        var result = await _userManager.CreateAsync(usuario, password);
+        var requiresManualPassword = username.Length != 6;
+        IdentityResult result;
+        if (requiresManualPassword)
+        {
+            result = await _userManager.CreateAsync(usuario);
+        }
+        else
+        {
+            var password = username;
+            result = await _userManager.CreateAsync(usuario, password);
+        }
         if (!result.Succeeded)
-            return $"No se pudo crear el usuario: {string.Join("; ", result.Errors.Select(e => e.Description))}";
+            return ($"No se pudo crear el usuario: {string.Join("; ", result.Errors.Select(e => e.Description))}", false);
 
         if (!await _userManager.IsInRoleAsync(usuario, "Empleado"))
             await _userManager.AddToRoleAsync(usuario, "Empleado");
 
-        return null;
+        return (null, requiresManualPassword);
     }
 
     private async Task<string?> ValidatePasswordAsync(ApplicationUser user, string newPassword)

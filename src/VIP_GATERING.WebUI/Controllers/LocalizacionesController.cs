@@ -272,15 +272,19 @@ public class LocalizacionesController : Controller
         }
 
         var nombre = model.Nombre.Trim();
-        var existe = await _db.Localizaciones.AnyAsync(l =>
-            l.Id != ent.Id
-            && l.EmpresaId == model.EmpresaId
-            && l.Nombre.ToLower() == nombre.ToLower());
-        if (existe)
+        var nombreCambio = !string.Equals(ent.Nombre, nombre, StringComparison.OrdinalIgnoreCase) || ent.EmpresaId != model.EmpresaId;
+        if (nombreCambio)
         {
-            ModelState.AddModelError("Nombre", "Ya existe una localizacion con ese nombre en la filial.");
-            ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
-            return View(model);
+            var existe = await _db.Localizaciones.AnyAsync(l =>
+                l.Id != ent.Id
+                && l.EmpresaId == model.EmpresaId
+                && l.Nombre.ToLower() == nombre.ToLower());
+            if (existe)
+            {
+                ModelState.AddModelError("Nombre", "Ya existe una localizacion con ese nombre en la empresa.");
+                ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
+                return View(model);
+            }
         }
 
         ent.Nombre = nombre;

@@ -425,9 +425,6 @@ public class ReportesController : Controller
             empresaId = _current.EmpresaId;
         }
 
-        if (empresaId == null)
-            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
-
         var data = await BuildCierreFacturacionAsync(empresaId, sucursalId, desde, hasta, false);
         data.Vm.Titulo = "Cierre de nomina";
         data.Vm.AccionGenerar = nameof(CierreNominaGenerar);
@@ -447,9 +444,6 @@ public class ReportesController : Controller
             if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
             empresaId = _current.EmpresaId;
         }
-
-        if (empresaId == null)
-            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
 
         if (sucursalId == null)
         {
@@ -504,9 +498,6 @@ public class ReportesController : Controller
             empresaId = _current.EmpresaId;
         }
 
-        if (empresaId == null)
-            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
-
         var data = await BuildCierreFacturacionAsync(empresaId, sucursalId, desde, hasta, true);
         data.Vm.Titulo = "Facturacion";
         data.Vm.AccionGenerar = nameof(FacturacionGenerar);
@@ -526,9 +517,6 @@ public class ReportesController : Controller
             if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
             empresaId = _current.EmpresaId;
         }
-
-        if (empresaId == null)
-            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
 
         if (sucursalId == null)
         {
@@ -583,9 +571,6 @@ public class ReportesController : Controller
             empresaId = _current.EmpresaId;
         }
 
-        if (empresaId == null)
-            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
-
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, false);
         vm.Titulo = "Nominas cerradas";
         vm.ExportExcelAction = nameof(NominasExcel);
@@ -604,9 +589,6 @@ public class ReportesController : Controller
             if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
             empresaId = _current.EmpresaId;
         }
-
-        if (empresaId == null)
-            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
 
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, true);
         vm.Titulo = "Facturas";
@@ -2158,7 +2140,9 @@ private async Task<CierreFacturacionData> BuildCierreFacturacionAsync(int? empre
     var sucursalesBase = _db.Sucursales.AsQueryable();
     if (empresaId != null)
         sucursalesBase = sucursalesBase.Where(s => s.EmpresaId == empresaId);
-    var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
+    var sucursales = empresaId != null
+        ? await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync()
+        : new List<Sucursal>();
 
     var baseQuery = _db.RespuestasFormulario
         .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
@@ -2420,7 +2404,9 @@ private async Task<CierreFacturacionDetalleVM> BuildCierreFacturacionDetalleAsyn
     var sucursalesQuery = _db.Sucursales.AsQueryable();
     if (empresaId != null)
         sucursalesQuery = sucursalesQuery.Where(s => s.EmpresaId == empresaId);
-    var sucursales = await sucursalesQuery.OrderBy(s => s.Nombre).ToListAsync();
+    var sucursales = empresaId != null
+        ? await sucursalesQuery.OrderBy(s => s.Nombre).ToListAsync()
+        : new List<Sucursal>();
 
     var baseQuery = _db.RespuestasFormulario
         .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)

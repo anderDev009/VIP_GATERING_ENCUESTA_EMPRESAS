@@ -6,6 +6,10 @@
     var localizaciones = (IEnumerable<VIP_GATERING.Domain.Entities.Localizacion>)(ViewBag.Localizaciones ?? new List<VIP_GATERING.Domain.Entities.Localizacion>());
     var localizacionAsignadaId = ViewBag.LocalizacionAsignadaId as int?;
     int? empresaSeleccionada = ViewBag.EmpresaId as int?;
+    var successMessage = ViewBag.SuccessMessage ?? TempData["Success"];
+    var passwordMessage = ViewBag.PasswordMessage ?? TempData["PasswordMessage"];
+    var showPasswordModal = ViewBag.ShowPasswordModal is bool show && show;
+    var passwordEmpleadoId = ViewBag.PasswordEmpleadoId as int?;
     var empresaLookup = empresas.ToDictionary(e => e.Id, e => e.Nombre);
     var usaPersonalizado = Model.SubsidioTipo != null || Model.SubsidioValor != null;
     var subsidioTipo = Model.SubsidioTipo ?? VIP_GATERING.Domain.Entities.SubsidioTipo.Porcentaje;
@@ -15,14 +19,14 @@
 
 <form asp-action="Create" method="post" class="space-y-4 card max-w-lg mx-auto">
     @Html.AntiForgeryToken()
-    @if (ViewBag.SuccessMessage != null)
+    @if (successMessage != null)
     {
         <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center text-emerald-900">
-            <div class="text-2xl font-semibold">@ViewBag.SuccessMessage</div>
+            <div class="text-2xl font-semibold">@successMessage</div>
             <div class="text-sm text-emerald-700 mt-1">Puedes continuar creando empleados.</div>
-            @if (ViewBag.PasswordMessage != null)
+            @if (passwordMessage != null)
             {
-                <div class="text-sm text-emerald-700 mt-2">@ViewBag.PasswordMessage</div>
+                <div class="text-sm text-emerald-700 mt-2">@passwordMessage</div>
             }
         </div>
     }
@@ -105,8 +109,57 @@
     </div>
 </form>
 
+@if (showPasswordModal && passwordEmpleadoId.HasValue)
+{
+    <div class="modal-backdrop">
+        <div class="modal-card">
+            <h2 class="text-lg font-semibold mb-2">Asignar contrasena</h2>
+            <p class="text-sm text-slate-600 mb-4">El usuario se creo sin contrasena automatica. Asigna una ahora.</p>
+            <form asp-action="ResetPassword" method="post" class="space-y-2">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@passwordEmpleadoId.Value" />
+                <input type="hidden" name="stayOnCreate" value="true" />
+                <input type="hidden" name="empresaId" value="@empresaSeleccionada" />
+                <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
+                <div>
+                    <label class="block text-sm">Nueva contrasena</label>
+                    <input type="password" name="newPassword" required minlength="6" class="border rounded p-2 w-full" placeholder="Minimo 6 caracteres" />
+                </div>
+                <div>
+                    <label class="block text-sm">Confirmar contrasena</label>
+                    <input type="password" name="confirmPassword" required minlength="6" class="border rounded p-2 w-full" placeholder="Repite la contrasena" />
+                </div>
+                <div class="text-xs text-slate-500">Debe tener al menos 6 caracteres de longitud.</div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button class="btn-primary" type="submit">Guardar contrasena</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
 @section Styles {
     <link rel="stylesheet" href="~/vendor/tom-select/tom-select.css" />
+    <style>
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            padding: 24px;
+        }
+        .modal-card {
+            width: 100%;
+            max-width: 420px;
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+        }
+    </style>
 }
 
 @section Scripts {

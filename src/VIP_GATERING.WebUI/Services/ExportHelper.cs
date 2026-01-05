@@ -45,26 +45,35 @@ public static class ExportHelper
     public static byte[] BuildPdf(string title, IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<string>> rows)
     {
         QuestPDF.Settings.License = LicenseType.Community;
+        var dense = headers.Count > 10;
+        var fontSize = dense ? 7 : 9;
+        var cellPadding = dense ? 2 : 4;
+        var pageSize = headers.Count > 12 ? PageSizes.A3.Landscape() : PageSizes.A4.Landscape();
         return Document.Create(container =>
         {
             container.Page(page =>
             {
                 page.Margin(20);
-                page.Size(PageSizes.A4.Landscape());
-                page.DefaultTextStyle(x => x.FontSize(9));
-                page.Header().Text(title).FontSize(14).SemiBold();
+                page.Size(pageSize);
+                page.DefaultTextStyle(x => x.FontSize(fontSize));
+                page.Header().Text(title).FontSize(dense ? 12 : 14).SemiBold();
                 page.Content().Table(table =>
                 {
                     table.ColumnsDefinition(columns =>
                     {
                         for (var i = 0; i < headers.Count; i++)
-                            columns.RelativeColumn();
+                        {
+                            var header = headers[i];
+                            var h = header.ToLowerInvariant();
+                            var wide = h.Contains("opcion") || h.Contains("localizacion") || h.Contains("plato") || h.Contains("descripcion");
+                            columns.RelativeColumn(wide ? 2 : 1);
+                        }
                     });
                     table.Header(h =>
                     {
                         foreach (var header in headers)
                         {
-                            h.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text(header).SemiBold();
+                            h.Cell().Background(Colors.Grey.Lighten3).Padding(cellPadding).Text(header).SemiBold();
                         }
                     });
                     foreach (var row in rows)
@@ -72,7 +81,7 @@ public static class ExportHelper
                         for (var i = 0; i < headers.Count; i++)
                         {
                             var value = i < row.Count ? row[i] : string.Empty;
-                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(4).Text(value);
+                            table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten3).Padding(cellPadding).Text(value);
                         }
                     }
                 });

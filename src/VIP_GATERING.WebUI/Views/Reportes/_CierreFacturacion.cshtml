@@ -144,7 +144,7 @@
     </div>
 </div>
 
-<form method="post" asp-action="@Model.AccionGenerar" class="mt-6 flex flex-wrap items-center gap-3">
+<form method="post" asp-action="@Model.AccionGenerar" class="mt-6 flex flex-wrap items-center gap-3" id="cierreForm">
     @Html.AntiForgeryToken()
     <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
     <input type="hidden" name="desde" value="@Model.Inicio.ToString("yyyy-MM-dd")" />
@@ -178,5 +178,42 @@
 
         empresa.addEventListener('change', refresh);
         refresh();
+    })();
+</script>
+<script>
+    (() => {
+        const form = document.getElementById('cierreForm');
+        if (!form) return;
+        form.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const formData = new FormData(form);
+            const action = form.getAttribute('action');
+            if (!action) return;
+            const response = await fetch(action, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!response.ok) {
+                form.submit();
+                return;
+            }
+            const blob = await response.blob();
+            const fileName = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/\"/g, '') || 'reporte.pdf';
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(link.href);
+
+            const url = new URL(window.location.href);
+            ['empresaId', 'sucursalId', 'desde', 'hasta'].forEach((key) => {
+                const val = formData.get(key);
+                if (val) url.searchParams.set(key, val.toString());
+            });
+            window.location.assign(url.toString());
+        });
     })();
 </script>
