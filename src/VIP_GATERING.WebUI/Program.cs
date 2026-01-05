@@ -72,9 +72,9 @@ app.Use(async (context, next) =>
         headers["Content-Security-Policy"] =
             "default-src 'self'; " +
             "img-src 'self' data: blob:; " +
-            "style-src 'self' 'unsafe-inline'; " +
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
             "script-src 'self'; " +
-            "font-src 'self' data:; " +
+            "font-src 'self' data: https://fonts.gstatic.com; " +
             "object-src 'none'; " +
             "frame-ancestors 'self';";
         return Task.CompletedTask;

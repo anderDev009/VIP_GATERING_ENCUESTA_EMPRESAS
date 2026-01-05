@@ -938,6 +938,47 @@ public static class SeedData
             }
         }
 
+        var empresas = await db.Empresas.AsNoTracking().Select(e => e.Id).ToListAsync();
+        foreach (var empresaId in empresas)
+        {
+            var menu = await db.Menus
+                .Include(m => m.OpcionesPorDia)
+                .FirstOrDefaultAsync(m => m.SucursalId == null && m.EmpresaId == empresaId && m.FechaInicio == weekStart && m.FechaTermino == weekEnd);
+            if (menu == null)
+            {
+                menu = new Menu
+                {
+                    FechaInicio = weekStart,
+                    FechaTermino = weekEnd,
+                    EmpresaId = empresaId,
+                    SucursalId = null,
+                    OpcionesPorDia = new List<OpcionMenu>()
+                };
+                db.Menus.Add(menu);
+            }
+
+            var existentes = menu.OpcionesPorDia
+                .Where(o => o.HorarioId == almuerzoHorario.Id || o.HorarioId == desayunoHorario.Id)
+                .ToList();
+            if (existentes.Count > 0)
+                db.OpcionesMenu.RemoveRange(existentes);
+
+            foreach (var day in DemoWeekDays)
+            {
+                if (MenuAlmuerzoSemana20260112.TryGetValue(day, out var almuerzo))
+                {
+                    var om = await BuildOpcionMenuAsync(menu, day, almuerzoHorario.Id, almuerzo);
+                    menu.OpcionesPorDia.Add(om);
+                }
+
+                if (MenuDesayunoSemana20260112.TryGetValue(day, out var desayuno))
+                {
+                    var om = await BuildOpcionMenuAsync(menu, day, desayunoHorario.Id, desayuno);
+                    menu.OpcionesPorDia.Add(om);
+                }
+            }
+        }
+
         if (db.ChangeTracker.HasChanges())
             await db.SaveChangesAsync();
     }
