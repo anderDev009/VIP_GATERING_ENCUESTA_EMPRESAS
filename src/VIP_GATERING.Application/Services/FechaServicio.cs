@@ -10,7 +10,7 @@ public interface IFechaServicio
 
 public class FechaServicio : IFechaServicio
 {
-    public DateOnly Hoy() => DateOnly.FromDateTime(DateTime.UtcNow.Date);
+    public DateOnly Hoy() => DateOnly.FromDateTime(DateTime.Now.Date);
 
     public (DateOnly inicio, DateOnly fin) RangoSemanaSiguiente()
     {

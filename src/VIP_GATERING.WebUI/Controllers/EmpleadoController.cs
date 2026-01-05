@@ -12,6 +12,23 @@ namespace VIP_GATERING.WebUI.Controllers;
 [Authorize(Roles = "Empleado")]
 public class EmpleadoController : Controller
 {
+    private static readonly HashSet<string> LocalizacionesGrupoUniversalPermitidas = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "UNIT SA",
+        "AUTONOVO SERVICIOS AUTONOVO, SERVICIOS AUTORIZADOS",
+        "UNIVERSAL ASISTENCIA",
+        "ARS UNIVERSAL (EZALIA)",
+        "SUPLIDORA PROPARTES (30 DE MAYO)",
+        "UNIVERSAL TORRE HABITAT (HABITAT CENTER)",
+        "SEGURIDAD PROPARTE",
+        "SEGURIDAD AUTONOVO",
+        "SEGURIDAD DE TORRE",
+        "SEGURIDAD LOPE",
+        "SEGURIDAD KM",
+        "SEGURIDAD ZONA",
+        "KM",
+        "UNIVERSAL LINCONL (Lincoln 57 Mil)"
+    };
     private readonly IMenuService _menuService;
     private readonly AppDbContext _db;
     private readonly ICurrentUserService _current;
@@ -90,25 +107,44 @@ public class EmpleadoController : Controller
             .Select(el => (int?)el.LocalizacionId)
             .FirstOrDefaultAsync();
 
-        var localizacionesRaw = await _db.Localizaciones
+        var localizacionesAsignadasIds = await _db.EmpleadosLocalizaciones
             .AsNoTracking()
-            .Include(l => l.Sucursal)
-            .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId)
-            .Select(l => new { l.Id, l.Nombre, l.SucursalId, SucursalNombre = l.Sucursal!.Nombre })
+            .Where(el => el.EmpleadoId == empleadoId)
+            .Select(el => el.LocalizacionId)
             .ToListAsync();
 
-        var sucursalesEntregaMap = sucursalesEmpresa.ToDictionary(s => s.Id, s => s.Nombre);
+        var localizacionesQuery = _db.Localizaciones
+            .AsNoTracking()
+            .Include(l => l.Sucursal)
+            .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+        if (localizacionesAsignadasIds.Count > 0)
+            localizacionesQuery = localizacionesQuery.Where(l => localizacionesAsignadasIds.Contains(l.Id));
+        var localizacionesRaw = await localizacionesQuery.ToListAsync();
 
         var localizacionesEntregaInfo = localizacionesRaw
-            .Select(l => new
+            .GroupBy(l => l.Nombre.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
             {
-                l.Id,
-                l.Nombre,
-                l.SucursalId,
-                SucursalNombre = sucursalesEntregaMap.TryGetValue(l.SucursalId, out var sucNombre) ? sucNombre : string.Empty,
-                Etiqueta = string.IsNullOrWhiteSpace(l.SucursalNombre) ? l.Nombre : $"{l.SucursalNombre} - {l.Nombre}"
+                var preferida = g.FirstOrDefault(l => l.SucursalId == sucursalPrincipalId);
+                var loc = preferida ?? g.OrderBy(l => l.Id).First();
+                var sucNombre = loc.Sucursal?.Nombre ?? string.Empty;
+                return new
+                {
+                    loc.Id,
+                    loc.Nombre,
+                    loc.SucursalId,
+                    SucursalNombre = sucNombre,
+                    Etiqueta = loc.Nombre
+                };
             })
             .ToList();
+
+        if (string.Equals(sucursalDependencia.EmpresaNombre, "GRUPO UNIVERSAL", StringComparison.OrdinalIgnoreCase))
+        {
+            localizacionesEntregaInfo = localizacionesEntregaInfo
+                .Where(l => LocalizacionesGrupoUniversalPermitidas.Contains(l.Nombre.Trim()))
+                .ToList();
+        }
 
         var localizacionesEntregaDisponibles = localizacionesEntregaInfo
             .OrderBy(l => l.Etiqueta)
@@ -274,7 +310,7 @@ public class EmpleadoController : Controller
             .ToListAsync();
 
         var esSemanaActual = semanaClave == "actual";
-        var edicion = await _menuEdicion.CalcularVentanaAsync(menu, opciones, DateTime.UtcNow, esSemanaActual);
+        var edicion = await _menuEdicion.CalcularVentanaAsync(menu, opciones, DateTime.Now, esSemanaActual);
         var bloqueadoPorTiempo = encuestaCerrada && !edicion.TieneVentanaActiva;
         var bloqueado = bloqueadoPorTiempo || noHabilitado;
         var mensajeBloqueo = bloqueado ? (edicion.MensajeBloqueo ?? $"El menu esta cerrado desde {fechaCierreAuto:dd/MM/yyyy}.") : null;
@@ -284,7 +320,7 @@ public class EmpleadoController : Controller
             : null;
         if (notaVentana != null && edicion.ProximoLimiteUtc.HasValue)
         {
-            var prox = DateTime.SpecifyKind(edicion.ProximoLimiteUtc.Value, DateTimeKind.Utc).ToLocalTime();
+            var prox = edicion.ProximoLimiteUtc.Value;
             notaVentana += $" Proximo corte: {prox:dd/MM HH:mm}.";
         }
 
@@ -432,11 +468,20 @@ public class EmpleadoController : Controller
             .Where(el => el.EmpleadoId == empleadoId)
             .Select(el => (int?)el.LocalizacionId)
             .FirstOrDefaultAsync();
+        var localizacionesAsignadasIds = await _db.EmpleadosLocalizaciones
+            .AsNoTracking()
+            .Where(el => el.EmpleadoId == empleadoId)
+            .Select(el => el.LocalizacionId)
+            .ToListAsync();
         if (!localizacionEntregaId.HasValue || localizacionEntregaId == 0)
         {
             if (localizacionDefectoId.HasValue)
             {
                 localizacionEntregaId = localizacionDefectoId;
+            }
+            else if (localizacionesAsignadasIds.Count > 0)
+            {
+                localizacionEntregaId = localizacionesAsignadasIds.First();
             }
             else
             {
@@ -452,6 +497,11 @@ public class EmpleadoController : Controller
         Localizacion? localizacionEntrega = null;
         if (localizacionEntregaId.HasValue && localizacionEntregaId.Value != 0)
         {
+            if (localizacionesAsignadasIds.Count > 0 && !localizacionesAsignadasIds.Contains(localizacionEntregaId.Value))
+            {
+                TempData["Error"] = "Localizacion de entrega no permitida.";
+                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
+            }
             localizacionEntrega = await _db.Localizaciones
                 .AsNoTracking()
                 .Include(l => l.Sucursal)
@@ -541,7 +591,7 @@ public class EmpleadoController : Controller
 
         var hoy = _fechas.Hoy();
         var esSemanaActual = hoy >= menu.FechaInicio && hoy <= menu.FechaTermino;
-        var edicion = await _menuEdicion.CalcularVentanaAsync(menu, opciones, DateTime.UtcNow, esSemanaActual);
+        var edicion = await _menuEdicion.CalcularVentanaAsync(menu, opciones, DateTime.Now, esSemanaActual);
         var encuestaCerrada = _cierre.EstaCerrada(menu);
         if ((encuestaCerrada && !edicion.TieneVentanaActiva) || edicion.Cerrado)
         {

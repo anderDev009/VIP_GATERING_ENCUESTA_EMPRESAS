@@ -23,14 +23,6 @@
     <a class="btn-outline" asp-action="ExportPdf" asp-route-q="@ViewBag.Q">Exportar PDF</a>
 </div>
 
-@await Html.PartialAsync("_Pagination", new VIP_GATERING.WebUI.Models.PagedResult<object>
-{
-    Items = Model.Items.Cast<object>().ToList(),
-    Page = Model.Page,
-    PageSize = Model.PageSize,
-    TotalItems = Model.TotalItems
-})
-
 <div class="overflow-x-auto">
     <table class="min-w-full bg-white border rounded">
         <thead class="bg-slate-100">
@@ -80,3 +72,11 @@
         </tbody>
     </table>
 </div>
+
+@await Html.PartialAsync("_Pagination", new VIP_GATERING.WebUI.Models.PagedResult<object>
+{
+    Items = Model.Items.Cast<object>().ToList(),
+    Page = Model.Page,
+    PageSize = Model.PageSize,
+    TotalItems = Model.TotalItems
+})

@@ -45,9 +45,13 @@ public static class SeedData
             await db.SaveChangesAsync();
         }
 
-        // Evitar reinsertar data si ya existe una empresa (seed solo una vez).
+        // Evitar reinsertar data si ya existe una empresa (seed solo una vez),
+        // pero permitir sembrar menus puntuales.
         if (await db.Empresas.AnyAsync())
+        {
+            await EnsureMenuSemana20260112Async(db);
             return;
+        }
 
         var etlData = LoadMenuEtlData(contentRootPath);
         var defaultPrecioDesayuno = etlData?.Empresas?.Select(x => x.PrecioDesayuno).FirstOrDefault(x => x.HasValue);
@@ -261,9 +265,9 @@ public static class SeedData
             db.Roles.Add(new Rol { Nombre = "Empleado" });
         await db.SaveChangesAsync();
 
-        await EnsureDemoLocalizacionesAsync(db);
         await EnsureDemoSucursalHorariosAsync(db);
         await EnsureExcelMenuProductosAsync(db);
+        await EnsureMenuSemana20260112Async(db);
         await EnsureDemoMenusAndResponsesAsync(db);
     }
 
@@ -329,34 +333,6 @@ public static class SeedData
     };
 
     private static readonly string[] DemoHorarioNames = new[] { "Desayuno", "Almuerzo" };
-
-    private static async Task EnsureDemoLocalizacionesAsync(AppDbContext db)
-    {
-        var sucursales = await db.Sucursales.AsNoTracking().ToListAsync();
-        var localizacionNombres = new[] { "Logistica", "Operaciones", "Mesa de control" };
-        var porEmpresa = sucursales.GroupBy(s => s.EmpresaId).ToList();
-        foreach (var grupo in porEmpresa)
-        {
-            var suc = grupo.OrderBy(s => s.Nombre).First();
-            foreach (var nombre in localizacionNombres)
-            {
-                if (await db.Localizaciones.AnyAsync(l => l.EmpresaId == suc.EmpresaId && l.Nombre == nombre))
-                    continue;
-
-                db.Localizaciones.Add(new Localizacion
-                {
-                    Nombre = nombre,
-                    EmpresaId = suc.EmpresaId,
-                    SucursalId = suc.Id,
-                    Direccion = $"{suc.Nombre} - {nombre}",
-                    IndicacionesEntrega = $"Entrega en {nombre}"
-                });
-            }
-        }
-
-        if (db.ChangeTracker.HasChanges())
-            await db.SaveChangesAsync();
-    }
 
     private static async Task EnsureDemoSucursalHorariosAsync(AppDbContext db)
     {
@@ -758,6 +734,197 @@ public static class SeedData
                         Menu = menu,
                         OpcionId = adicional.Id
                     });
+                }
+            }
+        }
+
+        if (db.ChangeTracker.HasChanges())
+            await db.SaveChangesAsync();
+    }
+
+    private static readonly Dictionary<DayOfWeek, string?[]> MenuAlmuerzoSemana20260112 = new()
+    {
+        [DayOfWeek.Monday] = new[]
+        {
+            "Arroz blanco + Hab. giras guisadas + Filete de pechuga en salsa pizza + Ensalada verde picada + Casabe tostado",
+            "Sancocho criollo + Arroz blanco + Casabe tostado",
+            "Mangu de guineitos + Cuadros de res guisado + Ensalada verde picada + Casabe tostado",
+            "Feriado",
+            "Feriado"
+        },
+        [DayOfWeek.Tuesday] = new[]
+        {
+            "Arroz blanco + Hab. negras guisadas + Pollo horneado al limon + Ensalada capresa + Yuquita frita",
+            "Moro de guandules con auyama gratinado + Higado de res encebollado + Ensalada capresa + Yuquita frita",
+            "Pure de yuca y auyama gratinado + Pollo horneado al limon + Ensalada capresa + Yuquita frita",
+            "Ensalada mozzarella capresa",
+            "Jugo"
+        },
+        [DayOfWeek.Wednesday] = new[]
+        {
+            "Arroz blanco + Guandules guisados con perejil + Pollo frito empanizado + Ensalada coles law + Yaniquequito",
+            "Arroz con coco decorado + Pollo frito empanizado + Bacalao en ensalada con papa + Yaniquequito y cebolla",
+            "Papas salteadas + Guandules guisados + Ensalada coles law + Yaniquequito",
+            "Dia Feriado",
+            "Dia Feriado"
+        },
+        [DayOfWeek.Thursday] = new[]
+        {
+            "Arroz blanco + Hab. rojas guisadas + Pollo asado en su jugo + Ensalada verde fresca + Arepitas de maiz",
+            "Locrio de cerdo con vegetales + Hab. rojas guisadas + Ensalada verde fresca + Arepitas de maiz",
+            "Mangu maduro gratinado + Filete de mero al ajillo + Ensalada verde fresca + Arepitas de maiz",
+            "Ensalada san. de pavo y pastrami",
+            "Jugo"
+        },
+        [DayOfWeek.Friday] = new[]
+        {
+            "Arroz blanco + Lentejas guisadas + Pollo guisado a la criolla + Ens. de vegetales al vapor + Chips",
+            "Moro de hab. negras + Ens. de vegetales al vapor + Chips",
+            "Guineitos hervidos con aji y cubanela y cebolla + Chuleta fresca a la bbq + Ens. de vegetales al vapor + Chips",
+            "Baguette integral de pavo y mozzarella",
+            "Ensalada + Jugo"
+        }
+    };
+
+    private static readonly Dictionary<DayOfWeek, string?[]> MenuDesayunoSemana20260112 = new()
+    {
+        [DayOfWeek.Monday] = new[]
+        {
+            "Viveres + Compana",
+            "Empanada + Jugo",
+            "Croissant + Jugo"
+        },
+        [DayOfWeek.Tuesday] = new[]
+        {
+            "Viveres + Compana",
+            "Empanada + Jugo",
+            "Croissant + Jugo"
+        },
+        [DayOfWeek.Wednesday] = new[] { null, null, null },
+        [DayOfWeek.Thursday] = new[] { "Feriado", "Feriado", "Feriado" },
+        [DayOfWeek.Friday] = new[]
+        {
+            "Viveres + Compana",
+            "Empanada + Jugo",
+            "Croissant + Jugo"
+        }
+    };
+
+    private static async Task EnsureMenuSemana20260112Async(AppDbContext db)
+    {
+        var almuerzoHorario = await db.Horarios.FirstOrDefaultAsync(h => h.Nombre == "Almuerzo");
+        var desayunoHorario = await db.Horarios.FirstOrDefaultAsync(h => h.Nombre == "Desayuno");
+        if (almuerzoHorario == null || desayunoHorario == null)
+            return;
+
+        var weekStart = new DateOnly(2026, 1, 12);
+        var weekEnd = weekStart.AddDays(4);
+
+        var opcionesMap = new Dictionary<string, Opcion>(StringComparer.OrdinalIgnoreCase);
+
+        async Task<Opcion> EnsureOpcionAsync(string nombre)
+        {
+            var trimmed = nombre.Trim();
+            if (opcionesMap.TryGetValue(trimmed, out var cached))
+                return cached;
+
+            var existente = await db.Opciones.FirstOrDefaultAsync(o => o.Nombre == trimmed);
+            if (existente == null)
+            {
+                existente = new Opcion
+                {
+                    Nombre = trimmed,
+                    Descripcion = trimmed,
+                    Costo = 240m,
+                    Precio = 240m,
+                    EsSubsidiado = true,
+                    LlevaItbis = true
+                };
+                db.Opciones.Add(existente);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(existente.Descripcion))
+                    existente.Descripcion = trimmed;
+                if (existente.Costo <= 0)
+                    existente.Costo = 240m;
+                if (existente.Precio == null)
+                    existente.Precio = existente.Costo;
+                if (!existente.EsSubsidiado)
+                    existente.EsSubsidiado = true;
+                if (!existente.LlevaItbis)
+                    existente.LlevaItbis = true;
+            }
+
+            opcionesMap[trimmed] = existente;
+            return existente;
+        }
+
+        async Task<OpcionMenu> BuildOpcionMenuAsync(Menu menu, DayOfWeek day, int horarioId, string?[] opciones)
+        {
+            var items = opciones
+                .Select(o => string.IsNullOrWhiteSpace(o) ? null : o!.Trim())
+                .ToArray();
+
+            var opcionMenu = new OpcionMenu
+            {
+                Menu = menu,
+                DiaSemana = day,
+                HorarioId = horarioId,
+                OpcionesMaximas = items.Count(i => !string.IsNullOrWhiteSpace(i))
+            };
+
+            if (!string.IsNullOrWhiteSpace(items.ElementAtOrDefault(0)))
+                opcionMenu.OpcionA = await EnsureOpcionAsync(items[0]!);
+            if (!string.IsNullOrWhiteSpace(items.ElementAtOrDefault(1)))
+                opcionMenu.OpcionB = await EnsureOpcionAsync(items[1]!);
+            if (!string.IsNullOrWhiteSpace(items.ElementAtOrDefault(2)))
+                opcionMenu.OpcionC = await EnsureOpcionAsync(items[2]!);
+            if (!string.IsNullOrWhiteSpace(items.ElementAtOrDefault(3)))
+                opcionMenu.OpcionD = await EnsureOpcionAsync(items[3]!);
+            if (!string.IsNullOrWhiteSpace(items.ElementAtOrDefault(4)))
+                opcionMenu.OpcionE = await EnsureOpcionAsync(items[4]!);
+
+            return opcionMenu;
+        }
+
+        var sucursales = await db.Sucursales.ToListAsync();
+        foreach (var suc in sucursales)
+        {
+            var menu = await db.Menus
+                .Include(m => m.OpcionesPorDia)
+                .FirstOrDefaultAsync(m => m.SucursalId == suc.Id && m.FechaInicio == weekStart && m.FechaTermino == weekEnd);
+            if (menu == null)
+            {
+                menu = new Menu
+                {
+                    FechaInicio = weekStart,
+                    FechaTermino = weekEnd,
+                    EmpresaId = suc.EmpresaId,
+                    SucursalId = suc.Id,
+                    OpcionesPorDia = new List<OpcionMenu>()
+                };
+                db.Menus.Add(menu);
+            }
+
+            var existentes = menu.OpcionesPorDia
+                .Where(o => o.HorarioId == almuerzoHorario.Id || o.HorarioId == desayunoHorario.Id)
+                .ToList();
+            if (existentes.Count > 0)
+                db.OpcionesMenu.RemoveRange(existentes);
+
+            foreach (var day in DemoWeekDays)
+            {
+                if (MenuAlmuerzoSemana20260112.TryGetValue(day, out var almuerzo))
+                {
+                    var om = await BuildOpcionMenuAsync(menu, day, almuerzoHorario.Id, almuerzo);
+                    menu.OpcionesPorDia.Add(om);
+                }
+
+                if (MenuDesayunoSemana20260112.TryGetValue(day, out var desayuno))
+                {
+                    var om = await BuildOpcionMenuAsync(menu, day, desayunoHorario.Id, desayuno);
+                    menu.OpcionesPorDia.Add(om);
                 }
             }
         }

@@ -20,7 +20,7 @@ public class EncuestaCierreService : IEncuestaCierreService
         if (menu.EncuestaCerradaManualmente) return true;
         if (menu.EncuestaReabiertaManualmente) return false;
 
-        var fechaReferencia = DateOnly.FromDateTime((referencia ?? DateTime.UtcNow).Date);
+        var fechaReferencia = DateOnly.FromDateTime((referencia ?? DateTime.Now).Date);
         var fechaCierreAuto = DateOnly.FromDateTime(GetFechaCierreAutomatica(menu));
         return fechaReferencia >= fechaCierreAuto;
     }
