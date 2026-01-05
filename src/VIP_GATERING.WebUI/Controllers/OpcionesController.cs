@@ -121,6 +121,7 @@ public class OpcionesController : Controller
         model.EsSubsidiado = true;
         model.ImagenUrl = await _imageService.SaveAsync(imagen, null);
         await _db.Opciones.AddAsync(model);
+        await _db.SaveChangesAsync();
         foreach (var horarioId in selectedHorarios)
         {
             _db.OpcionesHorarios.Add(new OpcionHorario { OpcionId = model.Id, HorarioId = horarioId });
@@ -260,7 +261,7 @@ public class OpcionesController : Controller
             }
         }
 
-        var width = Math.Max(6, maxDigits);
+        var width = Math.Max(4, maxDigits);
         var next = max + 1;
         return $"P{next.ToString().PadLeft(width, '0')}";
     }
