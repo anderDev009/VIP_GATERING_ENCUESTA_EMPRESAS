@@ -800,7 +800,7 @@ public static class SeedData
             "Empanada + Jugo",
             "Croissant + Jugo"
         },
-        [DayOfWeek.Wednesday] = new[] { null, null, null },
+        [DayOfWeek.Wednesday] = new string?[] { null, null, null },
         [DayOfWeek.Thursday] = new[] { "Feriado", "Feriado", "Feriado" },
         [DayOfWeek.Friday] = new[]
         {
