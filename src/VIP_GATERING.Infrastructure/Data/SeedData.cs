@@ -263,7 +263,6 @@ public static class SeedData
 
         await EnsureDemoLocalizacionesAsync(db);
         await EnsureDemoSucursalHorariosAsync(db);
-        await EnsureDemoEmployeesAsync(db);
         await EnsureExcelMenuProductosAsync(db);
         await EnsureDemoMenusAndResponsesAsync(db);
     }
@@ -352,49 +351,6 @@ public static class SeedData
                     Direccion = $"{suc.Nombre} - {nombre}",
                     IndicacionesEntrega = $"Entrega en {nombre}"
                 });
-            }
-        }
-
-        if (db.ChangeTracker.HasChanges())
-            await db.SaveChangesAsync();
-    }
-
-    private static async Task EnsureDemoEmployeesAsync(AppDbContext db)
-    {
-        var sucursales = await db.Sucursales.ToListAsync();
-        var empleadosDemo = new[]
-        {
-            new { Codigo = "RIC001", Nombre = "Richard", Sucursal = "ADMINISTRACION UNIVERSAL" },
-            new { Codigo = "ANDO001", Nombre = "Anderson", Sucursal = "ARS UNIVERSAL" },
-            new { Codigo = "DAMIAN1", Nombre = "Damian", Sucursal = "ASISTENCIA UNIVERSAL" },
-            new { Codigo = "ADONYS1", Nombre = "Adonys", Sucursal = "SUPLIDORA PROPARTES" }
-        };
-
-        foreach (var demo in empleadosDemo)
-        {
-            var sucursal = sucursales.FirstOrDefault(s => string.Equals(s.Nombre, demo.Sucursal, StringComparison.OrdinalIgnoreCase));
-            if (sucursal == null)
-                continue;
-
-            var empleado = await db.Empleados.FirstOrDefaultAsync(e => e.Codigo == demo.Codigo);
-            if (empleado == null)
-            {
-                empleado = new Empleado
-                {
-                    Nombre = demo.Nombre,
-                    Codigo = demo.Codigo,
-                    SucursalId = sucursal.Id,
-                    EsSubsidiado = true,
-                    Estado = EmpleadoEstado.Habilitado
-                };
-                db.Empleados.Add(empleado);
-            }
-            else
-            {
-                empleado.Nombre = demo.Nombre;
-                empleado.SucursalId = sucursal.Id;
-                empleado.Estado = EmpleadoEstado.Habilitado;
-                empleado.EsSubsidiado = true;
             }
         }
 
@@ -500,60 +456,6 @@ public static class SeedData
             }
             if (db.ChangeTracker.HasChanges())
                 await db.SaveChangesAsync();
-        }
-
-        var localizMap = await db.Localizaciones
-            .GroupBy(l => l.SucursalId)
-            .ToDictionaryAsync(g => g.Key, g => g.ToList());
-
-        var employeeMap = empleados
-            .Where(e => !string.IsNullOrWhiteSpace(e.Codigo))
-            .ToDictionary(e => e.Codigo!, StringComparer.OrdinalIgnoreCase);
-
-        var historyCodes = new[] { "RIC001", "ANDO001", "DAMIAN1" };
-        var currentCodes = new[] { "DAMIAN1", "ADONYS1" };
-        var demoDays = new[] { DayOfWeek.Monday, DayOfWeek.Tuesday };
-
-        foreach (var weekStart in weekStarts.Take(2))
-        {
-            foreach (var code in historyCodes)
-            {
-                if (!employeeMap.TryGetValue(code, out var empleado))
-                    continue;
-                if (!menuCache.TryGetValue((empleado.SucursalId, weekStart), out var menu))
-                    continue;
-                if (!localizMap.TryGetValue(empleado.SucursalId, out var locs) || locs.Count == 0)
-                    continue;
-
-                for (var i = 0; i < demoDays.Length; i++)
-                {
-                    var day = demoDays[i];
-                    var horario = DemoHorarioNames[i % DemoHorarioNames.Length];
-                    var location = locs[i % locs.Count];
-                    var selection = i % 2 == 0 ? 'A' : 'B';
-                    await AddOrUpdateDemoResponseAsync(db, empleado, menu, day, horario, selection, location.Id, horarios);
-                }
-            }
-        }
-
-        foreach (var code in currentCodes)
-        {
-            if (!employeeMap.TryGetValue(code, out var empleado))
-                continue;
-            var weekStart = weekStarts.Last();
-            if (!menuCache.TryGetValue((empleado.SucursalId, weekStart), out var menu))
-                continue;
-            if (!localizMap.TryGetValue(empleado.SucursalId, out var locs) || locs.Count == 0)
-                continue;
-
-            for (var i = 0; i < demoDays.Length; i++)
-            {
-                var day = demoDays[i];
-                var horario = DemoHorarioNames[i % DemoHorarioNames.Length];
-                var location = locs[(i + 1) % locs.Count];
-                var selection = i % 2 == 0 ? 'A' : 'B';
-                await AddOrUpdateDemoResponseAsync(db, empleado, menu, day, horario, selection, location.Id, horarios);
-            }
         }
 
         if (db.ChangeTracker.HasChanges())

@@ -119,23 +119,7 @@ public static class IdentitySeeder
         var adminUserName = EnsurePasswordCompliance("ADMIN");
         await EnsureUser(adminUserName, "Admin");
 
-        var demoEmployees = new[]
-        {
-            new { Codigo = "RIC001", Nombre = "ZRichard1_" },
-            new { Codigo = "ANDO001", Nombre = "ZAnderson1_" },
-            new { Codigo = "DAMIAN1", Nombre = "ZDamian1_" },
-            new { Codigo = "ADONYS1", Nombre = "ZAdonys1_" }
-        };
-
-        foreach (var demo in demoEmployees)
-        {
-            var empleado = await db.Empleados.FirstOrDefaultAsync(e => e.Codigo == demo.Codigo);
-            if (empleado == null)
-                continue;
-            var userName = EnsurePasswordCompliance(demo.Nombre);
-            var user = await EnsureUser(userName, "Empleado", empleado.Sucursal?.EmpresaId, empleado.Id);
-            await EnsureClaimAsync(users, user, "must_change_password", "1");
-        }
+        // Solo se crea el usuario admin por defecto.
     }
 
     private static string BuildUserName(string filialNombre, string? empleadoCodigo, int empleadoId)
