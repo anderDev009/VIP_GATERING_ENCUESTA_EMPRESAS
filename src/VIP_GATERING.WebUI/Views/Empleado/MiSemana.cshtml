@@ -62,7 +62,7 @@
             <div class="control-field">
                 <label>Ver semana</label>
                 <div class="control-input">
-                    <select name="semana" onchange="this.form.submit()">
+                    <select name="semana">
                         @foreach (var s in Model.SemanasDisponibles)
                         {
                             if (s.Clave == Model.SemanaClave)
@@ -82,7 +82,7 @@
                 <div class="control-field">
                     <label>Localizaci&oacute;n</label>
                     <div class="control-input">
-                        <select name="localizacionId" onchange="this.form.submit()">
+                        <select name="localizacionId">
                             @foreach (var s in Model.LocalizacionesEntregaDisponibles)
                             {
                                 if (s.id == Model.LocalizacionEntregaId)

@@ -181,4 +181,17 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+  const weekSelect = document.querySelector('select[name="semana"]');
+  const locSelect = document.querySelector('select[name="localizacionId"]');
+  const filterForm = (weekSelect?.form || locSelect?.form);
+  const handleFilterChange = () => {
+    if (!filterForm) return;
+    const url = new URL(filterForm.action || window.location.href, window.location.origin);
+    if (weekSelect) url.searchParams.set('semana', weekSelect.value);
+    if (locSelect) url.searchParams.set('localizacionId', locSelect.value);
+    window.location.assign(url.toString());
+  };
+  if (weekSelect) weekSelect.addEventListener('change', handleFilterChange);
+  if (locSelect) locSelect.addEventListener('change', handleFilterChange);
 });
