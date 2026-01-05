@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const progressText = document.getElementById('progress-text');
   const progressBar = document.querySelector('.progress-bar');
+  const progressTrack = document.querySelector('.progress-track');
   const updateProgress = () => {
     if (!progressText || !progressBar) return;
     const activePanel = document.querySelector('[data-tab-panel].is-active') || document.querySelector('[data-tab-panel]');
@@ -151,6 +152,13 @@ document.addEventListener('DOMContentLoaded', () => {
     s.addEventListener('change', recomputeTotals);
   });
   recomputeTotals();
+
+  if (progressTrack && progressBar) {
+    const total = parseInt(progressTrack.getAttribute('data-progress-total') || '0', 10);
+    const selected = parseInt(progressTrack.getAttribute('data-progress-selected') || '0', 10);
+    const pct = total === 0 ? 0 : Math.round((selected / total) * 100);
+    progressBar.style.width = `${pct}%`;
+  }
 
   const form = document.getElementById('form-menu');
   if (form) {

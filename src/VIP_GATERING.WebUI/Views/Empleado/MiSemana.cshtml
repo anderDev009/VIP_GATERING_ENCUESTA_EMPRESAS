@@ -133,9 +133,8 @@ else if (Model.Bloqueado)
         </div>
         <span class="chip chip--success" id="summary-total-chip">Total a pagar: @Model.TotalEmpleado.ToString("C")</span>
     </div>
-    <div class="progress-track">
-        @{ var pct = progressTotal == 0 ? 0 : (int)(100.0 * progressSelected / progressTotal); }
-        <div style="width:@pct%" class="progress-bar"></div>
+    <div class="progress-track" data-progress-total="@progressTotal" data-progress-selected="@progressSelected">
+        <div class="progress-bar"></div>
     </div>
     @if (!Model.Bloqueado && !noHabilitado)
     {
