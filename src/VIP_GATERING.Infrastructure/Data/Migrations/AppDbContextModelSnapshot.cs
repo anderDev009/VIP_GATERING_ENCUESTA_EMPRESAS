@@ -559,11 +559,65 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
                     b.Property<int?>("AdicionalOpcionId")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("AdicionalBaseSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("AdicionalEmpleadoPagaSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("AdicionalEmpresaPagaSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("AdicionalItbisEmpleadoSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("AdicionalItbisEmpresaSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("AdicionalItbisSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("AdicionalTotalSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("BaseSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<bool>("CierreNomina")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("EmpleadoId")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("EmpleadoPagaSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("EmpresaPagaSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime?>("FechaCierreNomina")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FechaFacturado")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Facturado")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("ItbisEmpleadoSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("ItbisEmpresaSnapshot")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("ItbisSnapshot")
+                        .HasColumnType("numeric");
+
                     b.Property<int?>("LocalizacionEntregaId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("NumeroFactura")
+                        .HasColumnType("text");
 
                     b.Property<int>("OpcionMenuId")
                         .HasColumnType("integer");
@@ -573,6 +627,9 @@ namespace VIP_GATERING.Infrastructure.Data.Migrations
 
                     b.Property<int>("SucursalEntregaId")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("TotalSnapshot")
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -332,6 +332,7 @@ public class ReportesController : Controller
         if (empresaId != null)
             sucursalesBase = sucursalesBase.Where(s => s.EmpresaId == empresaId);
         var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
+        // TotalesEmpleados sigue mostrando el resumen general; no requiere filial obligatoria.
         var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
 
         var baseQuery = _db.RespuestasFormulario
@@ -411,6 +412,294 @@ public class ReportesController : Controller
             Filas = rows
         };
         return View(vm);
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> CierreNomina(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+        {
+            if (_current.EmpresaId == null) return Forbid();
+            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
+            empresaId = _current.EmpresaId;
+        }
+
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+
+        var data = await BuildCierreFacturacionAsync(empresaId, sucursalId, desde, hasta, false);
+        data.Vm.Titulo = "Cierre de nomina";
+        data.Vm.AccionGenerar = nameof(CierreNominaGenerar);
+        data.Vm.AccionLabel = "Cerrar nomina";
+        data.Vm.TipoExport = "cierre-nomina";
+        return View(data.Vm);
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CierreNominaGenerar(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null, string? format = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+        {
+            if (_current.EmpresaId == null) return Forbid();
+            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
+            empresaId = _current.EmpresaId;
+        }
+
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+
+        if (sucursalId == null)
+        {
+            TempData["ExportMessage"] = "Debe seleccionar una filial para cerrar nomina.";
+            return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        var data = await BuildCierreFacturacionAsync(empresaId, sucursalId, desde, hasta, false);
+        if (data.Items.Count == 0)
+        {
+            TempData["ExportMessage"] = "No hay registros disponibles para el cierre de nomina.";
+            return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        var timestamp = DateTime.UtcNow;
+        EnsureSnapshots(data.Respuestas);
+        foreach (var r in data.Respuestas)
+        {
+            r.CierreNomina = true;
+            r.FechaCierreNomina = timestamp;
+        }
+        await _db.SaveChangesAsync();
+
+        var exportItems = data.Items
+            .Select(i => i with { CierreNomina = true, FechaCierreNomina = timestamp })
+            .ToList();
+        var export = BuildCierreFacturacionExport(exportItems);
+        var formatKey = string.IsNullOrWhiteSpace(format) ? "excel" : format.Trim().ToLowerInvariant();
+        switch (formatKey)
+        {
+            case "csv":
+                return File(ExportHelper.BuildCsv(export.Headers, export.Rows), "text/csv",
+                    $"cierre-nomina-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.csv");
+            case "pdf":
+                return File(ExportHelper.BuildPdf("Cierre nomina", export.Headers, export.Rows), "application/pdf",
+                    $"cierre-nomina-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.pdf");
+            default:
+                return File(ExportHelper.BuildExcel("Cierre nomina", export.Headers, export.Rows),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    $"cierre-nomina-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.xlsx");
+        }
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> Facturacion(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+        {
+            if (_current.EmpresaId == null) return Forbid();
+            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
+            empresaId = _current.EmpresaId;
+        }
+
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+
+        var data = await BuildCierreFacturacionAsync(empresaId, sucursalId, desde, hasta, true);
+        data.Vm.Titulo = "Facturacion";
+        data.Vm.AccionGenerar = nameof(FacturacionGenerar);
+        data.Vm.AccionLabel = "Facturar";
+        data.Vm.TipoExport = "facturacion";
+        return View(data.Vm);
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> FacturacionGenerar(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null, string? format = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+        {
+            if (_current.EmpresaId == null) return Forbid();
+            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
+            empresaId = _current.EmpresaId;
+        }
+
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+
+        if (sucursalId == null)
+        {
+            TempData["ExportMessage"] = "Debe seleccionar una filial para facturar.";
+            return RedirectToAction(nameof(Facturacion), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        var data = await BuildCierreFacturacionAsync(empresaId, sucursalId, desde, hasta, true);
+        if (data.Items.Count == 0)
+        {
+            TempData["ExportMessage"] = "No hay registros disponibles para facturacion.";
+            return RedirectToAction(nameof(Facturacion), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        var timestamp = DateTime.UtcNow;
+        EnsureSnapshots(data.Respuestas);
+        foreach (var r in data.Respuestas)
+        {
+            r.Facturado = true;
+            r.FechaFacturado = timestamp;
+        }
+        await _db.SaveChangesAsync();
+
+        var exportItems = data.Items
+            .Select(i => i with { Facturado = true, FechaFacturado = timestamp })
+            .ToList();
+        var export = BuildCierreFacturacionExport(exportItems);
+        var formatKey = string.IsNullOrWhiteSpace(format) ? "excel" : format.Trim().ToLowerInvariant();
+        switch (formatKey)
+        {
+            case "csv":
+                return File(ExportHelper.BuildCsv(export.Headers, export.Rows), "text/csv",
+                    $"facturacion-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.csv");
+            case "pdf":
+                return File(ExportHelper.BuildPdf("Facturacion", export.Headers, export.Rows), "application/pdf",
+                    $"facturacion-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.pdf");
+            default:
+                return File(ExportHelper.BuildExcel("Facturacion", export.Headers, export.Rows),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    $"facturacion-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.xlsx");
+        }
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> Nominas(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+        {
+            if (_current.EmpresaId == null) return Forbid();
+            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
+            empresaId = _current.EmpresaId;
+        }
+
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+
+        var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, false);
+        vm.Titulo = "Nominas cerradas";
+        vm.ExportExcelAction = nameof(NominasExcel);
+        vm.ExportCsvAction = nameof(NominasCsv);
+        vm.ExportPdfAction = nameof(NominasPdf);
+        return View(vm);
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> Facturas(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+        {
+            if (_current.EmpresaId == null) return Forbid();
+            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
+            empresaId = _current.EmpresaId;
+        }
+
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+
+        var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, true);
+        vm.Titulo = "Facturas";
+        vm.ExportExcelAction = nameof(FacturasExcel);
+        vm.ExportCsvAction = nameof(FacturasCsv);
+        vm.ExportPdfAction = nameof(FacturasPdf);
+        return View(vm);
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> NominasCsv(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+            empresaId = _current.EmpresaId;
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+        var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, false);
+        var export = BuildDetalleExport(vm);
+        return File(ExportHelper.BuildCsv(export.Headers, export.Rows), "text/csv", $"nominas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> NominasExcel(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+            empresaId = _current.EmpresaId;
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+        var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, false);
+        var export = BuildDetalleExport(vm);
+        return File(ExportHelper.BuildExcel("Nominas cerradas", export.Headers, export.Rows),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"nominas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> NominasPdf(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+            empresaId = _current.EmpresaId;
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+        var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, false);
+        var export = BuildDetalleExport(vm);
+        return File(ExportHelper.BuildPdf("Nominas cerradas", export.Headers, export.Rows),
+            "application/pdf",
+            $"nominas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> FacturasCsv(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+            empresaId = _current.EmpresaId;
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+        var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, true);
+        var export = BuildDetalleExport(vm);
+        return File(ExportHelper.BuildCsv(export.Headers, export.Rows), "text/csv", $"facturas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> FacturasExcel(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+            empresaId = _current.EmpresaId;
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+        var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, true);
+        var export = BuildDetalleExport(vm);
+        return File(ExportHelper.BuildExcel("Facturas", export.Headers, export.Rows),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"facturas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [HttpGet]
+    public async Task<IActionResult> FacturasPdf(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+            empresaId = _current.EmpresaId;
+        if (empresaId == null)
+            empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
+        var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, true);
+        var export = BuildDetalleExport(vm);
+        return File(ExportHelper.BuildPdf("Facturas", export.Headers, export.Rows),
+            "application/pdf",
+            $"facturas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
     }
 
     [Authorize(Roles = "Empleado")]
@@ -714,7 +1003,7 @@ public class ReportesController : Controller
             .ToList();
 
         const decimal itbisRate = 0.18m;
-        var items = new List<(DateOnly Fecha, int FilialId, string Filial, int EmpleadoId, string Empleado, string Tanda, string Opcion, string Seleccion, string Localizacion, decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado)>();
+        var items = new List<(DateOnly Fecha, int FilialId, string Filial, int EmpleadoId, string Empleado, string EmpleadoCodigo, string Tanda, string Opcion, string Seleccion, string Localizacion, decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado)>();
 
         foreach (var r in respuestas)
         {
@@ -729,6 +1018,7 @@ public class ReportesController : Controller
             var filial = sucursalEntrega.Nombre;
             var filialId = sucursalEntrega.Id;
             var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
+            var empleadoCodigo = r.Empleado.Codigo ?? string.Empty;
             var empleadoIdRow = r.Empleado.Id;
             var localizacion = r.LocalizacionEntrega?.Nombre ?? "Sin asignar";
 
@@ -752,7 +1042,7 @@ public class ReportesController : Controller
                 var itbisEmpleado = Math.Round(itbis * ratio, 2);
                 var itbisEmpresa = itbis - itbisEmpleado;
 
-                items.Add((fechaDia, filialId, filial, empleadoIdRow, empleadoNombre, tanda, nombre, seleccionLabel, localizacion, basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado));
+                items.Add((fechaDia, filialId, filial, empleadoIdRow, empleadoNombre, empleadoCodigo, tanda, nombre, seleccionLabel, localizacion, basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado));
             }
 
             var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
@@ -821,15 +1111,6 @@ public class ReportesController : Controller
             .GroupBy(i => i.Localizacion)
             .Select(g =>
             {
-                var adicionalesDetalle = g
-                    .Where(i => i.Seleccion == "Adicional")
-                    .Select(i => i.Opcion.StartsWith("Adicional:", StringComparison.OrdinalIgnoreCase)
-                        ? i.Opcion.Replace("Adicional:", string.Empty).Trim()
-                        : i.Opcion)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(n => n)
-                    .ToList();
-
                 var row = new DistribucionVM.DistribucionCocinaRow
                 {
                     Localizacion = g.Key
@@ -860,12 +1141,26 @@ public class ReportesController : Controller
                     }
                 }
 
-                if (adicionalesDetalle.Count > 0)
-                    row.AdicionalesDetalle = string.Join(", ", adicionalesDetalle);
-
                 return row;
             })
             .OrderBy(r => r.Localizacion)
+            .ToList();
+
+        var porLocalizacionCocinaDetalle = items
+            .Select(i => new DistribucionVM.DistribucionCocinaDetalleRow
+            {
+                Localizacion = i.Localizacion,
+                EmpleadoCodigo = string.IsNullOrWhiteSpace(i.EmpleadoCodigo) ? i.Empleado : i.EmpleadoCodigo,
+                EmpleadoNombre = i.Empleado,
+                Seleccion = i.Seleccion,
+                Opcion = i.Opcion.StartsWith("Adicional:", StringComparison.OrdinalIgnoreCase)
+                    ? i.Opcion.Replace("Adicional:", string.Empty).Trim()
+                    : i.Opcion
+            })
+            .OrderBy(r => r.Localizacion)
+            .ThenBy(r => r.EmpleadoCodigo)
+            .ThenBy(r => r.Seleccion)
+            .ThenBy(r => r.Opcion)
             .ToList();
 
         var vm = new DistribucionVM
@@ -881,7 +1176,8 @@ public class ReportesController : Controller
             ResumenFiliales = resumen,
             DetalleEmpleados = detalle,
             PorLocalizacion = porLocalizacion,
-            PorLocalizacionCocina = porLocalizacionCocina
+            PorLocalizacionCocina = porLocalizacionCocina,
+            PorLocalizacionCocinaDetalle = porLocalizacionCocinaDetalle
         };
         return View(vm);
     }
@@ -1656,6 +1952,26 @@ public class ReportesController : Controller
         return query;
     }
 
+
+private IQueryable<RespuestaFormulario> AplicarFiltrosEmpresaSucursales(IQueryable<RespuestaFormulario> query, int? empresaId, IReadOnlyCollection<int> sucursalIds)
+{
+    if (empresaId != null)
+    {
+        query = query.Where(r =>
+            (r.SucursalEntrega != null && r.SucursalEntrega.EmpresaId == empresaId) ||
+            (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.Sucursal != null && r.Empleado.Sucursal.EmpresaId == empresaId));
+    }
+
+    if (sucursalIds.Count > 0)
+    {
+        query = query.Where(r =>
+            (r.SucursalEntrega != null && sucursalIds.Contains(r.SucursalEntregaId)) ||
+            (r.SucursalEntrega == null && r.Empleado != null && sucursalIds.Contains(r.Empleado.SucursalId)));
+    }
+
+    return query;
+}
+
     private async Task<List<Empleado>> ObtenerEmpleadosFiltroAsync(int? empresaId, int? sucursalId)
     {
         var query = _db.Empleados
@@ -1680,6 +1996,67 @@ public class ReportesController : Controller
             sucursal.SubsidioValor,
             empleado.SubsidioTipo,
             empleado.SubsidioValor);
+
+    private (decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado)
+        CalcularMontos(Opcion opcion, Empleado empleado, Sucursal sucursal, Empresa empresa, bool aplicaSubsidio)
+    {
+        const decimal itbisRate = 0.18m;
+        var basePrecio = opcion.Precio ?? opcion.Costo;
+        if (basePrecio < 0) basePrecio = 0;
+        var itbis = opcion.LlevaItbis ? Math.Round(basePrecio * itbisRate, 2) : 0m;
+        decimal precioEmpleado = basePrecio;
+        if (aplicaSubsidio)
+        {
+            var ctx = BuildSubsidioContext(opcion.EsSubsidiado, empleado, sucursal, empresa);
+            precioEmpleado = _subsidios.CalcularPrecioEmpleado(basePrecio, ctx).PrecioEmpleado;
+        }
+        var ratio = basePrecio > 0 ? precioEmpleado / basePrecio : 1m;
+        if (ratio < 0) ratio = 0;
+        if (ratio > 1) ratio = 1;
+        var total = basePrecio + itbis;
+        var empleadoPaga = Math.Round(total * ratio, 2);
+        var empresaPaga = total - empleadoPaga;
+        var itbisEmpleado = Math.Round(itbis * ratio, 2);
+        var itbisEmpresa = itbis - itbisEmpleado;
+
+        return (basePrecio, itbis, total, empresaPaga, empleadoPaga, itbisEmpresa, itbisEmpleado);
+    }
+
+    private void EnsureSnapshots(IEnumerable<RespuestaFormulario> respuestas)
+    {
+        foreach (var r in respuestas)
+        {
+            if (r.OpcionMenu == null || r.Empleado == null) continue;
+            var sucursalEmpleado = r.Empleado.Sucursal;
+            var empresaEmpleado = sucursalEmpleado?.Empresa;
+            if (sucursalEmpleado == null || empresaEmpleado == null) continue;
+
+            var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
+            if (opcion != null && r.BaseSnapshot == null)
+            {
+                var montos = CalcularMontos(opcion, r.Empleado, sucursalEmpleado, empresaEmpleado, true);
+                r.BaseSnapshot = montos.Base;
+                r.ItbisSnapshot = montos.Itbis;
+                r.TotalSnapshot = montos.Total;
+                r.EmpresaPagaSnapshot = montos.EmpresaPaga;
+                r.EmpleadoPagaSnapshot = montos.EmpleadoPaga;
+                r.ItbisEmpresaSnapshot = montos.ItbisEmpresa;
+                r.ItbisEmpleadoSnapshot = montos.ItbisEmpleado;
+            }
+
+            if (r.AdicionalOpcion != null && r.AdicionalBaseSnapshot == null)
+            {
+                var montosAdicional = CalcularMontos(r.AdicionalOpcion, r.Empleado, sucursalEmpleado, empresaEmpleado, false);
+                r.AdicionalBaseSnapshot = montosAdicional.Base;
+                r.AdicionalItbisSnapshot = montosAdicional.Itbis;
+                r.AdicionalTotalSnapshot = montosAdicional.Total;
+                r.AdicionalEmpresaPagaSnapshot = montosAdicional.EmpresaPaga;
+                r.AdicionalEmpleadoPagaSnapshot = montosAdicional.EmpleadoPaga;
+                r.AdicionalItbisEmpresaSnapshot = montosAdicional.ItbisEmpresa;
+                r.AdicionalItbisEmpleadoSnapshot = montosAdicional.ItbisEmpleado;
+            }
+        }
+    }
 
     private static DateOnly ObtenerFechaDiaSemana(DateOnly inicioSemana, DayOfWeek dia)
     {
@@ -1711,7 +2088,498 @@ public class ReportesController : Controller
         return "Sin nombre";
     }
 
-    private static (string Title, string Suffix, IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows) BuildDistribucionExport(DistribucionVM vm, string? vista)
+    
+
+private sealed record CierreItem(
+    string Empresa,
+    int FilialId,
+    string Filial,
+    int EmpleadoId,
+    string Empleado,
+    string EmpleadoCodigo,
+    DateOnly Fecha,
+    string Tanda,
+    string Localizacion,
+    string Opcion,
+    string Seleccion,
+    decimal Base,
+    decimal Itbis,
+    decimal Total,
+    decimal EmpresaPaga,
+    decimal ItbisEmpresa,
+    decimal EmpleadoPaga,
+    decimal ItbisEmpleado,
+    bool CierreNomina,
+    DateTime? FechaCierreNomina,
+    bool Facturado,
+    DateTime? FechaFacturado,
+    string? NumeroFactura);
+
+private sealed class CierreFacturacionData
+{
+    public CierreFacturacionVM Vm { get; init; } = new();
+    public List<CierreItem> Items { get; init; } = new();
+    public List<RespuestaFormulario> Respuestas { get; init; } = new();
+}
+
+private async Task<CierreFacturacionData> BuildCierreFacturacionAsync(int? empresaId, int? sucursalId, DateOnly? desde, DateOnly? hasta, bool esFacturacion)
+{
+    DateOnly inicio;
+    DateOnly fin;
+    if (desde.HasValue && hasta.HasValue)
+    {
+        inicio = desde.Value;
+        fin = hasta.Value;
+        if (fin < inicio)
+        {
+            (inicio, fin) = (fin, inicio);
+        }
+    }
+    else if (desde.HasValue)
+    {
+        inicio = desde.Value;
+        fin = inicio.AddDays(4);
+    }
+    else if (hasta.HasValue)
+    {
+        fin = hasta.Value;
+        inicio = fin.AddDays(-4);
+    }
+    else
+    {
+        (inicio, fin) = GetDefaultReportRange(_fechas.Hoy());
+    }
+
+    var empresasQuery = _db.Empresas.AsQueryable();
+    if (empresaId != null)
+        empresasQuery = empresasQuery.Where(e => e.Id == empresaId);
+    var empresas = await empresasQuery.OrderBy(e => e.Nombre).ToListAsync();
+
+    var sucursalesBase = _db.Sucursales.AsQueryable();
+    if (empresaId != null)
+        sucursalesBase = sucursalesBase.Where(s => s.EmpresaId == empresaId);
+    var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
+
+    var baseQuery = _db.RespuestasFormulario
+        .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
+        .Include(r => r.SucursalEntrega).ThenInclude(s => s!.Empresa)
+        .Include(r => r.LocalizacionEntrega)
+        .Include(r => r.AdicionalOpcion)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.Horario)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionA)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionB)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionC)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionD)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
+        .Where(r => r.OpcionMenu != null
+            && r.OpcionMenu.Menu != null
+            && r.OpcionMenu.Menu.FechaInicio <= fin
+            && r.OpcionMenu.Menu.FechaTermino >= inicio);
+
+    if (empresaId != null)
+        baseQuery = baseQuery.Where(r =>
+            (r.SucursalEntrega != null && r.SucursalEntrega.EmpresaId == empresaId) ||
+            (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.Sucursal != null && r.Empleado.Sucursal.EmpresaId == empresaId));
+
+    if (sucursalId != null)
+        baseQuery = baseQuery.Where(r =>
+            (r.SucursalEntrega != null && r.SucursalEntrega.Id == sucursalId) ||
+            (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.SucursalId == sucursalId));
+    if (!esFacturacion)
+        baseQuery = baseQuery.Where(r => !r.CierreNomina);
+    else
+        baseQuery = baseQuery.Where(r => r.CierreNomina && !r.Facturado);
+
+    var respuestas = await baseQuery.ToListAsync();
+    respuestas = respuestas
+        .Where(r =>
+        {
+            if (r.OpcionMenu == null || r.OpcionMenu.Menu == null) return false;
+            var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana);
+            return fecha >= inicio && fecha <= fin;
+        })
+        .ToList();
+
+    const decimal itbisRate = 0.18m;
+    var items = new List<CierreItem>();
+
+    foreach (var r in respuestas)
+    {
+        if (r.OpcionMenu == null || r.Empleado == null) continue;
+        var fechaDia = ObtenerFechaDiaSemana(r.OpcionMenu.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
+        var sucEmpleado = r.Empleado.Sucursal;
+        var empresaEmpleado = sucEmpleado?.Empresa;
+        var sucursalEntrega = r.SucursalEntrega ?? sucEmpleado;
+        if (sucEmpleado == null || empresaEmpleado == null || sucursalEntrega == null) continue;
+
+        var empresaNombre = sucursalEntrega.Empresa?.Nombre ?? empresaEmpleado.Nombre;
+        var tanda = r.OpcionMenu.Horario?.Nombre ?? "Sin horario";
+        var filial = sucursalEntrega.Nombre;
+        var filialId = sucursalEntrega.Id;
+        var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
+        var empleadoCodigo = r.Empleado.Codigo ?? string.Empty;
+        var empleadoIdRow = r.Empleado.Id;
+        var localizacion = r.LocalizacionEntrega?.Nombre ?? "Sin asignar";
+
+        void AddItem(Opcion opcion, string nombre, string seleccionLabel, bool aplicaSubsidio)
+        {
+            var basePrecio = opcion.Precio ?? opcion.Costo;
+            if (basePrecio < 0) basePrecio = 0;
+            var itbis = opcion.LlevaItbis ? Math.Round(basePrecio * itbisRate, 2) : 0m;
+            decimal precioEmpleado = basePrecio;
+            if (aplicaSubsidio)
+            {
+                var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, sucEmpleado, empresaEmpleado);
+                precioEmpleado = _subsidios.CalcularPrecioEmpleado(basePrecio, ctx).PrecioEmpleado;
+            }
+            var ratio = basePrecio > 0 ? precioEmpleado / basePrecio : 1m;
+            if (ratio < 0) ratio = 0;
+            if (ratio > 1) ratio = 1;
+            var total = basePrecio + itbis;
+            var empleadoPaga = Math.Round(total * ratio, 2);
+            var empresaPaga = total - empleadoPaga;
+            var itbisEmpleado = Math.Round(itbis * ratio, 2);
+            var itbisEmpresa = itbis - itbisEmpleado;
+
+            items.Add(new CierreItem(
+                empresaNombre,
+                filialId,
+                filial,
+                empleadoIdRow,
+                empleadoNombre,
+                empleadoCodigo,
+                fechaDia,
+                tanda,
+                localizacion,
+                nombre,
+                seleccionLabel,
+                basePrecio,
+                itbis,
+                total,
+                empresaPaga,
+                itbisEmpresa,
+                empleadoPaga,
+                itbisEmpleado,
+                r.CierreNomina,
+                r.FechaCierreNomina,
+                r.Facturado,
+                r.FechaFacturado,
+                r.NumeroFactura));
+        }
+
+        var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
+        if (opcion != null)
+            AddItem(opcion, opcion.Nombre ?? "Sin definir", MapSeleccion(r.Seleccion), true);
+
+        if (r.AdicionalOpcion != null)
+            AddItem(r.AdicionalOpcion, $"Adicional: {r.AdicionalOpcion.Nombre ?? "Sin definir"}", "Adicional", false);
+    }
+
+    var resumen = items
+        .GroupBy(i => new { i.FilialId, i.Filial })
+        .Select(g => new CierreFacturacionVM.ResumenFilialRow
+        {
+            FilialId = g.Key.FilialId,
+            Filial = g.Key.Filial,
+            Base = g.Sum(x => x.Base),
+            Itbis = g.Sum(x => x.Itbis),
+            Total = g.Sum(x => x.Total),
+            EmpresaPaga = g.Sum(x => x.EmpresaPaga),
+            EmpleadoPaga = g.Sum(x => x.EmpleadoPaga)
+        })
+        .OrderBy(r => r.Filial)
+        .ToList();
+
+    var detalle = items
+        .GroupBy(i => new { i.EmpleadoId, i.Empleado, i.FilialId, i.Filial })
+        .Select(g => new CierreFacturacionVM.DetalleEmpleadoRow
+        {
+            EmpleadoId = g.Key.EmpleadoId,
+            Empleado = g.Key.Empleado,
+            Filial = g.Key.Filial,
+            Cantidad = g.Count(),
+            Base = g.Sum(x => x.Base),
+            Itbis = g.Sum(x => x.Itbis),
+            Total = g.Sum(x => x.Total),
+            EmpresaPaga = g.Sum(x => x.EmpresaPaga),
+            EmpleadoPaga = g.Sum(x => x.EmpleadoPaga),
+            ItbisEmpresa = g.Sum(x => x.ItbisEmpresa),
+            ItbisEmpleado = g.Sum(x => x.ItbisEmpleado)
+        })
+        .OrderBy(r => r.Filial)
+        .ThenBy(r => r.Empleado)
+        .ToList();
+
+        var vm = new CierreFacturacionVM
+        {
+            Inicio = inicio,
+            Fin = fin,
+            EmpresaId = empresaId,
+            SucursalId = sucursalId,
+        Empresas = empresas,
+        Sucursales = sucursales,
+        ResumenFiliales = resumen,
+        DetalleEmpleados = detalle
+    };
+
+    return new CierreFacturacionData
+    {
+        Vm = vm,
+        Items = items,
+        Respuestas = respuestas
+    };
+}
+
+private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows) BuildCierreFacturacionExport(List<CierreItem> items)
+{
+    var headers = new[]
+    {
+        "Empresa",
+        "Filial",
+        "Empleado codigo",
+        "Empleado",
+        "Fecha",
+        "Tanda",
+        "Localizacion",
+        "Opcion",
+        "Seleccion",
+        "Precio base",
+        "ITBIS total",
+        "Total",
+        "Empresa paga",
+        "ITBIS empresa",
+        "Empleado paga",
+        "ITBIS empleado",
+        "Cierre nomina",
+        "Fecha cierre nomina",
+        "Facturado",
+        "Fecha facturado",
+        "Numero factura"
+    };
+
+    var rows = items.Select(i => (IReadOnlyList<string>)new[]
+    {
+        i.Empresa,
+        i.Filial,
+        i.EmpleadoCodigo,
+        i.Empleado,
+        i.Fecha.ToString("yyyy-MM-dd"),
+        i.Tanda,
+        i.Localizacion,
+        i.Opcion,
+        i.Seleccion,
+        i.Base.ToString("0.00", CultureInfo.InvariantCulture),
+        i.Itbis.ToString("0.00", CultureInfo.InvariantCulture),
+        i.Total.ToString("0.00", CultureInfo.InvariantCulture),
+        i.EmpresaPaga.ToString("0.00", CultureInfo.InvariantCulture),
+        i.ItbisEmpresa.ToString("0.00", CultureInfo.InvariantCulture),
+        i.EmpleadoPaga.ToString("0.00", CultureInfo.InvariantCulture),
+        i.ItbisEmpleado.ToString("0.00", CultureInfo.InvariantCulture),
+        i.CierreNomina ? "Si" : "No",
+        i.FechaCierreNomina?.ToString("yyyy-MM-dd") ?? string.Empty,
+        i.Facturado ? "Si" : "No",
+        i.FechaFacturado?.ToString("yyyy-MM-dd") ?? string.Empty,
+        i.NumeroFactura ?? string.Empty
+    }).ToList();
+
+    return (headers, rows);
+}
+
+private async Task<CierreFacturacionDetalleVM> BuildCierreFacturacionDetalleAsync(int? empresaId, int? sucursalId, DateOnly? desde, DateOnly? hasta, bool facturado)
+{
+    DateOnly inicio;
+    DateOnly fin;
+    if (desde.HasValue && hasta.HasValue)
+    {
+        inicio = desde.Value;
+        fin = hasta.Value;
+        if (fin < inicio)
+            (inicio, fin) = (fin, inicio);
+    }
+    else if (desde.HasValue)
+    {
+        inicio = desde.Value;
+        fin = inicio.AddDays(4);
+    }
+    else if (hasta.HasValue)
+    {
+        fin = hasta.Value;
+        inicio = fin.AddDays(-4);
+    }
+    else
+    {
+        (inicio, fin) = GetDefaultReportRange(_fechas.Hoy());
+    }
+
+    var empresasQuery = _db.Empresas.AsQueryable();
+    if (empresaId != null)
+        empresasQuery = empresasQuery.Where(e => e.Id == empresaId);
+    var empresas = await empresasQuery.OrderBy(e => e.Nombre).ToListAsync();
+
+    var sucursalesQuery = _db.Sucursales.AsQueryable();
+    if (empresaId != null)
+        sucursalesQuery = sucursalesQuery.Where(s => s.EmpresaId == empresaId);
+    var sucursales = await sucursalesQuery.OrderBy(s => s.Nombre).ToListAsync();
+
+    var baseQuery = _db.RespuestasFormulario
+        .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
+        .Include(r => r.SucursalEntrega).ThenInclude(s => s!.Empresa)
+        .Include(r => r.LocalizacionEntrega)
+        .Include(r => r.AdicionalOpcion)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.Horario)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionA)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionB)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionC)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionD)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
+        .Where(r => r.OpcionMenu != null
+            && r.OpcionMenu.Menu != null
+            && r.OpcionMenu.Menu.FechaInicio <= fin
+            && r.OpcionMenu.Menu.FechaTermino >= inicio);
+
+    if (empresaId != null)
+        baseQuery = baseQuery.Where(r =>
+            (r.SucursalEntrega != null && r.SucursalEntrega.EmpresaId == empresaId) ||
+            (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.Sucursal != null && r.Empleado.Sucursal.EmpresaId == empresaId));
+
+    if (sucursalId != null)
+        baseQuery = baseQuery.Where(r =>
+            (r.SucursalEntrega != null && r.SucursalEntrega.Id == sucursalId) ||
+            (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.SucursalId == sucursalId));
+
+    baseQuery = facturado ? baseQuery.Where(r => r.Facturado) : baseQuery.Where(r => r.CierreNomina);
+
+    var respuestas = await baseQuery.ToListAsync();
+    respuestas = respuestas
+        .Where(r =>
+        {
+            if (r.OpcionMenu == null || r.OpcionMenu.Menu == null) return false;
+            var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana);
+            return fecha >= inicio && fecha <= fin;
+        })
+        .ToList();
+
+    var rows = new List<CierreFacturacionDetalleVM.Row>();
+    foreach (var r in respuestas)
+    {
+        if (r.OpcionMenu == null || r.Empleado == null) continue;
+        var fechaDia = ObtenerFechaDiaSemana(r.OpcionMenu.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
+        var sucursalEntrega = r.SucursalEntrega ?? r.Empleado.Sucursal;
+        var empresa = sucursalEntrega?.Empresa ?? r.Empleado.Sucursal?.Empresa;
+        if (sucursalEntrega == null || empresa == null) continue;
+
+        var tanda = r.OpcionMenu.Horario?.Nombre ?? "Sin horario";
+        var filial = sucursalEntrega.Nombre;
+        var empresaNombre = empresa.Nombre ?? "Empresa";
+        var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
+        var empleadoCodigo = r.Empleado.Codigo ?? string.Empty;
+
+        var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
+        if (opcion != null)
+        {
+            var montos = r.BaseSnapshot.HasValue
+                ? (r.BaseSnapshot.Value, r.ItbisSnapshot ?? 0m, r.TotalSnapshot ?? 0m, r.EmpresaPagaSnapshot ?? 0m, r.EmpleadoPagaSnapshot ?? 0m, r.ItbisEmpresaSnapshot ?? 0m, r.ItbisEmpleadoSnapshot ?? 0m)
+                : CalcularMontos(opcion, r.Empleado, r.Empleado.Sucursal!, empresa, true);
+
+            rows.Add(new CierreFacturacionDetalleVM.Row
+            {
+                Fecha = fechaDia,
+                Empresa = empresaNombre,
+                Filial = filial,
+                EmpleadoCodigo = empleadoCodigo,
+                Empleado = empleadoNombre,
+                Tanda = tanda,
+                Seleccion = MapSeleccion(r.Seleccion),
+                Opcion = opcion.Nombre ?? "Sin definir",
+                Base = montos.Item1,
+                Itbis = montos.Item2,
+                Total = montos.Item3,
+                EmpresaPaga = montos.Item4,
+                EmpleadoPaga = montos.Item5,
+                ItbisEmpresa = montos.Item6,
+                ItbisEmpleado = montos.Item7,
+                EsAdicional = false
+            });
+        }
+
+        if (r.AdicionalOpcion != null)
+        {
+            var montosAd = r.AdicionalBaseSnapshot.HasValue
+                ? (r.AdicionalBaseSnapshot.Value, r.AdicionalItbisSnapshot ?? 0m, r.AdicionalTotalSnapshot ?? 0m, r.AdicionalEmpresaPagaSnapshot ?? 0m, r.AdicionalEmpleadoPagaSnapshot ?? 0m, r.AdicionalItbisEmpresaSnapshot ?? 0m, r.AdicionalItbisEmpleadoSnapshot ?? 0m)
+                : CalcularMontos(r.AdicionalOpcion, r.Empleado, r.Empleado.Sucursal!, empresa, false);
+
+            rows.Add(new CierreFacturacionDetalleVM.Row
+            {
+                Fecha = fechaDia,
+                Empresa = empresaNombre,
+                Filial = filial,
+                EmpleadoCodigo = empleadoCodigo,
+                Empleado = empleadoNombre,
+                Tanda = tanda,
+                Seleccion = "Adicional",
+                Opcion = r.AdicionalOpcion.Nombre ?? "Sin definir",
+                Base = montosAd.Item1,
+                Itbis = montosAd.Item2,
+                Total = montosAd.Item3,
+                EmpresaPaga = montosAd.Item4,
+                EmpleadoPaga = montosAd.Item5,
+                ItbisEmpresa = montosAd.Item6,
+                ItbisEmpleado = montosAd.Item7,
+                EsAdicional = true
+            });
+        }
+    }
+
+    rows = rows
+        .OrderBy(r => r.Filial)
+        .ThenBy(r => r.EmpleadoCodigo)
+        .ThenBy(r => r.Fecha)
+        .ToList();
+
+    return new CierreFacturacionDetalleVM
+    {
+        Inicio = inicio,
+        Fin = fin,
+        EmpresaId = empresaId,
+        SucursalId = sucursalId,
+        Empresas = empresas,
+        Sucursales = sucursales,
+        Filas = rows
+    };
+}
+
+private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows) BuildDetalleExport(CierreFacturacionDetalleVM vm)
+{
+    var headers = new[]
+    {
+        "Fecha","Empresa","Filial","Empleado codigo","Empleado","Tanda","Seleccion","Plato/Adicional","Base","ITBIS","Total","Empresa paga","Empleado paga","ITBIS empresa","ITBIS empleado"
+    };
+
+    var rows = vm.Filas.Select(r => (IReadOnlyList<string>)new[]
+    {
+        r.Fecha.ToString("yyyy-MM-dd"),
+        r.Empresa,
+        r.Filial,
+        r.EmpleadoCodigo,
+        r.Empleado,
+        r.Tanda,
+        r.Seleccion,
+        r.Opcion,
+        r.Base.ToString("0.00", CultureInfo.InvariantCulture),
+        r.Itbis.ToString("0.00", CultureInfo.InvariantCulture),
+        r.Total.ToString("0.00", CultureInfo.InvariantCulture),
+        r.EmpresaPaga.ToString("0.00", CultureInfo.InvariantCulture),
+        r.EmpleadoPaga.ToString("0.00", CultureInfo.InvariantCulture),
+        r.ItbisEmpresa.ToString("0.00", CultureInfo.InvariantCulture),
+        r.ItbisEmpleado.ToString("0.00", CultureInfo.InvariantCulture)
+    }).ToList();
+
+    return (headers, rows);
+}
+
+private static (string Title, string Suffix, IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows) BuildDistribucionExport(DistribucionVM vm, string? vista)
     {
         var normalized = string.IsNullOrWhiteSpace(vista) ? "resumen" : vista.Trim().ToLowerInvariant();
         switch (normalized)
@@ -1750,21 +2618,69 @@ public class ReportesController : Controller
                     r.EmpleadoPaga.ToString("C")
                 }).ToList());
             case "cocina":
-                return ("Localizacion (cocina)", "cocina", new[]
                 {
-                    "Localizacion","Opcion 1","Opcion 2","Opcion 3","Opcion 4","Opcion 5","Adicionales","Total","Adicionales detalle"
-                }, vm.PorLocalizacionCocina.Select(r => (IReadOnlyList<string>)new[]
-                {
-                    r.Localizacion,
-                    r.Opcion1.ToString(),
-                    r.Opcion2.ToString(),
-                    r.Opcion3.ToString(),
-                    r.Opcion4.ToString(),
-                    r.Opcion5.ToString(),
-                    r.Adicionales.ToString(),
-                    r.Total.ToString(),
-                    r.AdicionalesDetalle ?? string.Empty
-                }).ToList());
+                    var headers = new[]
+                    {
+                        "Localizacion","Opcion 1","Opcion 2","Opcion 3","Opcion 4","Opcion 5","Adicional","Total Opcion","Total Adic"
+                    };
+                    var rows = new List<IReadOnlyList<string>>();
+                    foreach (var r in vm.PorLocalizacionCocina)
+                    {
+                        rows.Add(new[]
+                        {
+                            r.Localizacion,
+                            r.Opcion1.ToString(),
+                            r.Opcion2.ToString(),
+                            r.Opcion3.ToString(),
+                            r.Opcion4.ToString(),
+                            r.Opcion5.ToString(),
+                            r.Adicionales.ToString(),
+                            r.TotalOpciones.ToString(),
+                            r.Adicionales.ToString()
+                        });
+
+                        var detalles = vm.PorLocalizacionCocinaDetalle
+                            .Where(d => d.Localizacion == r.Localizacion)
+                            .ToList();
+                        if (detalles.Count > 0)
+                        {
+                            rows.Add(new[]
+                            {
+                                "Detalle","Codigo","Nombre","Seleccion","Plato/Adicional","","","",""
+                            });
+                            foreach (var d in detalles)
+                            {
+                                rows.Add(new[]
+                                {
+                                    string.Empty,
+                                    d.EmpleadoCodigo,
+                                    d.EmpleadoNombre,
+                                    d.Seleccion,
+                                    d.Opcion,
+                                    string.Empty,
+                                    string.Empty,
+                                    string.Empty,
+                                    string.Empty
+                                });
+                            }
+                        }
+                    }
+
+                    rows.Add(new[]
+                    {
+                        "Fecha entrega", string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty
+                    });
+                    rows.Add(new[]
+                    {
+                        "Recibido", string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty
+                    });
+                    rows.Add(new[]
+                    {
+                        "Entregado", string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty
+                    });
+
+                    return ("Localizacion (cocina)", "cocina", headers, rows);
+                }
             default:
                 return ("Distribucion resumen por filial", "resumen", new[]
                 {

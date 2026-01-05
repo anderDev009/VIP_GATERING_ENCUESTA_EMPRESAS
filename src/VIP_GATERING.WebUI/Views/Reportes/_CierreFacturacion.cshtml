@@ -1,0 +1,182 @@
+@model VIP_GATERING.WebUI.Models.Reportes.CierreFacturacionVM
+
+<h1 class="text-xl font-semibold mb-4">@Model.Titulo desde @Model.Inicio.ToString("dd/MM/yyyy") hasta @Model.Fin.ToString("dd/MM/yyyy")</h1>
+
+@if (TempData["ExportMessage"] != null)
+{
+    <div class="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-emerald-700">
+        @TempData["ExportMessage"]
+    </div>
+}
+@if (Model.SucursalId == null)
+{
+    <div class="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-amber-700">
+        Selecciona una filial para ver los datos y proceder con el cierre o la facturacion.
+    </div>
+}
+
+@{
+    var limpiarAction = Model.AccionGenerar.Replace("Generar", string.Empty);
+}
+
+<form method="get" class="mb-6 grid gap-4 md:grid-cols-4 items-end">
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Desde</label>
+        <input type="date" name="desde" value="@Model.Inicio.ToString("yyyy-MM-dd")" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" />
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Hasta</label>
+        <input type="date" name="hasta" value="@Model.Fin.ToString("yyyy-MM-dd")" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" />
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Empresa</label>
+        @if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+        {
+            var empresaNombre = Model.Empresas.FirstOrDefault(e => e.Id == Model.EmpresaId)?.Nombre ?? "Empresa";
+            <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
+            <div class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">@empresaNombre</div>
+        }
+        else
+        {
+            <select name="empresaId" id="cierreEmpresa" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" required>
+                <option value="">Seleccione empresa</option>
+                @foreach (var e in Model.Empresas)
+                {
+                    <option value="@e.Id" selected="@(Model.EmpresaId == e.Id ? "selected" : null)">@e.Nombre</option>
+                }
+            </select>
+        }
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Filial</label>
+        <select name="sucursalId" id="cierreSucursal" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" required>
+            <option value="">Seleccione filial</option>
+            @foreach (var s in Model.Sucursales)
+            {
+                <option value="@s.Id" data-empresa="@s.EmpresaId" selected="@(Model.SucursalId == s.Id ? "selected" : null)">@s.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="flex gap-3 md:col-span-4">
+        <button type="submit" class="btn-primary">Filtrar</button>
+        <a class="btn-outline" asp-action="@limpiarAction">Limpiar</a>
+    </div>
+    <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3">
+        <div class="text-sm text-slate-600">Total base: <span class="font-semibold">@Model.TotalBase.ToString("C")</span></div>
+        <div class="text-sm text-slate-600">ITBIS: <span class="font-semibold">@Model.TotalItbis.ToString("C")</span></div>
+        <div class="text-sm text-slate-600">Total general: <span class="font-semibold">@Model.TotalGeneral.ToString("C")</span></div>
+        <div class="text-sm text-slate-600">Empresa paga: <span class="font-semibold">@Model.TotalEmpresa.ToString("C")</span></div>
+        <div class="text-sm text-slate-600">Empleado paga: <span class="font-semibold">@Model.TotalEmpleado.ToString("C")</span></div>
+    </div>
+</form>
+
+<div class="space-y-6">
+    <div>
+        <h2 class="text-base font-semibold mb-2">Resumen por filial</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>Filial</th>
+                <th class="text-right">Base</th>
+                <th class="text-right">ITBIS</th>
+                <th class="text-right">Total</th>
+                <th class="text-right">Empresa paga</th>
+                <th class="text-right">Empleado paga</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.ResumenFiliales)
+            {
+                <tr>
+                    <td>@r.Filial</td>
+                    <td class="text-right">@r.Base.ToString("C")</td>
+                    <td class="text-right">@r.Itbis.ToString("C")</td>
+                    <td class="text-right">@r.Total.ToString("C")</td>
+                    <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
+                    <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot>
+            <tr>
+                <th>Total</th>
+                <th class="text-right">@Model.TotalBase.ToString("C")</th>
+                <th class="text-right">@Model.TotalItbis.ToString("C")</th>
+                <th class="text-right">@Model.TotalGeneral.ToString("C")</th>
+                <th class="text-right">@Model.TotalEmpresa.ToString("C")</th>
+                <th class="text-right">@Model.TotalEmpleado.ToString("C")</th>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div>
+        <h2 class="text-base font-semibold mb-2">Detalle por empleado</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>Empleado</th>
+                <th>Filial</th>
+                <th class="text-right">Selecciones</th>
+                <th class="text-right">Base</th>
+                <th class="text-right">ITBIS</th>
+                <th class="text-right">Total</th>
+                <th class="text-right">Empresa paga</th>
+                <th class="text-right">Empleado paga</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.DetalleEmpleados)
+            {
+                <tr>
+                    <td>@r.Empleado</td>
+                    <td>@r.Filial</td>
+                    <td class="text-right">@r.Cantidad</td>
+                    <td class="text-right">@r.Base.ToString("C")</td>
+                    <td class="text-right">@r.Itbis.ToString("C")</td>
+                    <td class="text-right">@r.Total.ToString("C")</td>
+                    <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
+                    <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<form method="post" asp-action="@Model.AccionGenerar" class="mt-6 flex flex-wrap items-center gap-3">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
+    <input type="hidden" name="desde" value="@Model.Inicio.ToString("yyyy-MM-dd")" />
+    <input type="hidden" name="hasta" value="@Model.Fin.ToString("yyyy-MM-dd")" />
+    <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
+    <div class="flex flex-wrap gap-2">
+        <button type="submit" name="format" value="pdf" class="btn-primary">@Model.AccionLabel</button>
+    </div>
+    <div class="text-sm text-slate-500">Al confirmar, se descargara el PDF y el proceso quedara registrado como exitoso.</div>
+</form>
+
+<script>
+    (() => {
+        const empresa = document.getElementById('cierreEmpresa');
+        const sucursal = document.getElementById('cierreSucursal');
+        if (!empresa || !sucursal) return;
+
+        const refresh = () => {
+            const empresaId = empresa.value;
+            Array.from(sucursal.options).forEach(opt => {
+                if (!opt.value) return;
+                const show = !empresaId || opt.dataset.empresa === empresaId;
+                opt.style.display = show ? '' : 'none';
+            });
+            const current = sucursal.options[sucursal.selectedIndex];
+            if (current && current.style.display === 'none') {
+                const firstVisible = Array.from(sucursal.options).find(o => !o.value || o.style.display !== 'none');
+                if (firstVisible) sucursal.value = firstVisible.value;
+            }
+        };
+
+        empresa.addEventListener('change', refresh);
+        refresh();
+    })();
+</script>

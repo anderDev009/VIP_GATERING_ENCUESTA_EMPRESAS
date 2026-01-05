@@ -50,14 +50,6 @@
         <div class="text-xs text-slate-500 mt-1">Se usara como sugerida al entrar al menu, pero el empleado podra cambiarla.</div>
     </div>
     <div>
-        <label class="block text-sm">Estado</label>
-        <select asp-for="Estado" class="w-full border rounded p-2">
-            <option value="0" selected="@(Model.Estado==VIP_GATERING.Domain.Entities.EmpleadoEstado.Habilitado)">Habilitado</option>
-            <option value="1" selected="@(Model.Estado==VIP_GATERING.Domain.Entities.EmpleadoEstado.Suspendido)">Suspendido</option>
-            <option value="2" selected="@(Model.Estado==VIP_GATERING.Domain.Entities.EmpleadoEstado.Desactivado)">Desactivado</option>
-        </select>
-    </div>
-    <div>
         <label class="block text-sm">Codigo</label>
         <input asp-for="Codigo" class="w-full border rounded p-2" />
     </div>

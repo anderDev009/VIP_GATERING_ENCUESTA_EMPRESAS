@@ -278,11 +278,22 @@ public class EmpleadosController : Controller
         await _db.Empleados.AddAsync(model);
         await _db.SaveChangesAsync();
         var codigoUsuario = model.Codigo?.Trim();
-        if (!string.IsNullOrWhiteSpace(codigoUsuario))
+        string? passwordMessage = null;
+        if (!string.IsNullOrWhiteSpace(codigoUsuario) && codigoUsuario.Length == 6)
         {
             var autoUserError = await TryCreateIdentityUsuarioAsync(model.Id, codigoUsuario, model.SucursalId);
             if (!string.IsNullOrEmpty(autoUserError))
-                TempData["Error"] = autoUserError;
+            {
+                passwordMessage = autoUserError;
+            }
+            else
+            {
+                passwordMessage = "Contrasena inicial creada con el mismo codigo.";
+            }
+        }
+        else
+        {
+            passwordMessage = "No se genero contrasena automatica. Asignala en el mantenimiento del empleado.";
         }
         if (localizacionId.HasValue)
         {
@@ -311,6 +322,8 @@ public class EmpleadosController : Controller
         ViewBag.LocalizacionAsignadaId = null;
         ViewBag.EmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => (int?)s.EmpresaId).FirstOrDefaultAsync();
         ViewBag.SuccessMessage = "Empleado agregado con exito.";
+        ViewBag.PasswordMessage = passwordMessage;
+        ModelState.Clear();
         return View(new Empleado { SucursalId = model.SucursalId, EsSubsidiado = true, Codigo = null, Nombre = null });
     }
 
@@ -411,7 +424,7 @@ public class EmpleadosController : Controller
         ent.Codigo = codigoNuevo;
         ent.Nombre = model.Nombre;
         ent.SucursalId = model.SucursalId;
-        ent.Estado = model.Estado;
+        ent.Estado = EmpleadoEstado.Habilitado;
         ent.EsSubsidiado = model.EsSubsidiado;
         ent.SubsidioTipo = model.SubsidioTipo;
         ent.SubsidioValor = model.SubsidioValor;
@@ -709,7 +722,9 @@ public class EmpleadosController : Controller
         var resultMessage = await TryCreateIdentityUsuarioAsync(empleado.Id, codigo, empleado.SucursalId);
         if (string.IsNullOrEmpty(resultMessage))
         {
-            var defaultPassword = BuildDefaultPassword(empleado.Sucursal?.Nombre, codigo, empleado.Id);
+            var defaultPassword = codigo.Length == 6
+                ? codigo
+                : BuildDefaultPassword(empleado.Sucursal?.Nombre, codigo, empleado.Id);
             TempData["Success"] = $"Usuario creado automaticamente ({codigo}). La contrasena inicial es {defaultPassword}.";
         }
         else
@@ -842,7 +857,9 @@ public class EmpleadosController : Controller
             EmpresaId = empresaId
         };
 
-        var password = BuildDefaultPassword(sucursalNombre, username, empleadoId);
+        var password = username.Length == 6
+            ? username
+            : BuildDefaultPassword(sucursalNombre, username, empleadoId);
         var result = await _userManager.CreateAsync(usuario, password);
         if (!result.Succeeded)
             return $"No se pudo crear el usuario: {string.Join("; ", result.Errors.Select(e => e.Description))}";

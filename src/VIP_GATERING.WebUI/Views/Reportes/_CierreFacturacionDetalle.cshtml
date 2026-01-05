@@ -1,0 +1,126 @@
+@model VIP_GATERING.WebUI.Models.Reportes.CierreFacturacionDetalleVM
+
+<h1 class="text-xl font-semibold mb-4">@Model.Titulo desde @Model.Inicio.ToString("dd/MM/yyyy") hasta @Model.Fin.ToString("dd/MM/yyyy")</h1>
+
+@if (Model.SucursalId == null)
+{
+    <div class="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-amber-700">
+        Selecciona una filial para ver el detalle del cierre o facturacion.
+    </div>
+}
+
+@{
+    var limpiarAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+}
+<form method="get" class="mb-6 grid gap-4 md:grid-cols-4 items-end">
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Desde</label>
+        <input type="date" name="desde" value="@Model.Inicio.ToString("yyyy-MM-dd")" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" />
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Hasta</label>
+        <input type="date" name="hasta" value="@Model.Fin.ToString("yyyy-MM-dd")" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" />
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Empresa</label>
+        @if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
+        {
+            var empresaNombre = Model.Empresas.FirstOrDefault(e => e.Id == Model.EmpresaId)?.Nombre ?? "Empresa";
+            <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
+            <div class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">@empresaNombre</div>
+        }
+        else
+        {
+            <select name="empresaId" id="cierreDetalleEmpresa" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" required>
+                <option value="">Seleccione empresa</option>
+                @foreach (var e in Model.Empresas)
+                {
+                    <option value="@e.Id" selected="@(Model.EmpresaId == e.Id ? "selected" : null)">@e.Nombre</option>
+                }
+            </select>
+        }
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Filial</label>
+        <select name="sucursalId" id="cierreDetalleSucursal" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" required>
+            <option value="">Seleccione filial</option>
+            @foreach (var s in Model.Sucursales)
+            {
+                <option value="@s.Id" data-empresa="@s.EmpresaId" selected="@(Model.SucursalId == s.Id ? "selected" : null)">@s.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="flex gap-3 md:col-span-4">
+        <button type="submit" class="btn-primary">Filtrar</button>
+        <a class="btn-outline" asp-action="@limpiarAction">Limpiar</a>
+        <a class="btn-outline" asp-action="@Model.ExportExcelAction" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")">Exportar Excel</a>
+        <a class="btn-outline" asp-action="@Model.ExportCsvAction" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")">Exportar CSV</a>
+        <a class="btn-outline" asp-action="@Model.ExportPdfAction" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")">Exportar PDF</a>
+    </div>
+</form>
+
+<div class="overflow-x-auto">
+    <table class="min-w-full bg-white border rounded">
+        <thead class="bg-slate-100">
+            <tr>
+                <th class="text-left p-2">Fecha</th>
+                <th class="text-left p-2">Empresa</th>
+                <th class="text-left p-2">Filial</th>
+                <th class="text-left p-2">Empleado</th>
+                <th class="text-left p-2">Tanda</th>
+                <th class="text-left p-2">Seleccion</th>
+                <th class="text-left p-2">Plato/Adicional</th>
+                <th class="text-right p-2">Base</th>
+                <th class="text-right p-2">ITBIS</th>
+                <th class="text-right p-2">Total</th>
+                <th class="text-right p-2">Empresa paga</th>
+                <th class="text-right p-2">Empleado paga</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Filas)
+        {
+            var empleado = string.IsNullOrWhiteSpace(r.EmpleadoCodigo) ? r.Empleado : $"{r.EmpleadoCodigo} - {r.Empleado}";
+            <tr class="border-t">
+                <td class="p-2">@r.Fecha.ToString("yyyy-MM-dd")</td>
+                <td class="p-2">@r.Empresa</td>
+                <td class="p-2">@r.Filial</td>
+                <td class="p-2">@empleado</td>
+                <td class="p-2">@r.Tanda</td>
+                <td class="p-2">@r.Seleccion</td>
+                <td class="p-2">@r.Opcion</td>
+                <td class="p-2 text-right">@r.Base.ToString("C")</td>
+                <td class="p-2 text-right">@r.Itbis.ToString("C")</td>
+                <td class="p-2 text-right">@r.Total.ToString("C")</td>
+                <td class="p-2 text-right">@r.EmpresaPaga.ToString("C")</td>
+                <td class="p-2 text-right">@r.EmpleadoPaga.ToString("C")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+<script>
+    (() => {
+        const empresa = document.getElementById('cierreDetalleEmpresa');
+        const sucursal = document.getElementById('cierreDetalleSucursal');
+        if (!empresa || !sucursal) return;
+
+        const refresh = () => {
+            const empresaId = empresa.value;
+            Array.from(sucursal.options).forEach(opt => {
+                if (!opt.value) return;
+                const show = !empresaId || opt.dataset.empresa === empresaId;
+                opt.style.display = show ? '' : 'none';
+            });
+            const current = sucursal.options[sucursal.selectedIndex];
+            if (current && current.style.display === 'none') {
+                const firstVisible = Array.from(sucursal.options).find(o => !o.value || o.style.display !== 'none');
+                if (firstVisible) sucursal.value = firstVisible.value;
+            }
+        };
+
+        empresa.addEventListener('change', refresh);
+        refresh();
+    })();
+</script>

@@ -95,7 +95,8 @@ public class OpcionesController : Controller
     public async Task<IActionResult> Create()
     {
         await LoadHorariosAsync();
-        return View(new Opcion());
+        var model = new Opcion { Codigo = await GetNextPlatoCodigoAsync() };
+        return View(model);
     }
 
     [HttpPost]
@@ -113,6 +114,9 @@ public class OpcionesController : Controller
             await LoadHorariosAsync(selectedHorarios);
             return View(model);
         }
+        model.Codigo = string.IsNullOrWhiteSpace(model.Codigo)
+            ? await GetNextPlatoCodigoAsync()
+            : model.Codigo.Trim();
         model.LlevaItbis = true;
         model.EsSubsidiado = true;
         model.ImagenUrl = await _imageService.SaveAsync(imagen, null);
@@ -232,5 +236,32 @@ public class OpcionesController : Controller
             );
         }
         return query;
+    }
+
+    private async Task<string> GetNextPlatoCodigoAsync()
+    {
+        var codigos = await _db.Opciones
+            .AsNoTracking()
+            .Where(o => o.Codigo != null && o.Codigo.StartsWith("P"))
+            .Select(o => o.Codigo!)
+            .ToListAsync();
+
+        var max = 0;
+        var maxDigits = 0;
+        foreach (var codigo in codigos)
+        {
+            if (codigo.Length < 2) continue;
+            var digits = new string(codigo.Skip(1).TakeWhile(char.IsDigit).ToArray());
+            if (digits.Length == 0) continue;
+            if (int.TryParse(digits, out var val))
+            {
+                if (val > max) max = val;
+                if (digits.Length > maxDigits) maxDigits = digits.Length;
+            }
+        }
+
+        var width = Math.Max(6, maxDigits);
+        var next = max + 1;
+        return $"P{next.ToString().PadLeft(width, '0')}";
     }
 }

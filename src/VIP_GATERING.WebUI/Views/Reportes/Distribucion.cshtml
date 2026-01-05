@@ -186,13 +186,17 @@
             <th>Opcion 3</th>
             <th>Opcion 4</th>
             <th>Opcion 5</th>
-            <th>Adicionales</th>
-            <th>Total</th>
+            <th>Adicional</th>
+            <th>Total Opcion</th>
+            <th>Total Adic</th>
         </tr>
         </thead>
         <tbody>
         @foreach (var r in Model.PorLocalizacionCocina)
         {
+            var detalles = Model.PorLocalizacionCocinaDetalle
+                .Where(d => d.Localizacion == r.Localizacion)
+                .ToList();
             <tr>
                 <td>@r.Localizacion</td>
                 <td class="text-right">@r.Opcion1</td>
@@ -201,14 +205,32 @@
                 <td class="text-right">@r.Opcion4</td>
                 <td class="text-right">@r.Opcion5</td>
                 <td class="text-right">@r.Adicionales</td>
-                <td class="text-right">@r.Total</td>
+                <td class="text-right">@r.TotalOpciones</td>
+                <td class="text-right">@r.Adicionales</td>
             </tr>
-            @if (!string.IsNullOrWhiteSpace(r.AdicionalesDetalle))
+            @if (detalles.Count > 0)
             {
                 <tr>
-                    <td class="text-sm font-semibold">Adicionales</td>
-                    <td colspan="7" class="text-sm text-slate-600">@r.AdicionalesDetalle</td>
+                    <td class="text-sm font-semibold">Detalle</td>
+                    <td class="text-sm text-slate-600">Codigo</td>
+                    <td class="text-sm text-slate-600">Nombre</td>
+                    <td class="text-sm text-slate-600">Seleccion</td>
+                    <td colspan="3" class="text-sm text-slate-600">Plato/Adicional</td>
+                    <td></td>
+                    <td></td>
                 </tr>
+                @foreach (var d in detalles)
+                {
+                    <tr>
+                        <td></td>
+                        <td class="text-sm">@d.EmpleadoCodigo</td>
+                        <td class="text-sm">@d.EmpleadoNombre</td>
+                        <td class="text-sm">@d.Seleccion</td>
+                        <td colspan="3" class="text-sm">@d.Opcion</td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                }
             }
         }
         </tbody>
@@ -221,10 +243,26 @@
             <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion4)</th>
             <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion5)</th>
             <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Adicionales)</th>
-            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Total)</th>
+            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.TotalOpciones)</th>
+            <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Adicionales)</th>
         </tr>
         </tfoot>
     </table>
+
+    <div class="mt-6 grid gap-6 md:grid-cols-3 text-sm text-slate-600">
+        <div>
+            <div class="border-b border-slate-300 pb-2"></div>
+            <div class="mt-2 text-center">Fecha entrega</div>
+        </div>
+        <div>
+            <div class="border-b border-slate-300 pb-2"></div>
+            <div class="mt-2 text-center">Recibido</div>
+        </div>
+        <div>
+            <div class="border-b border-slate-300 pb-2"></div>
+            <div class="mt-2 text-center">Entregado</div>
+        </div>
+    </div>
 </div>
 
 @section Scripts {

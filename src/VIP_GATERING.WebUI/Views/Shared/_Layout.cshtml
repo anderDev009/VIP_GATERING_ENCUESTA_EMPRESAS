@@ -53,7 +53,7 @@
                     </div>
                 }
 
-                @if (User.IsInRole("Admin") || User.IsInRole("Empresa"))
+                @if (User.IsInRole("Admin") || User.IsInRole("Empresa") || User.IsInRole("RRHH"))
                 {
                     <div class="nav-dropdown">
                         <button type="button" class="btn-primary nav-dropdown__trigger">
@@ -66,7 +66,11 @@
                                 <a asp-controller="Reportes" asp-action="Distribucion" class="nav-dropdown__item">Distribucion</a>
                             }
                             <a asp-controller="Reportes" asp-action="Selecciones" class="nav-dropdown__item">Selecciones</a>
-                            <a asp-controller="Reportes" asp-action="Seleccionados" class="nav-dropdown__item">Seleccionados pendientes</a>
+                            <a asp-controller="Reportes" asp-action="Seleccionados" class="nav-dropdown__item">Seleccionados pendientes</a>
+                            <a asp-controller="Reportes" asp-action="CierreNomina" class="nav-dropdown__item">Cierre nomina</a>
+                            <a asp-controller="Reportes" asp-action="Facturacion" class="nav-dropdown__item">Facturacion</a>
+                            <a asp-controller="Reportes" asp-action="Nominas" class="nav-dropdown__item">Nominas cerradas</a>
+                            <a asp-controller="Reportes" asp-action="Facturas" class="nav-dropdown__item">Facturas</a>
                         </div>
                     </div>
                 }

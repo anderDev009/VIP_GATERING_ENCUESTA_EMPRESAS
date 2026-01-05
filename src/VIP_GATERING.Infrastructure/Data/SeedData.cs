@@ -331,11 +331,13 @@ public static class SeedData
     {
         var sucursales = await db.Sucursales.AsNoTracking().ToListAsync();
         var localizacionNombres = new[] { "Logistica", "Operaciones", "Mesa de control" };
-        foreach (var suc in sucursales)
+        var porEmpresa = sucursales.GroupBy(s => s.EmpresaId).ToList();
+        foreach (var grupo in porEmpresa)
         {
+            var suc = grupo.OrderBy(s => s.Nombre).First();
             foreach (var nombre in localizacionNombres)
             {
-                if (await db.Localizaciones.AnyAsync(l => l.SucursalId == suc.Id && l.Nombre == nombre))
+                if (await db.Localizaciones.AnyAsync(l => l.EmpresaId == suc.EmpresaId && l.Nombre == nombre))
                     continue;
 
                 db.Localizaciones.Add(new Localizacion

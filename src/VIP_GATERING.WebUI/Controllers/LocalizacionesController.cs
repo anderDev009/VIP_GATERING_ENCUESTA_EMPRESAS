@@ -22,30 +22,37 @@ public class LocalizacionesController : Controller
 
     public async Task<IActionResult> Index(int? empresaId, int? sucursalId, string? q, int page = 1, int pageSize = 10)
     {
-        var query = _db.Localizaciones
-            .Include(l => l.Empresa)
-            .Include(l => l.Sucursal).ThenInclude(s => s!.Empresa)
-            .AsQueryable();
+        var baseQuery = _db.Localizaciones.AsQueryable();
 
         if (User.IsInRole("Empresa") && _current.EmpresaId != null)
         {
             var currentEmpresaId = _current.EmpresaId;
-            query = query.Where(l => l.EmpresaId == currentEmpresaId);
+            baseQuery = baseQuery.Where(l => l.EmpresaId == currentEmpresaId);
         }
 
         if (empresaId != null)
-            query = query.Where(l => l.EmpresaId == empresaId);
+            baseQuery = baseQuery.Where(l => l.EmpresaId == empresaId);
         if (sucursalId != null)
-            query = query.Where(l => l.SucursalId == sucursalId);
+            baseQuery = baseQuery.Where(l => l.SucursalId == sucursalId);
 
         if (!string.IsNullOrWhiteSpace(q))
         {
             var ql = q.ToLower();
-            query = query.Where(l =>
+            baseQuery = baseQuery.Where(l =>
                 l.Nombre.ToLower().Contains(ql) ||
                 (l.Sucursal != null && l.Sucursal.Nombre.ToLower().Contains(ql)) ||
                 (l.Sucursal != null && l.Sucursal.Empresa != null && l.Sucursal.Empresa.Nombre.ToLower().Contains(ql)));
         }
+
+        var uniqueIds = await baseQuery
+            .GroupBy(l => new { l.EmpresaId, Nombre = l.Nombre.ToLower() })
+            .Select(g => g.Min(l => l.Id))
+            .ToListAsync();
+
+        var query = _db.Localizaciones
+            .Include(l => l.Empresa)
+            .Include(l => l.Sucursal).ThenInclude(s => s!.Empresa)
+            .Where(l => uniqueIds.Contains(l.Id));
 
         var paged = await query.OrderBy(l => l.Nombre).ToPagedResultAsync(page, pageSize);
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
@@ -112,32 +119,36 @@ public class LocalizacionesController : Controller
 
     private IQueryable<Localizacion> BuildExportQuery(int? empresaId, int? sucursalId, string? q)
     {
-        var query = _db.Localizaciones
-            .Include(l => l.Empresa)
-            .Include(l => l.Sucursal).ThenInclude(s => s!.Empresa)
-            .AsQueryable();
+        var baseQuery = _db.Localizaciones.AsQueryable();
 
         if (User.IsInRole("Empresa") && _current.EmpresaId != null)
         {
             var currentEmpresaId = _current.EmpresaId;
-            query = query.Where(l => l.EmpresaId == currentEmpresaId);
+            baseQuery = baseQuery.Where(l => l.EmpresaId == currentEmpresaId);
         }
 
         if (empresaId != null)
-            query = query.Where(l => l.EmpresaId == empresaId);
+            baseQuery = baseQuery.Where(l => l.EmpresaId == empresaId);
         if (sucursalId != null)
-            query = query.Where(l => l.SucursalId == sucursalId);
+            baseQuery = baseQuery.Where(l => l.SucursalId == sucursalId);
 
         if (!string.IsNullOrWhiteSpace(q))
         {
             var ql = q.ToLower();
-            query = query.Where(l =>
+            baseQuery = baseQuery.Where(l =>
                 l.Nombre.ToLower().Contains(ql) ||
                 (l.Sucursal != null && l.Sucursal.Nombre.ToLower().Contains(ql)) ||
                 (l.Sucursal != null && l.Sucursal.Empresa != null && l.Sucursal.Empresa.Nombre.ToLower().Contains(ql)));
         }
 
-        return query;
+        var uniqueIds = baseQuery
+            .GroupBy(l => new { l.EmpresaId, Nombre = l.Nombre.ToLower() })
+            .Select(g => g.Min(l => l.Id));
+
+        return _db.Localizaciones
+            .Include(l => l.Empresa)
+            .Include(l => l.Sucursal).ThenInclude(s => s!.Empresa)
+            .Where(l => uniqueIds.Contains(l.Id));
     }
 
     public async Task<IActionResult> Create()
@@ -186,7 +197,18 @@ public class LocalizacionesController : Controller
             return await ReturnInvalidAsync(model);
         }
 
+        var nombre = model.Nombre.Trim();
+        var existe = await _db.Localizaciones.AnyAsync(l =>
+            l.EmpresaId == model.EmpresaId
+            && l.Nombre.ToLower() == nombre.ToLower());
+        if (existe)
+        {
+            ModelState.AddModelError("Nombre", "Ya existe una localizacion con ese nombre en la empresa.");
+            return await ReturnInvalidAsync(model);
+        }
+
         model.SucursalId = sucursal.Id;
+        model.Nombre = nombre;
         await _db.Localizaciones.AddAsync(model);
         await _db.SaveChangesAsync();
         TempData["Success"] = "Localizacion creada.";
@@ -233,26 +255,43 @@ public class LocalizacionesController : Controller
         if (User.IsInRole("Empresa") && _current.EmpresaId != null && _current.EmpresaId != model.EmpresaId)
             return Forbid();
 
-        var sucursal = await _db.Sucursales
-            .Where(s => s.EmpresaId == model.EmpresaId)
-            .OrderBy(s => s.Nombre)
-            .FirstOrDefaultAsync();
-        if (sucursal == null)
+        var sucursalId = ent.SucursalId;
+        if (ent.EmpresaId != model.EmpresaId)
         {
-            ModelState.AddModelError("EmpresaId", "La empresa seleccionada no tiene filiales.");
+            var sucursal = await _db.Sucursales
+                .Where(s => s.EmpresaId == model.EmpresaId)
+                .OrderBy(s => s.Nombre)
+                .FirstOrDefaultAsync();
+            if (sucursal == null)
+            {
+                ModelState.AddModelError("EmpresaId", "La empresa seleccionada no tiene filiales.");
+                ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
+                return View(model);
+            }
+            sucursalId = sucursal.Id;
+        }
+
+        var nombre = model.Nombre.Trim();
+        var existe = await _db.Localizaciones.AnyAsync(l =>
+            l.Id != ent.Id
+            && l.EmpresaId == model.EmpresaId
+            && l.Nombre.ToLower() == nombre.ToLower());
+        if (existe)
+        {
+            ModelState.AddModelError("Nombre", "Ya existe una localizacion con ese nombre en la filial.");
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
             return View(model);
         }
 
-        ent.Nombre = model.Nombre;
+        ent.Nombre = nombre;
         ent.EmpresaId = model.EmpresaId;
-        ent.SucursalId = sucursal.Id;
+        ent.SucursalId = sucursalId;
         ent.Rnc = model.Rnc;
         ent.Direccion = model.Direccion;
         ent.IndicacionesEntrega = model.IndicacionesEntrega;
         await _db.SaveChangesAsync();
         TempData["Success"] = "Localizacion actualizada.";
-        return RedirectToAction(nameof(Index), new { empresaId = sucursal.EmpresaId });
+        return RedirectToAction(nameof(Index), new { empresaId = ent.EmpresaId });
     }
 
     [HttpPost]

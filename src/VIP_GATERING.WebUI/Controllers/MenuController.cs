@@ -291,6 +291,51 @@ public class MenuController : Controller
             empresaId = _current.EmpresaId;
         if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
 
+        var vm = await BuildMenuPreviewVmAsync(inicio, fin, empresaId, sucursalId);
+        return View("VistaPrevia", vm);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportMenuCsv(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
+    {
+        if (User.IsInRole("Empresa") && empresaId == null)
+            empresaId = _current.EmpresaId;
+        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
+
+        var vm = await BuildMenuPreviewVmAsync(inicio, fin, empresaId, sucursalId);
+        var export = BuildMenuPreviewExport(vm);
+        var bytes = ExportHelper.BuildCsv(export.Headers, export.Rows);
+        return File(bytes, "text/csv", $"menu-{inicio:yyyyMMdd}-{fin:yyyyMMdd}.csv");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportMenuExcel(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
+    {
+        if (User.IsInRole("Empresa") && empresaId == null)
+            empresaId = _current.EmpresaId;
+        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
+
+        var vm = await BuildMenuPreviewVmAsync(inicio, fin, empresaId, sucursalId);
+        var export = BuildMenuPreviewExport(vm);
+        var bytes = ExportHelper.BuildExcel("Menu", export.Headers, export.Rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"menu-{inicio:yyyyMMdd}-{fin:yyyyMMdd}.xlsx");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ExportMenuPdf(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
+    {
+        if (User.IsInRole("Empresa") && empresaId == null)
+            empresaId = _current.EmpresaId;
+        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
+
+        var vm = await BuildMenuPreviewVmAsync(inicio, fin, empresaId, sucursalId);
+        var export = BuildMenuPreviewExport(vm);
+        var pdf = ExportHelper.BuildPdf("Menu", export.Headers, export.Rows);
+        return File(pdf, "application/pdf", $"menu-{inicio:yyyyMMdd}-{fin:yyyyMMdd}.pdf");
+    }
+
+    private async Task<MenuPreviewVM> BuildMenuPreviewVmAsync(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
+    {
         var menu = await _menuService.GetOrCreateMenuAsync(inicio, fin, empresaId, sucursalId);
         var opciones = await _db.OpcionesMenu
             .Include(o => o.OpcionA)
@@ -317,7 +362,7 @@ public class MenuController : Controller
             ? await _db.Sucursales.Where(s => s.Id == sucursalLookupId).Select(s => s.Nombre).FirstOrDefaultAsync()
             : null;
 
-        var vm = new MenuPreviewVM
+        return new MenuPreviewVM
         {
             FechaInicio = inicio,
             FechaTermino = fin,
@@ -339,8 +384,36 @@ public class MenuController : Controller
                 OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas
             }).ToList()
         };
+    }
 
-        return View("VistaPrevia", vm);
+    private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows) BuildMenuPreviewExport(MenuPreviewVM vm)
+    {
+        var max = vm.Dias.Count == 0 ? 3 : vm.Dias.Max(d => d.OpcionesMaximas <= 0 ? 3 : d.OpcionesMaximas);
+        var headers = new List<string> { "Dia", "Horario" };
+        for (var i = 0; i < max; i++)
+        {
+            headers.Add($"Plato {(char)('A' + i)}");
+        }
+
+        var rows = vm.Dias
+            .OrderBy(d => d.HorarioOrden)
+            .ThenBy(d => d.DiaSemana)
+            .Select(d =>
+            {
+                var row = new List<string>
+                {
+                    System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana),
+                    d.HorarioNombre ?? "General"
+                };
+                var opciones = new[] { d.A, d.B, d.C, d.D, d.E };
+                for (var i = 0; i < max; i++)
+                {
+                    row.Add(opciones.Length > i ? (opciones[i] ?? string.Empty) : string.Empty);
+                }
+                return (IReadOnlyList<string>)row;
+            }).ToList();
+
+        return (headers, rows);
     }
 
     [HttpGet]

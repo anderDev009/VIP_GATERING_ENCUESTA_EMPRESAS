@@ -19,6 +19,7 @@ public class DistribucionVM
     public List<DetalleEmpleadoRow> DetalleEmpleados { get; set; } = new();
     public List<DistribucionLocalizacionRow> PorLocalizacion { get; set; } = new();
     public List<DistribucionCocinaRow> PorLocalizacionCocina { get; set; } = new();
+    public List<DistribucionCocinaDetalleRow> PorLocalizacionCocinaDetalle { get; set; } = new();
 
     public decimal TotalBase => ResumenFiliales.Sum(r => r.Base);
     public decimal TotalItbis => ResumenFiliales.Sum(r => r.Itbis);
@@ -73,7 +74,16 @@ public class DistribucionVM
         public int Opcion4 { get; set; }
         public int Opcion5 { get; set; }
         public int Adicionales { get; set; }
-        public int Total => Opcion1 + Opcion2 + Opcion3 + Opcion4 + Opcion5 + Adicionales;
-        public string? AdicionalesDetalle { get; set; }
+        public int TotalOpciones => Opcion1 + Opcion2 + Opcion3 + Opcion4 + Opcion5;
+        public int Total => TotalOpciones + Adicionales;
+    }
+
+    public class DistribucionCocinaDetalleRow
+    {
+        public string Localizacion { get; set; } = string.Empty;
+        public string EmpleadoCodigo { get; set; } = string.Empty;
+        public string EmpleadoNombre { get; set; } = string.Empty;
+        public string Seleccion { get; set; } = string.Empty;
+        public string Opcion { get; set; } = string.Empty;
     }
 }

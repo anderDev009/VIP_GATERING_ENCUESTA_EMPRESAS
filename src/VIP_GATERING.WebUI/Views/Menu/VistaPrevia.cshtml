@@ -33,8 +33,11 @@
     </div>
     @if (!string.IsNullOrWhiteSpace(backUrl))
     {
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
             <a class="btn-outline" href="@backUrl">Volver</a>
+            <a class="btn-outline" asp-action="ExportMenuExcel" asp-route-inicio="@Model.FechaInicio.ToString("yyyy-MM-dd")" asp-route-fin="@Model.FechaTermino.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId">Exportar Excel</a>
+            <a class="btn-outline" asp-action="ExportMenuCsv" asp-route-inicio="@Model.FechaInicio.ToString("yyyy-MM-dd")" asp-route-fin="@Model.FechaTermino.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId">Exportar CSV</a>
+            <a class="btn-outline" asp-action="ExportMenuPdf" asp-route-inicio="@Model.FechaInicio.ToString("yyyy-MM-dd")" asp-route-fin="@Model.FechaTermino.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId">Exportar PDF</a>
         </div>
     }
     <div class="panel-subtitle">Esta vista muestra como se vera el menu para los empleados.</div>

@@ -106,7 +106,84 @@ app.MapControllerRoute(
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    var applied = false;
+    for (var attempt = 1; attempt <= 10; attempt++)
+    {
+        try
+        {
+            var pending = await db.Database.GetPendingMigrationsAsync();
+            if (pending.Any())
+                db.Database.Migrate();
+            applied = true;
+            break;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Startup] Migracion fallida (intento {attempt}/10): {ex.Message}");
+            await Task.Delay(TimeSpan.FromSeconds(3));
+        }
+    }
+    if (!applied)
+        throw new Exception("No se pudieron aplicar migraciones despues de varios intentos.");
+
+    // Fallback defensivo: asegurar columnas nuevas si la BD quedo desfasada.
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"CierreNomina\" boolean NOT NULL DEFAULT false;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"FechaCierreNomina\" timestamp with time zone NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"Facturado\" boolean NOT NULL DEFAULT false;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"FechaFacturado\" timestamp with time zone NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"NumeroFactura\" text NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"BaseSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"ItbisSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"TotalSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"EmpresaPagaSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"EmpleadoPagaSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"ItbisEmpresaSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"ItbisEmpleadoSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"AdicionalBaseSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"AdicionalItbisSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"AdicionalTotalSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"AdicionalEmpresaPagaSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"AdicionalEmpleadoPagaSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"AdicionalItbisEmpresaSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"AdicionalItbisEmpleadoSnapshot\" numeric NULL;");
     await SeedData.EnsureSeedAsync(db, app.Environment.ContentRootPath);
     // Ensure Identity roles and demo users
     var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
