@@ -256,7 +256,10 @@ public class MenuService : IMenuService
         {
             var asignadasLoc = await _empleadosLocalizaciones.ListAsync(el => el.EmpleadoId == empleadoId, ct);
             if (asignadasLoc.Count > 0 && !asignadasLoc.Any(a => a.LocalizacionId == localizacion.Id))
-                throw new InvalidOperationException("La localizacion de entrega no esta asignada al empleado.");
+            {
+                // La validacion de pertenencia a empresa se realiza en el controller.
+                // Aqui no bloqueamos si la localizacion no esta asignada al empleado.
+            }
         }
 
         // Validar adicional: debe estar configurado como adicional fijo para el menu
