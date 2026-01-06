@@ -905,6 +905,8 @@ public static class SeedData
             var menu = await db.Menus
                 .Include(m => m.OpcionesPorDia)
                 .FirstOrDefaultAsync(m => m.SucursalId == suc.Id && m.FechaInicio == weekStart && m.FechaTermino == weekEnd);
+            if (menu != null && menu.OpcionesPorDia.Any())
+                continue;
             if (menu == null)
             {
                 menu = new Menu
@@ -917,12 +919,6 @@ public static class SeedData
                 };
                 db.Menus.Add(menu);
             }
-
-            var existentes = menu.OpcionesPorDia
-                .Where(o => o.HorarioId == almuerzoHorario.Id || o.HorarioId == desayunoHorario.Id)
-                .ToList();
-            if (existentes.Count > 0)
-                db.OpcionesMenu.RemoveRange(existentes);
 
             foreach (var day in DemoWeekDays)
             {
@@ -946,6 +942,8 @@ public static class SeedData
             var menu = await db.Menus
                 .Include(m => m.OpcionesPorDia)
                 .FirstOrDefaultAsync(m => m.SucursalId == null && m.EmpresaId == empresaId && m.FechaInicio == weekStart && m.FechaTermino == weekEnd);
+            if (menu != null && menu.OpcionesPorDia.Any())
+                continue;
             if (menu == null)
             {
                 menu = new Menu
@@ -958,12 +956,6 @@ public static class SeedData
                 };
                 db.Menus.Add(menu);
             }
-
-            var existentes = menu.OpcionesPorDia
-                .Where(o => o.HorarioId == almuerzoHorario.Id || o.HorarioId == desayunoHorario.Id)
-                .ToList();
-            if (existentes.Count > 0)
-                db.OpcionesMenu.RemoveRange(existentes);
 
             foreach (var day in DemoWeekDays)
             {

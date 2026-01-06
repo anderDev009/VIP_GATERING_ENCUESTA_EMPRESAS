@@ -13,18 +13,21 @@ public class MenuCloneService : IMenuCloneService
     private readonly IMenuService _menuService;
     private readonly IRepository<Menu> _menus;
     private readonly IRepository<OpcionMenu> _opcionesMenu;
+    private readonly IRepository<MenuAdicional> _menusAdicionales;
     private readonly IRepository<RespuestaFormulario> _respuestas;
     private readonly IUnitOfWork _uow;
 
     public MenuCloneService(IMenuService menuService,
         IRepository<Menu> menus,
         IRepository<OpcionMenu> opcionesMenu,
+        IRepository<MenuAdicional> menusAdicionales,
         IRepository<RespuestaFormulario> respuestas,
         IUnitOfWork uow)
     {
         _menuService = menuService;
         _menus = menus;
         _opcionesMenu = opcionesMenu;
+        _menusAdicionales = menusAdicionales;
         _respuestas = respuestas;
         _uow = uow;
     }
@@ -32,7 +35,14 @@ public class MenuCloneService : IMenuCloneService
     public async Task<(int updated, int skipped)> CloneEmpresaMenuToSucursalesAsync(DateOnly inicio, DateOnly fin, int empresaId, IEnumerable<int> sucursalIds, CancellationToken ct = default)
     {
         var menuEmpresa = await _menuService.GetOrCreateMenuAsync(inicio, fin, empresaId, null, ct);
-        var diasEmpresa = (await _opcionesMenu.ListAsync(om => om.MenuId == menuEmpresa.Id, ct)).OrderBy(d => d.DiaSemana).ToList();
+        var diasEmpresa = (await _opcionesMenu.ListAsync(om => om.MenuId == menuEmpresa.Id, ct))
+            .OrderBy(d => d.DiaSemana)
+            .ThenBy(d => d.HorarioId)
+            .ToList();
+        var diasEmpresaMap = diasEmpresa.ToDictionary(d => (d.DiaSemana, d.HorarioId));
+
+        var adicionalesEmpresa = await _menusAdicionales.ListAsync(a => a.MenuId == menuEmpresa.Id, ct);
+        var adicionalesEmpresaIds = adicionalesEmpresa.Select(a => a.OpcionId).ToHashSet();
 
         int updated = 0, skipped = 0;
         foreach (var sucursalId in sucursalIds)
@@ -52,12 +62,29 @@ public class MenuCloneService : IMenuCloneService
 
             foreach (var dSuc in diasSucursal)
             {
-                var dEmp = diasEmpresa.FirstOrDefault(x => x.DiaSemana == dSuc.DiaSemana);
+                if (!diasEmpresaMap.TryGetValue((dSuc.DiaSemana, dSuc.HorarioId), out var dEmp))
+                    continue;
                 if (dEmp == null) continue;
                 dSuc.OpcionIdA = dEmp.OpcionIdA;
                 dSuc.OpcionIdB = dEmp.OpcionIdB;
                 dSuc.OpcionIdC = dEmp.OpcionIdC;
+                dSuc.OpcionIdD = dEmp.OpcionIdD;
+                dSuc.OpcionIdE = dEmp.OpcionIdE;
+                dSuc.OpcionesMaximas = dEmp.OpcionesMaximas;
             }
+
+            var adicionalesSucursal = await _menusAdicionales.ListAsync(a => a.MenuId == menuSucursal.Id, ct);
+            foreach (var existente in adicionalesSucursal.Where(a => !adicionalesEmpresaIds.Contains(a.OpcionId)))
+            {
+                _menusAdicionales.Remove(existente);
+            }
+            var actualesIds = adicionalesSucursal.Select(a => a.OpcionId).ToHashSet();
+            var nuevos = adicionalesEmpresaIds.Except(actualesIds)
+                .Select(id => new MenuAdicional { MenuId = menuSucursal.Id, OpcionId = id })
+                .ToList();
+            if (nuevos.Count > 0)
+                await _menusAdicionales.AddRangeAsync(nuevos, ct);
+
             updated++;
         }
 
