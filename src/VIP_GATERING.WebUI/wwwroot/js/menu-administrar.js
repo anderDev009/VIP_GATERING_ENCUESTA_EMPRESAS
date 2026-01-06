@@ -88,8 +88,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const saveForm = document.getElementById('menu-save-form');
   const applyInput = document.getElementById('apply-all-sucursales');
-  const empresaSelect = document.querySelector('select[name="empresaId"]');
-  const sucursalSelect = document.getElementById('sucursal-select');
   if (saveForm && applyInput && empresaSelect && sucursalSelect) {
     saveForm.addEventListener('submit', (event) => {
       const empresaId = empresaSelect.value;
