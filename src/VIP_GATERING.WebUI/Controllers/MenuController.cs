@@ -12,17 +12,16 @@ using VIP_GATERING.WebUI.Services;
 namespace VIP_GATERING.WebUI.Controllers;
 
 // Panel simple para armar menu semanal
-[Authorize(Roles = "Admin,Empresa")]
+[Authorize(Roles = "Admin")]
 public class MenuController : Controller
 {
     private readonly AppDbContext _db;
     private readonly IMenuService _menuService;
     private readonly ILogger<MenuController> _logger;
     private readonly IMenuCloneService _cloneService;
-    private readonly ICurrentUserService _current;
     private readonly IEncuestaCierreService _cierre;
-    public MenuController(AppDbContext db, IMenuService menuService, ILogger<MenuController> logger, IMenuCloneService cloneService, ICurrentUserService current, IEncuestaCierreService cierre)
-    { _db = db; _menuService = menuService; _logger = logger; _cloneService = cloneService; _current = current; _cierre = cierre; }
+    public MenuController(AppDbContext db, IMenuService menuService, ILogger<MenuController> logger, IMenuCloneService cloneService, IEncuestaCierreService cierre)
+    { _db = db; _menuService = menuService; _logger = logger; _cloneService = cloneService; _cierre = cierre; }
 
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(200);
 
@@ -31,12 +30,6 @@ public class MenuController : Controller
     public async Task<IActionResult> Clientes(string? q, int page = 1, int pageSize = 10)
     {
         var query = _db.Empresas.AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _current.EmpresaId;
-            if (empresaId != null)
-                query = query.Where(e => e.Id == empresaId);
-        }
         if (!string.IsNullOrWhiteSpace(q))
         {
             var ql = q.ToLower();
@@ -73,12 +66,6 @@ public class MenuController : Controller
     public async Task<IActionResult> Sucursales(int? empresaId, string? q)
     {
         var sucQuery = _db.Sucursales.Include(s => s.Empresa).AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _current.EmpresaId;
-            sucQuery = sucQuery.Where(s => s.EmpresaId == currentEmpresaId);
-            if (empresaId == null) empresaId = currentEmpresaId;
-        }
         if (empresaId != null) sucQuery = sucQuery.Where(s => s.EmpresaId == empresaId);
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -102,7 +89,6 @@ public class MenuController : Controller
     [HttpGet]
     public async Task<IActionResult> Copiar(int empresaId, DateTime? fecha)
     {
-        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
         var empresa = await _db.Empresas.FirstAsync(e => e.Id == empresaId);
         var baseDate = fecha?.Date ?? DateTime.UtcNow.Date;
         int diff = ((int)baseDate.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
@@ -123,7 +109,6 @@ public class MenuController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Copiar(int empresaId, DateOnly inicio, DateOnly fin, [FromForm] List<int> sucursalIds)
     {
-        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
         if (sucursalIds == null || sucursalIds.Count == 0)
         {
             TempData["Info"] = "Debe seleccionar al menos una filial.";
@@ -139,12 +124,6 @@ public class MenuController : Controller
     [HttpGet]
     public async Task<IActionResult> Administrar(DateTime? fecha, int? empresaId, int? sucursalId, string? alcance)
     {
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _current.EmpresaId;
-            if (empresaId == null) empresaId = currentEmpresaId;
-            if (empresaId != currentEmpresaId) return Forbid();
-        }
         var baseDate = fecha?.Date ?? DateTime.UtcNow.Date;
         // Si no se especifica fecha y hoy es domingo, movemos a lunes siguiente como semana por defecto
         if (fecha == null && baseDate.DayOfWeek == DayOfWeek.Sunday)
@@ -172,10 +151,7 @@ public class MenuController : Controller
         if (empresaSel != null && empresas.All(e => e.Id != empresaSel))
             empresaSel = empresas.FirstOrDefault()?.Id;
 
-        var sucursalesAllQuery = _db.Sucursales.AsQueryable();
-        if (User.IsInRole("Empresa") && empresaSel != null)
-            sucursalesAllQuery = sucursalesAllQuery.Where(s => s.EmpresaId == empresaSel);
-        var sucursalesAll = await sucursalesAllQuery
+        var sucursalesAll = await _db.Sucursales
             .Select(s => new { s.Id, s.Nombre, s.EmpresaId })
             .ToListAsync();
         var sucursalesEmpresa = empresaSel != null
@@ -199,8 +175,6 @@ public class MenuController : Controller
             if (horariosCount == 0)
             {
                 TempData["Error"] = "La filial seleccionada no tiene horarios configurados. Configura horarios en Filiales.";
-                if (User.IsInRole("Empresa"))
-                    return RedirectToAction(nameof(Sucursales), new { empresaId = empresaSel });
                 return RedirectToAction(nameof(Sucursales));
             }
         }
@@ -287,10 +261,6 @@ public class MenuController : Controller
     [HttpGet]
     public async Task<IActionResult> VistaPrevia(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
     {
-        if (User.IsInRole("Empresa") && empresaId == null)
-            empresaId = _current.EmpresaId;
-        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
-
         var vm = await BuildMenuPreviewVmAsync(inicio, fin, empresaId, sucursalId);
         return View("VistaPrevia", vm);
     }
@@ -298,10 +268,6 @@ public class MenuController : Controller
     [HttpGet]
     public async Task<IActionResult> ExportMenuCsv(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
     {
-        if (User.IsInRole("Empresa") && empresaId == null)
-            empresaId = _current.EmpresaId;
-        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
-
         var vm = await BuildMenuPreviewVmAsync(inicio, fin, empresaId, sucursalId);
         var export = BuildMenuPreviewExport(vm);
         var bytes = ExportHelper.BuildCsv(export.Headers, export.Rows);
@@ -311,10 +277,6 @@ public class MenuController : Controller
     [HttpGet]
     public async Task<IActionResult> ExportMenuExcel(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
     {
-        if (User.IsInRole("Empresa") && empresaId == null)
-            empresaId = _current.EmpresaId;
-        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
-
         var vm = await BuildMenuPreviewVmAsync(inicio, fin, empresaId, sucursalId);
         var export = BuildMenuPreviewExport(vm);
         var bytes = ExportHelper.BuildExcel("Menu", export.Headers, export.Rows);
@@ -324,10 +286,6 @@ public class MenuController : Controller
     [HttpGet]
     public async Task<IActionResult> ExportMenuPdf(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
     {
-        if (User.IsInRole("Empresa") && empresaId == null)
-            empresaId = _current.EmpresaId;
-        if (User.IsInRole("Empresa") && _current.EmpresaId != empresaId) return Forbid();
-
         var vm = await BuildMenuPreviewVmAsync(inicio, fin, empresaId, sucursalId);
         var export = BuildMenuPreviewExport(vm);
         var pdf = ExportHelper.BuildPdf("Menu", export.Headers, export.Rows);
@@ -432,7 +390,6 @@ public class MenuController : Controller
     public async Task<IActionResult> Guardar(MenuEdicionVM model)
     {
         if (model == null) return RedirectToAction(nameof(Administrar));
-        if (User.IsInRole("Empresa") && _current.EmpresaId != model.EmpresaId) return Forbid();
 
         // Reglas: si ya existe al menos un empleado con 100% de respuestas, bloquear cambios
         var menuDb = await _menuService.GetOrCreateMenuAsync(model.FechaInicio, model.FechaTermino, model.EmpresaId, model.SucursalId);
@@ -589,20 +546,12 @@ public class MenuController : Controller
         return RedirectToAction(nameof(Administrar), new { fecha = inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId, sucursalId });
     }
 
-    [Authorize(Roles = "Admin,Empresa")]
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EliminarEncuesta(DateOnly inicio, int? empresaId, int? sucursalId)
     {
         var fin = inicio.AddDays(4);
-        // Seguridad: empresa solo en su alcance
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _current.EmpresaId;
-            if (currentEmpresaId == null || (empresaId != null && currentEmpresaId != empresaId)) return Forbid();
-            empresaId ??= currentEmpresaId;
-        }
-
         var menu = await _menuService.FindMenuAsync(inicio, fin, empresaId, sucursalId);
         if (menu == null)
         {

@@ -223,6 +223,8 @@ public static class SeedData
             db.Roles.Add(new Rol { Nombre = "Admin" });
         if (!await db.Roles.AnyAsync(r => r.Nombre == "Empleado"))
             db.Roles.Add(new Rol { Nombre = "Empleado" });
+        if (!await db.Roles.AnyAsync(r => r.Nombre == "RRHH"))
+            db.Roles.Add(new Rol { Nombre = "RRHH" });
         await db.SaveChangesAsync();
 
         await EnsureDemoSucursalHorariosAsync(db);

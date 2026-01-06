@@ -20,7 +20,7 @@ using VIP_GATERING.WebUI.Services;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
-[Authorize(Roles = "Admin,Empresa")]
+[Authorize(Roles = "Admin,RRHH")]
 public class EmpleadosController : Controller
 {
     private readonly AppDbContext _db;
@@ -40,13 +40,6 @@ public class EmpleadosController : Controller
             .Include(e => e.LocalizacionesAsignadas).ThenInclude(l => l.Localizacion)
             .Where(e => !e.Borrado)
             .AsQueryable();
-        // If Empresa role, limit to current Empresa
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _currentUser.EmpresaId;
-            if (currentEmpresaId != null)
-                query = query.Where(e => e.Sucursal!.EmpresaId == currentEmpresaId);
-        }
         if (empresaId != null) query = query.Where(e => e.Sucursal!.EmpresaId == empresaId);
         if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId);
         if (!string.IsNullOrWhiteSpace(q))
@@ -95,12 +88,6 @@ public class EmpleadosController : Controller
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
         var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaActual = _currentUser.EmpresaId;
-            if (empresaActual != null)
-                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaActual);
-        }
         if (empresaId != null)
             localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
         if (sucursalId != null)
@@ -186,17 +173,11 @@ public class EmpleadosController : Controller
     {
         var empresas = _db.Empresas.AsQueryable();
         var sucursales = _db.Sucursales.AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _currentUser.EmpresaId;
-            empresas = empresas.Where(e => e.Id == currentEmpresaId);
-            sucursales = sucursales.Where(s => s.EmpresaId == currentEmpresaId);
-        }
-        if (!User.IsInRole("Empresa") && empresaId != null)
+        if (empresaId != null)
         {
             sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
         }
-        if (!User.IsInRole("Empresa") && sucursalId != null && empresaId == null)
+        if (sucursalId != null && empresaId == null)
         {
             empresaId = await _db.Sucursales
                 .Where(s => s.Id == sucursalId)
@@ -208,16 +189,10 @@ public class EmpleadosController : Controller
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
         var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _currentUser.EmpresaId;
-            if (currentEmpresaId != null)
-                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == currentEmpresaId);
-        }
         var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
         ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
         ViewBag.LocalizacionAsignadaId = null;
-        ViewBag.EmpresaId = User.IsInRole("Empresa") ? _currentUser.EmpresaId : empresaId;
+        ViewBag.EmpresaId = empresaId;
         return View(new Empleado { SucursalId = sucursalId ?? 0, EsSubsidiado = true });
     }
 
@@ -231,14 +206,6 @@ public class EmpleadosController : Controller
             var empresas = _db.Empresas.AsQueryable();
             var sucursales = _db.Sucursales.AsQueryable();
             var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
-            if (User.IsInRole("Empresa"))
-            {
-                var empresaId = _currentUser.EmpresaId;
-                empresas = empresas.Where(e => e.Id == empresaId);
-                sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
-                if (empresaId != null)
-                    localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
-            }
             ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
             var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
@@ -255,13 +222,6 @@ public class EmpleadosController : Controller
             ValidateCodigoEmpleado(model.Codigo, ModelState);
         if (!ModelState.IsValid)
             return await ReturnInvalidAsync();
-        // Seguridad: Empresa solo puede crear en sus sucursales
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _currentUser.EmpresaId;
-            var sucEmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
-            if (empresaId == null || sucEmpresaId != empresaId) return Forbid();
-        }
         if (!string.IsNullOrWhiteSpace(model.Codigo) && await CodigoEmpleadoEnUsoAsync(model.Codigo, model.SucursalId))
         {
             ModelState.AddModelError("Codigo", "No se puede agregar un empleado con ese codigo porque ya existe en la empresa.");
@@ -320,14 +280,6 @@ public class EmpleadosController : Controller
         var empresas = _db.Empresas.AsQueryable();
         var sucursales = _db.Sucursales.AsQueryable();
         var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _currentUser.EmpresaId;
-            empresas = empresas.Where(e => e.Id == empresaId);
-            sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
-            if (empresaId != null)
-                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
-        }
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
         var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
@@ -347,29 +299,11 @@ public class EmpleadosController : Controller
             .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (ent == null) return NotFound();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _currentUser.EmpresaId;
-            var empEmpresaId = await _db.Sucursales.Where(s => s.Id == ent.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
-            if (empresaId == null || empEmpresaId != empresaId) return Forbid();
-        }
         var empresas = _db.Empresas.AsQueryable();
         var sucursales = _db.Sucursales.AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _currentUser.EmpresaId;
-            empresas = empresas.Where(e => e.Id == empresaId);
-            sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
-        }
         ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
         var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _currentUser.EmpresaId;
-            if (empresaId != null)
-                localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
-        }
         var localizacionAsignadaId = await _db.EmpleadosLocalizaciones
             .Where(el => el.EmpleadoId == ent.Id)
             .Select(el => (int?)el.LocalizacionId)
@@ -394,14 +328,6 @@ public class EmpleadosController : Controller
             var empresas = _db.Empresas.AsQueryable();
             var sucursales = _db.Sucursales.AsQueryable();
             var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
-            if (User.IsInRole("Empresa"))
-            {
-                var empresaId = _currentUser.EmpresaId;
-                empresas = empresas.Where(e => e.Id == empresaId);
-                sucursales = sucursales.Where(s => s.EmpresaId == empresaId);
-                if (empresaId != null)
-                    localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
-            }
             ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Sucursales = await sucursales.OrderBy(s => s.Nombre).ToListAsync();
             var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
@@ -421,12 +347,6 @@ public class EmpleadosController : Controller
             return await ReturnInvalidAsync();
         var ent = await _db.Empleados.FindAsync(id);
         if (ent == null) return NotFound();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _currentUser.EmpresaId;
-            var newSucEmpresaId = await _db.Sucursales.Where(s => s.Id == model.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
-            if (empresaId == null || newSucEmpresaId != empresaId) return Forbid();
-        }
         var codigoNuevo = model.Codigo?.Trim();
         var codigoAnterior = ent.Codigo?.Trim();
         var codigoCambio = !string.Equals(codigoAnterior, codigoNuevo, StringComparison.OrdinalIgnoreCase);
@@ -512,12 +432,6 @@ public class EmpleadosController : Controller
         var ent = await _db.Empleados.FindAsync(id);
         if (ent != null)
         {
-            if (User.IsInRole("Empresa"))
-            {
-                var empresaId = _currentUser.EmpresaId;
-                var empEmpresaId = await _db.Sucursales.Where(s => s.Id == ent.SucursalId).Select(s => s.EmpresaId).FirstOrDefaultAsync();
-                if (empresaId == null || empEmpresaId != empresaId) return Forbid();
-            }
             var sucId = ent.SucursalId;
             ent.Estado = EmpleadoEstado.Desactivado;
             ent.Borrado = true;
@@ -556,13 +470,6 @@ public class EmpleadosController : Controller
             .Include(e => e.LocalizacionesAsignadas).ThenInclude(l => l.Localizacion)
             .Where(e => !e.Borrado)
             .AsQueryable();
-
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _currentUser.EmpresaId;
-            if (currentEmpresaId != null)
-                query = query.Where(e => e.Sucursal!.EmpresaId == currentEmpresaId);
-        }
         if (empresaId != null) query = query.Where(e => e.Sucursal!.EmpresaId == empresaId);
         if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId);
         if (!string.IsNullOrWhiteSpace(q))
@@ -595,15 +502,6 @@ public class EmpleadosController : Controller
     [HttpGet]
     public async Task<IActionResult> Semana(int id)
     {
-        // Validar alcance para rol Empresa
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _currentUser.EmpresaId;
-            var empEmpresaId = await _db.Empleados.Include(e => e.Sucursal).Where(e => e.Id == id)
-                .Select(e => e.Sucursal!.EmpresaId).FirstOrDefaultAsync();
-            if (empresaId == null || empEmpresaId != empresaId) return Forbid();
-        }
-
         var modelo = await ConstruirSemanaEmpleadoAsync(id, false);
         if (modelo == null) return NotFound();
         return View("Semana", modelo);
@@ -713,7 +611,7 @@ public class EmpleadosController : Controller
         return RedirectToAction(nameof(Semana), new { id = empleadoId });
     }
 
-    // Crear usuario de Identity para un empleado (solo Admin o Empresa dentro de su empresa)
+    // Crear usuario de Identity para un empleado (solo Admin)
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CrearUsuario(int id)
@@ -722,11 +620,6 @@ public class EmpleadosController : Controller
             .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
             .FirstOrDefaultAsync(e => e.Id == id);
         if (empleado == null) return NotFound();
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _currentUser.EmpresaId;
-            if (currentEmpresaId == null || empleado.Sucursal!.EmpresaId != currentEmpresaId) return Forbid();
-        }
 
         var codigo = empleado.Codigo?.Trim();
         if (string.IsNullOrWhiteSpace(codigo))
@@ -748,18 +641,13 @@ public class EmpleadosController : Controller
         return RedirectToAction(nameof(Edit), new { id });
     }
 
-    // Reset de contrasena (Admin o Empresa sobre su empleado)
+    // Reset de contrasena (Admin)
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ResetPassword(int id, string newPassword, string confirmPassword, bool stayOnCreate = false, int? empresaId = null, int? sucursalId = null)
     {
         var empleado = await _db.Empleados.Include(e => e.Sucursal).FirstOrDefaultAsync(e => e.Id == id);
         if (empleado == null) return NotFound();
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _currentUser.EmpresaId;
-            if (currentEmpresaId == null || empleado.Sucursal!.EmpresaId != currentEmpresaId) return Forbid();
-        }
         if (string.IsNullOrWhiteSpace(newPassword))
         {
             TempData["Error"] = "La nueva contrasena es requerida.";

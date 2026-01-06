@@ -30,22 +30,13 @@
     </div>
     <div class="md:col-span-2">
         <label class="text-xs uppercase tracking-widest text-slate-400">Empresa</label>
-        @if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-        {
-            var empresaNombre = Model.Empresas.FirstOrDefault(e => e.Id == Model.EmpresaId)?.Nombre ?? "Empresa";
-            <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
-            <div class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">@empresaNombre</div>
-        }
-        else
-        {
-            <select name="empresaId" id="cierreEmpresa" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" required>
-                <option value="">Seleccione empresa</option>
-                @foreach (var e in Model.Empresas)
-                {
-                    <option value="@e.Id" selected="@(Model.EmpresaId == e.Id ? "selected" : null)">@e.Nombre</option>
-                }
-            </select>
-        }
+        <select name="empresaId" id="cierreEmpresa" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" required>
+            <option value="">Seleccione empresa</option>
+            @foreach (var e in Model.Empresas)
+            {
+                <option value="@e.Id" selected="@(Model.EmpresaId == e.Id ? "selected" : null)">@e.Nombre</option>
+            }
+        </select>
     </div>
     <div class="md:col-span-2">
         <label class="text-xs uppercase tracking-widest text-slate-400">Filial</label>

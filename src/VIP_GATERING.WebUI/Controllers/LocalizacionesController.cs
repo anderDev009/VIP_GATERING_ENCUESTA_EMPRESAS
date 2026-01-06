@@ -8,27 +8,19 @@ using VIP_GATERING.WebUI.Services;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
-[Authorize(Roles = "Admin,Empresa,RRHH")]
+[Authorize(Roles = "Admin")]
 public class LocalizacionesController : Controller
 {
     private readonly AppDbContext _db;
-    private readonly ICurrentUserService _current;
 
-    public LocalizacionesController(AppDbContext db, ICurrentUserService current)
+    public LocalizacionesController(AppDbContext db)
     {
         _db = db;
-        _current = current;
     }
 
     public async Task<IActionResult> Index(int? empresaId, int? sucursalId, string? q, int page = 1, int pageSize = 10)
     {
         var baseQuery = _db.Localizaciones.AsQueryable();
-
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null)
-        {
-            var currentEmpresaId = _current.EmpresaId;
-            baseQuery = baseQuery.Where(l => l.EmpresaId == currentEmpresaId);
-        }
 
         if (empresaId != null)
             baseQuery = baseQuery.Where(l => l.EmpresaId == empresaId);
@@ -121,12 +113,6 @@ public class LocalizacionesController : Controller
     {
         var baseQuery = _db.Localizaciones.AsQueryable();
 
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null)
-        {
-            var currentEmpresaId = _current.EmpresaId;
-            baseQuery = baseQuery.Where(l => l.EmpresaId == currentEmpresaId);
-        }
-
         if (empresaId != null)
             baseQuery = baseQuery.Where(l => l.EmpresaId == empresaId);
         if (sucursalId != null)
@@ -153,14 +139,7 @@ public class LocalizacionesController : Controller
 
     public async Task<IActionResult> Create()
     {
-        var empresas = _db.Empresas.AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _current.EmpresaId;
-            if (empresaId == null) return Forbid();
-            empresas = empresas.Where(e => e.Id == empresaId);
-        }
-        ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
+        ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         return View(new Localizacion());
     }
 
@@ -183,9 +162,6 @@ public class LocalizacionesController : Controller
             ModelState.AddModelError("EmpresaId", "Empresa requerida.");
             return await ReturnInvalidAsync(model);
         }
-
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null && _current.EmpresaId != model.EmpresaId)
-            return Forbid();
 
         var sucursal = await _db.Sucursales
             .Where(s => s.EmpresaId == model.EmpresaId)
@@ -219,8 +195,6 @@ public class LocalizacionesController : Controller
     {
         var ent = await _db.Localizaciones.Include(l => l.Sucursal).FirstOrDefaultAsync(l => l.Id == id);
         if (ent == null) return NotFound();
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null && ent.EmpresaId != _current.EmpresaId)
-            return Forbid();
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         return View(ent);
     }
@@ -251,9 +225,6 @@ public class LocalizacionesController : Controller
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
             return View(model);
         }
-
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null && _current.EmpresaId != model.EmpresaId)
-            return Forbid();
 
         var sucursalId = ent.SucursalId;
         if (ent.EmpresaId != model.EmpresaId)
@@ -305,9 +276,6 @@ public class LocalizacionesController : Controller
         var ent = await _db.Localizaciones.Include(l => l.Sucursal).FirstOrDefaultAsync(l => l.Id == id);
         if (ent == null) return RedirectToAction(nameof(Index));
 
-        if (User.IsInRole("Empresa") && _current.EmpresaId != null && ent.EmpresaId != _current.EmpresaId)
-            return Forbid();
-
         var usado = await _db.EmpleadosLocalizaciones.AnyAsync(el => el.LocalizacionId == ent.Id)
             || await _db.RespuestasFormulario.AnyAsync(r => r.LocalizacionEntregaId == ent.Id);
         if (usado)
@@ -324,13 +292,7 @@ public class LocalizacionesController : Controller
 
     private async Task<IActionResult> ReturnInvalidAsync(Localizacion model)
     {
-        var empresas = _db.Empresas.AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _current.EmpresaId;
-            empresas = empresas.Where(e => e.Id == empresaId);
-        }
-        ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
+        ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         return View(model);
     }
 }

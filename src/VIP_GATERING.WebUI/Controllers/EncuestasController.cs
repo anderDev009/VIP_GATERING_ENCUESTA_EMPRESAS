@@ -7,7 +7,7 @@ using VIP_GATERING.WebUI.Services;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
-[Authorize(Roles = "Admin,Sucursal")]
+[Authorize(Roles = "Admin")]
 public class EncuestasController : Controller
 {
     private readonly AppDbContext _db;
@@ -22,15 +22,6 @@ public class EncuestasController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Anular(int empleadoId)
     {
-        // Seguridad: si es Sucursal, solo sobre su propia sucursal
-        if (User.IsInRole("Sucursal"))
-        {
-            var sucActual = _current.SucursalId;
-            if (sucActual == null) return Forbid();
-            var principal = await _db.Empleados.Where(e => e.Id == empleadoId).Select(e => e.SucursalId).FirstOrDefaultAsync();
-            if (principal != sucActual) return Forbid();
-        }
-
         // Determinar semana siguiente y menu efectivo del empleado
         var (inicio, fin) = _fechas.RangoSemanaSiguiente();
         var existeEmpleado = await _db.Empleados.AnyAsync(e => e.Id == empleadoId);

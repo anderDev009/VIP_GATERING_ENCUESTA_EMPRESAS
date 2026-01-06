@@ -41,20 +41,14 @@
     {
         <div class="alert">Menu en progreso (@Model.RespuestasCount/@Model.TotalDias).</div>
     }
-    @{
-        var showActions = User.IsInRole("Admin") || User.IsInRole("Sucursal") || (Model.EsJefe && User.IsInRole("Admin"));
-    }
-    @if (showActions)
+    @if (User.IsInRole("Admin"))
     {
         <div class="flex flex-wrap gap-2">
-            @if (User.IsInRole("Admin") || User.IsInRole("Sucursal"))
-            {
-                <form asp-controller="Encuestas" asp-action="Anular" method="post">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="empleadoId" value="@Model.EmpleadoId" />
-                    <button class="btn-soft btn-soft--danger" onclick="return confirm('Anular menu del empleado?');">Anular menu</button>
-                </form>
-            }
+            <form asp-controller="Encuestas" asp-action="Anular" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="empleadoId" value="@Model.EmpleadoId" />
+                <button class="btn-soft btn-soft--danger" onclick="return confirm('Anular menu del empleado?');">Anular menu</button>
+            </form>
             @if (Model.EsJefe && User.IsInRole("Admin"))
             {
                 <a asp-action="EditarSemana" asp-route-id="@Model.EmpleadoId" class="btn-outline">Editar selecciones (jefe)</a>

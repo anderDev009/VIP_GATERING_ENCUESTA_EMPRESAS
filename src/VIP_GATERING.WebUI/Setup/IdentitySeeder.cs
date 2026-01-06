@@ -23,7 +23,7 @@ public static class IdentitySeeder
             await db.Database.MigrateAsync();
         }
 
-        // Roles: Admin, Empresa, Empleado, Sucursal, Monitor, RRHH
+        // Roles: Admin, Empleado, RRHH
         async Task EnsureRole(string name)
         {
             if (await roles.FindByNameAsync(name) == null)
@@ -34,11 +34,22 @@ public static class IdentitySeeder
         }
 
         await EnsureRole("Admin");
-        await EnsureRole("Empresa");
         await EnsureRole("Empleado");
-        await EnsureRole("Sucursal");
-        await EnsureRole("Monitor");
         await EnsureRole("RRHH");
+
+        var allowedRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Admin",
+            "Empleado",
+            "RRHH"
+        };
+        var extraRoles = await roles.Roles
+            .Where(r => r.Name != null && !allowedRoles.Contains(r.Name))
+            .ToListAsync();
+        foreach (var extra in extraRoles)
+        {
+            await roles.DeleteAsync(extra);
+        }
 
         // Users
         async Task EnsurePasswordAsync(ApplicationUser user, string expectedPassword)
@@ -119,7 +130,10 @@ public static class IdentitySeeder
         var adminUserName = EnsurePasswordCompliance("ADMIN");
         await EnsureUser(adminUserName, "Admin");
 
-        // Solo se crea el usuario admin por defecto.
+        var rrhhUserName = EnsurePasswordCompliance("RRHH");
+        await EnsureUser(rrhhUserName, "RRHH");
+
+        // Solo se crean los usuarios admin y RRHH por defecto.
     }
 
     private static string BuildUserName(string filialNombre, string? empleadoCodigo, int empleadoId)

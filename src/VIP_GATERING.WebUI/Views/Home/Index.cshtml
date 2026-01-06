@@ -2,7 +2,6 @@
     ViewData["Title"] = "Panel principal";
     var nombre = User.Identity?.IsAuthenticated == true ? User.Identity.Name : "Invitado";
     var esAdmin = User.IsInRole("Admin");
-    var esEmpresa = User.IsInRole("Empresa");
     var hoy = DateTime.Today;
     var diff = ((int)hoy.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
     var lunes = hoy.AddDays(-diff);
@@ -16,7 +15,7 @@
         <p class="text-slate-500 max-w-xl">Consulta el estado general de menus y accede rapidamente a los modulos clave para continuar con la operacion diaria.</p>
         <div class="mt-4 flex flex-wrap gap-3">
             <a asp-controller="Empleado" asp-action="MiSemana" class="btn-primary">Mi semana</a>
-            @if (esAdmin || esEmpresa)
+            @if (esAdmin)
             {
                 <a asp-controller="Menu" asp-action="Administrar" class="btn-outline">Administrar menus</a>
             }
@@ -35,7 +34,7 @@
         <a asp-controller="Empleado" asp-action="MiSemana">Mi semana</a>
         <p>Confirma selecciones y visualiza el menu asignado para cada empleado.</p>
     </div>
-    @if (esAdmin || esEmpresa)
+    @if (esAdmin)
     {
         <div class="dashboard-card">
             <span class="text-xs uppercase text-slate-400">Recursos</span>

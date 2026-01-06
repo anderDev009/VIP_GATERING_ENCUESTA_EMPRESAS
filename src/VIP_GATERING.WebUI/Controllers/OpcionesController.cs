@@ -20,7 +20,7 @@ public class OpcionesController : Controller
         _imageService = imageService;
     }
 
-    [Authorize(Roles = "Admin,Monitor")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Index(string? q, int page = 1, int pageSize = 10)
     {
         var query = _db.Opciones.Where(o => !o.Borrado).AsQueryable();
@@ -38,7 +38,7 @@ public class OpcionesController : Controller
         return View("IndexClean", paged);
     }
 
-    [Authorize(Roles = "Admin,Monitor")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> ExportCsv(string? q)
     {
@@ -56,7 +56,7 @@ public class OpcionesController : Controller
         return File(bytes, "text/csv", "platos.csv");
     }
 
-    [Authorize(Roles = "Admin,Monitor")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> ExportExcel(string? q)
     {
@@ -74,7 +74,7 @@ public class OpcionesController : Controller
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "platos.xlsx");
     }
 
-    [Authorize(Roles = "Admin,Monitor")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> ExportPdf(string? q)
     {

@@ -111,18 +111,11 @@ public class ReportesController : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [Authorize(Roles = "Admin,Empleado")]
     [HttpGet]
     public async Task<IActionResult> Selecciones(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        // Empresa solo puede ver su propia data
-        if (User.IsInRole("Empresa"))
-        {
-            if (_current.EmpresaId == null) return Forbid();
-            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
-            empresaId = _current.EmpresaId;
-        }
-        else if (User.IsInRole("Empleado"))
+        if (User.IsInRole("Empleado"))
         {
             if (_current.EmpresaId == null) return Forbid();
             empresaId = _current.EmpresaId;
@@ -314,17 +307,10 @@ public class ReportesController : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [Authorize(Roles = "Admin,Empleado")]
     [HttpGet]
     public async Task<IActionResult> TotalesEmpleados(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
     {
-        if (User.IsInRole("Empresa"))
-        {
-            if (_current.EmpresaId == null) return Forbid();
-            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
-            empresaId = _current.EmpresaId;
-        }
-
         var (inicio, fin) = _fechas.RangoSemanaSiguiente();
 
         var empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
@@ -414,17 +400,10 @@ public class ReportesController : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> CierreNomina(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-        {
-            if (_current.EmpresaId == null) return Forbid();
-            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
-            empresaId = _current.EmpresaId;
-        }
-
         var data = await BuildCierreFacturacionAsync(empresaId, sucursalId, desde, hasta, false);
         data.Vm.Titulo = "Cierre de nomina";
         data.Vm.AccionGenerar = nameof(CierreNominaGenerar);
@@ -433,18 +412,11 @@ public class ReportesController : Controller
         return View(data.Vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CierreNominaGenerar(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null, string? format = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-        {
-            if (_current.EmpresaId == null) return Forbid();
-            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
-            empresaId = _current.EmpresaId;
-        }
-
         if (sucursalId == null)
         {
             TempData["ExportMessage"] = "Debe seleccionar una filial para cerrar nomina.";
@@ -487,17 +459,10 @@ public class ReportesController : Controller
         }
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> Facturacion(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-        {
-            if (_current.EmpresaId == null) return Forbid();
-            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
-            empresaId = _current.EmpresaId;
-        }
-
         var data = await BuildCierreFacturacionAsync(empresaId, sucursalId, desde, hasta, true);
         data.Vm.Titulo = "Facturacion";
         data.Vm.AccionGenerar = nameof(FacturacionGenerar);
@@ -506,18 +471,11 @@ public class ReportesController : Controller
         return View(data.Vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> FacturacionGenerar(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null, string? format = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-        {
-            if (_current.EmpresaId == null) return Forbid();
-            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
-            empresaId = _current.EmpresaId;
-        }
-
         if (sucursalId == null)
         {
             TempData["ExportMessage"] = "Debe seleccionar una filial para facturar.";
@@ -560,17 +518,10 @@ public class ReportesController : Controller
         }
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> Nominas(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-        {
-            if (_current.EmpresaId == null) return Forbid();
-            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
-            empresaId = _current.EmpresaId;
-        }
-
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, false);
         vm.Titulo = "Nominas cerradas";
         vm.ExportExcelAction = nameof(NominasExcel);
@@ -579,17 +530,10 @@ public class ReportesController : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> Facturas(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-        {
-            if (_current.EmpresaId == null) return Forbid();
-            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
-            empresaId = _current.EmpresaId;
-        }
-
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, true);
         vm.Titulo = "Facturas";
         vm.ExportExcelAction = nameof(FacturasExcel);
@@ -598,12 +542,10 @@ public class ReportesController : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> NominasCsv(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-            empresaId = _current.EmpresaId;
         if (empresaId == null)
             empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, false);
@@ -611,12 +553,10 @@ public class ReportesController : Controller
         return File(ExportHelper.BuildCsv(export.Headers, export.Rows), "text/csv", $"nominas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> NominasExcel(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-            empresaId = _current.EmpresaId;
         if (empresaId == null)
             empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, false);
@@ -626,12 +566,10 @@ public class ReportesController : Controller
             $"nominas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> NominasPdf(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-            empresaId = _current.EmpresaId;
         if (empresaId == null)
             empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, false);
@@ -641,12 +579,10 @@ public class ReportesController : Controller
             $"nominas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> FacturasCsv(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-            empresaId = _current.EmpresaId;
         if (empresaId == null)
             empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, true);
@@ -654,12 +590,10 @@ public class ReportesController : Controller
         return File(ExportHelper.BuildCsv(export.Headers, export.Rows), "text/csv", $"facturas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> FacturasExcel(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-            empresaId = _current.EmpresaId;
         if (empresaId == null)
             empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, true);
@@ -669,12 +603,10 @@ public class ReportesController : Controller
             $"facturas-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
     }
 
-    [Authorize(Roles = "Admin,Empresa,RRHH")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> FacturasPdf(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa") || User.IsInRole("RRHH"))
-            empresaId = _current.EmpresaId;
         if (empresaId == null)
             empresaId = await _db.Empresas.OrderBy(e => e.Nombre).Select(e => (int?)e.Id).FirstOrDefaultAsync();
         var vm = await BuildCierreFacturacionDetalleAsync(empresaId, sucursalId, desde, hasta, true);
@@ -785,17 +717,11 @@ public class ReportesController : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [Authorize(Roles = "Admin,Empleado")]
     [HttpGet]
     public async Task<IActionResult> Seleccionados(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        if (User.IsInRole("Empresa"))
-        {
-            if (_current.EmpresaId == null) return Forbid();
-            if (empresaId != null && empresaId != _current.EmpresaId) return Forbid();
-            empresaId = _current.EmpresaId;
-        }
-        else if (User.IsInRole("Empleado"))
+        if (User.IsInRole("Empleado"))
         {
             if (_current.EmpresaId == null) return Forbid();
             empresaId = _current.EmpresaId;
@@ -1164,7 +1090,7 @@ public class ReportesController : Controller
         return View(vm);
     }
 
-    [Authorize(Roles = "Admin,Empresa")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> TotalesEmpleadosCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
     {
@@ -1199,7 +1125,7 @@ public class ReportesController : Controller
         return File(bytes, "text/csv", $"totales-empleados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
     }
 
-    [Authorize(Roles = "Admin,Empresa")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> TotalesEmpleadosExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
     {
@@ -1234,7 +1160,7 @@ public class ReportesController : Controller
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"totales-empleados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
     }
 
-    [Authorize(Roles = "Admin,Empresa")]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> TotalesEmpleadosPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null)
     {
@@ -1415,7 +1341,7 @@ public class ReportesController : Controller
         return File(pdf, "application/pdf", $"items-semana-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
     }
 
-    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [Authorize(Roles = "Admin,Empleado")]
     [HttpGet]
     public async Task<IActionResult> SeleccionesCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
@@ -1459,7 +1385,7 @@ public class ReportesController : Controller
         return File(bytes, "text/csv", $"selecciones-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
     }
 
-    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [Authorize(Roles = "Admin,Empleado")]
     [HttpGet]
     public async Task<IActionResult> SeleccionesExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
@@ -1503,7 +1429,7 @@ public class ReportesController : Controller
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"selecciones-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
     }
 
-    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [Authorize(Roles = "Admin,Empleado")]
     [HttpGet]
     public async Task<IActionResult> SeleccionesPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
@@ -1628,7 +1554,7 @@ public class ReportesController : Controller
         return File(pdf, "application/pdf", $"selecciones-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
     }
 
-    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [Authorize(Roles = "Admin,Empleado")]
     [HttpGet]
     public async Task<IActionResult> SeleccionadosCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
@@ -1672,7 +1598,7 @@ public class ReportesController : Controller
         return File(bytes, "text/csv", $"seleccionados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
     }
 
-    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [Authorize(Roles = "Admin,Empleado")]
     [HttpGet]
     public async Task<IActionResult> SeleccionadosExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
@@ -1716,7 +1642,7 @@ public class ReportesController : Controller
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"seleccionados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
     }
 
-    [Authorize(Roles = "Admin,Empresa,Empleado")]
+    [Authorize(Roles = "Admin,Empleado")]
     [HttpGet]
     public async Task<IActionResult> SeleccionadosPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {

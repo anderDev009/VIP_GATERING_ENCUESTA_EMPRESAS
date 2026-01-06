@@ -100,7 +100,7 @@
     var usuarioNombre = (string?)ViewBag.UsuarioNombre;
     var usuarioSugerido = (string?)ViewBag.UsuarioSugerido;
 }
-@if (User.IsInRole("Admin") || User.IsInRole("Empresa"))
+@if (User.IsInRole("Admin") || User.IsInRole("RRHH"))
 {
     <div class="card max-w-lg mx-auto mt-6">
         <h2 class="text-lg font-semibold mb-2">Cuenta de usuario</h2>

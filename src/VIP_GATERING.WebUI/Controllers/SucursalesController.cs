@@ -10,27 +10,19 @@ using VIP_GATERING.WebUI.Services;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
-[Authorize(Roles = "Admin,Empresa")]
+[Authorize(Roles = "Admin")]
 public class SucursalesController : Controller
 {
     private readonly AppDbContext _db;
-    private readonly ICurrentUserService _current;
 
-    public SucursalesController(AppDbContext db, ICurrentUserService current)
+    public SucursalesController(AppDbContext db)
     {
         _db = db;
-        _current = current;
     }
 
     public async Task<IActionResult> Index(int? empresaId, string? q, int page = 1, int pageSize = 10)
     {
         var query = _db.Sucursales.Include(s => s.Empresa).Where(s => !s.Borrado).AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _current.EmpresaId;
-            if (currentEmpresaId != null)
-                query = query.Where(s => s.EmpresaId == currentEmpresaId);
-        }
         if (empresaId != null) query = query.Where(s => s.EmpresaId == empresaId);
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -94,12 +86,6 @@ public class SucursalesController : Controller
     private IQueryable<Sucursal> BuildExportQuery(int? empresaId, string? q)
     {
         var query = _db.Sucursales.Include(s => s.Empresa).Where(s => !s.Borrado).AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var currentEmpresaId = _current.EmpresaId;
-            if (currentEmpresaId != null)
-                query = query.Where(s => s.EmpresaId == currentEmpresaId);
-        }
         if (empresaId != null) query = query.Where(s => s.EmpresaId == empresaId);
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -111,14 +97,7 @@ public class SucursalesController : Controller
 
     public async Task<IActionResult> Create()
     {
-        var empresas = _db.Empresas.AsQueryable();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _current.EmpresaId;
-            if (empresaId == null) return Forbid();
-            empresas = empresas.Where(e => e.Id == empresaId);
-        }
-        ViewBag.Empresas = await empresas.OrderBy(e => e.Nombre).ToListAsync();
+        ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
         return View(new Sucursal());
     }
@@ -133,11 +112,6 @@ public class SucursalesController : Controller
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Horarios = await _db.Horarios.OrderBy(h => h.Orden).ToListAsync();
             return View(model);
-        }
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _current.EmpresaId;
-            if (empresaId == null || model.EmpresaId != empresaId) return Forbid();
         }
         await _db.Sucursales.AddAsync(model);
         await _db.SaveChangesAsync();
@@ -170,7 +144,6 @@ public class SucursalesController : Controller
     {
         var ent = await _db.Sucursales.FindAsync(id);
         if (ent == null) return NotFound();
-        if (User.IsInRole("Empresa") && _current.EmpresaId != ent.EmpresaId) return Forbid();
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
         ViewBag.SelHorarios = await _db.SucursalesHorarios.Where(sh => sh.SucursalId == ent.Id).Select(sh => sh.HorarioId).ToListAsync();
@@ -183,11 +156,6 @@ public class SucursalesController : Controller
     {
         var ent = await _db.Sucursales.FindAsync(id);
         if (ent == null) return NotFound();
-        if (User.IsInRole("Empresa"))
-        {
-            var empresaId = _current.EmpresaId;
-            if (empresaId == null || ent.EmpresaId != empresaId || model.EmpresaId != empresaId) return Forbid();
-        }
         ApplySubsidioFromForm(model);
         if (!ModelState.IsValid)
         {
@@ -227,7 +195,6 @@ public class SucursalesController : Controller
         var ent = await _db.Sucursales.FindAsync(id);
         if (ent != null)
         {
-            if (User.IsInRole("Empresa") && (_current.EmpresaId == null || ent.EmpresaId != _current.EmpresaId)) return Forbid();
             var empresaId = ent.EmpresaId;
             ent.Borrado = true;
             await _db.SaveChangesAsync();

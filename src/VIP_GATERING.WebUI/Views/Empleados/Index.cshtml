@@ -120,7 +120,7 @@
                             <button class="btn-outline text-rose-500 border-rose-100 hover:border-rose-300">Desactivar</button>
                         </form>
                         <a asp-action="Semana" asp-route-id="@e.Id" class="btn-outline">Ver semana</a>
-                        @if (User.IsInRole("Admin") || User.IsInRole("Empresa"))
+                        @if (User.IsInRole("Admin") || User.IsInRole("RRHH"))
                         {
                             if (!empUserIds.Contains(e.Id))
                             {
