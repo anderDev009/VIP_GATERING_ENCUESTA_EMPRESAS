@@ -108,3 +108,23 @@
   color: #475569;
   margin-top: 12px;
 }
+
+@media (max-width: 600px) {
+  .login-card {
+    margin: 24px 16px;
+    padding: 24px;
+  }
+
+  .login-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .login-title {
+    font-size: 20px;
+  }
+
+  .login-submit {
+    font-size: 15px;
+  }
+}

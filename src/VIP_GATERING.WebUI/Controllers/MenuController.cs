@@ -504,6 +504,23 @@ public class MenuController : Controller
 
             await _db.SaveChangesAsync();
             TempData["Success"] = "Menu actualizado correctamente.";
+
+            if (model.AplicarATodasFiliales && model.EmpresaId != null && model.SucursalId == null)
+            {
+                var sucursalIds = await _db.Sucursales
+                    .Where(s => s.EmpresaId == model.EmpresaId)
+                    .Select(s => s.Id)
+                    .ToListAsync();
+                if (sucursalIds.Count > 0)
+                {
+                    var (updated, skipped) = await _cloneService.CloneEmpresaMenuToSucursalesAsync(
+                        model.FechaInicio,
+                        model.FechaTermino,
+                        model.EmpresaId.Value,
+                        sucursalIds);
+                    TempData["Success"] = $"Menu actualizado. Filiales actualizadas: {updated}. Omitidas por bloqueo: {skipped}.";
+                }
+            }
             _logger.LogInformation("[POST Guardar] Cambios guardados OK.");
         }
         catch (Exception ex)

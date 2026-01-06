@@ -25,6 +25,7 @@ public class MenuEdicionVM
     public bool PuedeCerrarManualmente => !EncuestaCerrada;
     public bool PuedeReabrir => EncuestaCerrada;
     public bool PuedeEliminarEncuesta { get; set; }
+    public bool AplicarATodasFiliales { get; set; }
 }
 
 public class DiaEdicion

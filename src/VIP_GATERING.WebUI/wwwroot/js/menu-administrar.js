@@ -85,4 +85,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
   if (tabButtons.length > 0) tabButtons[0].classList.add('is-active');
+
+  const saveForm = document.getElementById('menu-save-form');
+  const applyInput = document.getElementById('apply-all-sucursales');
+  const empresaSelect = document.querySelector('select[name="empresaId"]');
+  const sucursalSelect = document.getElementById('sucursal-select');
+  if (saveForm && applyInput && empresaSelect && sucursalSelect) {
+    saveForm.addEventListener('submit', (event) => {
+      const empresaId = empresaSelect.value;
+      const sucursalId = sucursalSelect.value;
+      const isGlobalEmpresa = empresaId && !sucursalId;
+      applyInput.value = 'false';
+      if (!isGlobalEmpresa) return;
+
+      const ok = window.confirm('Deseas aplicar este menu a todas las filiales de la empresa seleccionada?');
+      if (ok) {
+        applyInput.value = 'true';
+      }
+    });
+  }
 });

@@ -124,13 +124,14 @@
     }
 </div>
 
-<form asp-action="Guardar" method="post" class="space-y-4 menu-config">
+<form asp-action="Guardar" method="post" class="space-y-4 menu-config" id="menu-save-form">
     @Html.AntiForgeryToken()
     <div class="text-red-700 mb-2">@Html.ValidationSummary()</div>
     <input type="hidden" asp-for="FechaInicio" />
     <input type="hidden" asp-for="FechaTermino" />
     <input type="hidden" name="EmpresaId" value="@Model.EmpresaId" />
     <input type="hidden" name="SucursalId" value="@Model.SucursalId" />
+    <input type="hidden" name="AplicarATodasFiliales" id="apply-all-sucursales" value="false" />
 
     <div class="page-panel page-panel--compact mb-4">
         <div class="panel-header">

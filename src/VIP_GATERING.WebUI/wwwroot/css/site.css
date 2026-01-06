@@ -11,4 +11,31 @@
 .toast-item--info{background:#0284c7;color:#fff}
 .toast-item--error{background:#dc2626;color:#fff}
 .toast-hide{opacity:0;transform:translateY(-6px)}
+.tab-switch--stack{flex-direction:column;align-items:flex-start;justify-content:flex-start}
+
+@media (max-width:900px){
+  .app-shell{padding:1rem .9rem 1.6rem}
+  .app-header{flex-direction:column;align-items:stretch}
+  .app-logo{justify-content:flex-start}
+  .app-nav{width:100%;justify-content:flex-start}
+  .app-nav>.btn-primary,
+  .app-nav>.btn-outline,
+  .app-nav>.btn-soft,
+  .app-nav>.btn-ghost,
+  .app-nav>.nav-dropdown{width:100%}
+  .app-nav .btn-primary,
+  .app-nav .btn-outline,
+  .app-nav .btn-soft,
+  .app-nav .btn-ghost{justify-content:center}
+  .nav-dropdown__menu{position:static;min-width:100%;box-shadow:none;margin-top:.35rem}
+  .page-panel,.card{padding:1rem}
+}
+
+@media (max-width:900px){
+  .app-main table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .app-main thead,.app-main tbody{display:table;width:100%}
+  .app-main th{white-space:nowrap}
+  .menu-table{display:block;overflow-x:auto}
+  .menu-daycell,.menu-table th:first-child{position:static;box-shadow:none}
+}
 
