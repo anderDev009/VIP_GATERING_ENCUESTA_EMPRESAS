@@ -8,6 +8,7 @@ public class CierreFacturacionDetalleVM
     public string ExportCsvAction { get; set; } = string.Empty;
     public string ExportExcelAction { get; set; } = string.Empty;
     public string ExportPdfAction { get; set; } = string.Empty;
+    public string EstadoProceso { get; set; } = "Cerrado";
 
     public DateOnly Inicio { get; set; }
     public DateOnly Fin { get; set; }

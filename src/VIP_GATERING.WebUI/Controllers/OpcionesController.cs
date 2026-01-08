@@ -95,7 +95,7 @@ public class OpcionesController : Controller
     public async Task<IActionResult> Create()
     {
         await LoadHorariosAsync();
-        var model = new Opcion { Codigo = await GetNextPlatoCodigoAsync() };
+        var model = new Opcion { Codigo = await GetNextPlatoCodigoAsync(), LlevaItbis = true };
         return View(model);
     }
 
@@ -117,7 +117,6 @@ public class OpcionesController : Controller
         model.Codigo = string.IsNullOrWhiteSpace(model.Codigo)
             ? await GetNextPlatoCodigoAsync()
             : model.Codigo.Trim();
-        model.LlevaItbis = true;
         model.EsSubsidiado = true;
         model.ImagenUrl = await _imageService.SaveAsync(imagen, null);
         await _db.Opciones.AddAsync(model);

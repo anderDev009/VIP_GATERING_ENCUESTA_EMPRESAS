@@ -107,27 +107,6 @@ public class EmpleadosController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> ExportCsv(int? empresaId, int? sucursalId, int? localizacionId, string? q)
-    {
-        var empleados = await BuildExportQuery(empresaId, sucursalId, localizacionId, q)
-            .OrderBy(e => e.Nombre ?? e.Codigo)
-            .ToListAsync();
-        var headers = new[] { "Codigo", "Nombre", "Empresa", "Filial", "Estado", "Subsidio", "Localizacion" };
-        var rows = empleados.Select(e => (IReadOnlyList<string>)new[]
-        {
-            e.Codigo ?? string.Empty,
-            e.Nombre ?? string.Empty,
-            e.Sucursal?.Empresa?.Nombre ?? string.Empty,
-            e.Sucursal?.Nombre ?? string.Empty,
-            e.Estado.ToString(),
-            e.EsSubsidiado ? "Si" : "No",
-            e.LocalizacionesAsignadas.FirstOrDefault()?.Localizacion?.Nombre ?? string.Empty
-        }).ToList();
-        var bytes = ExportHelper.BuildCsv(headers, rows);
-        return File(bytes, "text/csv", "empleados.csv");
-    }
-
-    [HttpGet]
     public async Task<IActionResult> ExportExcel(int? empresaId, int? sucursalId, int? localizacionId, string? q)
     {
         var empleados = await BuildExportQuery(empresaId, sucursalId, localizacionId, q)
@@ -146,27 +125,6 @@ public class EmpleadosController : Controller
         }).ToList();
         var bytes = ExportHelper.BuildExcel("Empleados", headers, rows);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "empleados.xlsx");
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> ExportPdf(int? empresaId, int? sucursalId, int? localizacionId, string? q)
-    {
-        var empleados = await BuildExportQuery(empresaId, sucursalId, localizacionId, q)
-            .OrderBy(e => e.Nombre ?? e.Codigo)
-            .ToListAsync();
-        var headers = new[] { "Codigo", "Nombre", "Empresa", "Filial", "Estado", "Subsidio", "Localizacion" };
-        var rows = empleados.Select(e => (IReadOnlyList<string>)new[]
-        {
-            e.Codigo ?? string.Empty,
-            e.Nombre ?? string.Empty,
-            e.Sucursal?.Empresa?.Nombre ?? string.Empty,
-            e.Sucursal?.Nombre ?? string.Empty,
-            e.Estado.ToString(),
-            e.EsSubsidiado ? "Si" : "No",
-            e.LocalizacionesAsignadas.FirstOrDefault()?.Localizacion?.Nombre ?? string.Empty
-        }).ToList();
-        var pdf = ExportHelper.BuildPdf("Empleados", headers, rows);
-        return File(pdf, "application/pdf", "empleados.pdf");
     }
 
     public async Task<IActionResult> Create(int? empresaId = null, int? sucursalId = null)

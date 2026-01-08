@@ -1,0 +1,72 @@
+@model VIP_GATERING.WebUI.Models.Reportes.CierreListadoVM
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h1 class="text-xl font-semibold">@Model.Titulo</h1>
+    @if (Model.MostrarCrear && !string.IsNullOrWhiteSpace(Model.AccionCrear))
+    {
+        <a asp-action="@Model.AccionCrear" class="btn-primary">Crear</a>
+    }
+</div>
+
+<div class="overflow-x-auto">
+    <table class="min-w-full bg-white border rounded">
+        <thead class="bg-slate-100">
+            <tr>
+                <th class="text-left p-2">Semana</th>
+                <th class="text-left p-2">Empresa</th>
+                <th class="text-left p-2">Filial</th>
+                <th class="text-center p-2">Estado</th>
+                <th class="text-right p-2">Selecciones</th>
+                <th class="text-right p-2">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Paginado.Items)
+        {
+            var label = "Editar";
+            <tr class="border-t">
+                <td class="p-2">@r.Inicio.ToString("dd/MM/yyyy") - @r.Fin.ToString("dd/MM/yyyy")</td>
+                <td class="p-2">@r.Empresa</td>
+                <td class="p-2">@r.Filial</td>
+                <td class="p-2 text-center">
+                    <span class="chip">@r.Estado</span>
+                </td>
+                <td class="p-2 text-right">@r.TotalSelecciones</td>
+                <td class="p-2 text-right">
+                    <div class="flex justify-end gap-2">
+                        @if (!string.IsNullOrWhiteSpace(Model.AccionEditar))
+                        {
+                            <a class="btn-outline" asp-action="@Model.AccionEditar" asp-route-empresaId="@r.EmpresaId" asp-route-sucursalId="@r.SucursalId" asp-route-desde="@r.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@r.Fin.ToString("yyyy-MM-dd")">@label</a>
+                        }
+                        @if (r.Cerrado && !string.IsNullOrWhiteSpace(Model.AccionDetalle))
+                        {
+                            <a class="btn-outline" asp-action="@Model.AccionDetalle" asp-route-empresaId="@r.EmpresaId" asp-route-sucursalId="@r.SucursalId" asp-route-desde="@r.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@r.Fin.ToString("yyyy-MM-dd")">Detalle</a>
+                        }
+                        @if (r.Cerrado && !string.IsNullOrWhiteSpace(Model.AccionEliminar))
+                        {
+                            <form asp-action="@Model.AccionEliminar" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="empresaId" value="@r.EmpresaId" />
+                                <input type="hidden" name="sucursalId" value="@r.SucursalId" />
+                                <input type="hidden" name="desde" value="@r.Inicio.ToString("yyyy-MM-dd")" />
+                                <input type="hidden" name="hasta" value="@r.Fin.ToString("yyyy-MM-dd")" />
+                                <input type="hidden" name="page" value="@Model.Paginado.Page" />
+                                <input type="hidden" name="pageSize" value="@Model.Paginado.PageSize" />
+                                <button type="submit" class="btn-outline">Eliminar</button>
+                            </form>
+                        }
+                    </div>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
+
+@await Html.PartialAsync("_Pagination", new VIP_GATERING.WebUI.Models.PagedResult<object>
+{
+    Items = Model.Paginado.Items.Cast<object>().ToList(),
+    Page = Model.Paginado.Page,
+    PageSize = Model.Paginado.PageSize,
+    TotalItems = Model.Paginado.TotalItems
+})

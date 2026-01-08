@@ -6,6 +6,7 @@ using System.Globalization;
 using VIP_GATERING.Application.Services;
 using VIP_GATERING.Domain.Entities;
 using VIP_GATERING.Infrastructure.Data;
+using VIP_GATERING.WebUI.Models;
 using VIP_GATERING.WebUI.Models.Reportes;
 using VIP_GATERING.WebUI.Services;
 using QuestPDF.Fluent;
@@ -409,6 +410,13 @@ public class ReportesController : Controller
         data.Vm.AccionGenerar = nameof(CierreNominaGenerar);
         data.Vm.AccionLabel = "Cerrar nomina";
         data.Vm.TipoExport = "cierre-nomina";
+        if (empresaId != null && sucursalId != null)
+        {
+            var (inicio, fin) = ResolveRango(desde, hasta);
+            var respuestas = await BuildCierreBaseAsync(inicio, fin, empresaId.Value, sucursalId.Value);
+            data.Vm.EstaCerrado = respuestas.Any(r => r.CierreNomina);
+        }
+        data.Vm.EstadoProceso = data.Vm.EstaCerrado ? "Cerrado" : "Abierto";
         return View(data.Vm);
     }
 
@@ -438,25 +446,8 @@ public class ReportesController : Controller
             r.FechaCierreNomina = timestamp;
         }
         await _db.SaveChangesAsync();
-
-        var exportItems = data.Items
-            .Select(i => i with { CierreNomina = true, FechaCierreNomina = timestamp })
-            .ToList();
-        var export = BuildCierreFacturacionExport(exportItems);
-        var formatKey = string.IsNullOrWhiteSpace(format) ? "excel" : format.Trim().ToLowerInvariant();
-        switch (formatKey)
-        {
-            case "csv":
-                return File(ExportHelper.BuildCsv(export.Headers, export.Rows), "text/csv",
-                    $"cierre-nomina-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.csv");
-            case "pdf":
-                return File(ExportHelper.BuildPdf("Cierre nomina", export.Headers, export.Rows), "application/pdf",
-                    $"cierre-nomina-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.pdf");
-            default:
-                return File(ExportHelper.BuildExcel("Cierre nomina", export.Headers, export.Rows),
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    $"cierre-nomina-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.xlsx");
-        }
+        TempData["Success"] = "Nomina creada correctamente.";
+        return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
     }
 
     [Authorize(Roles = "Admin")]
@@ -468,7 +459,60 @@ public class ReportesController : Controller
         data.Vm.AccionGenerar = nameof(FacturacionGenerar);
         data.Vm.AccionLabel = "Facturar";
         data.Vm.TipoExport = "facturacion";
+        if (empresaId != null && sucursalId != null)
+        {
+            var (inicio, fin) = ResolveRango(desde, hasta);
+            var respuestas = await BuildCierreBaseAsync(inicio, fin, empresaId.Value, sucursalId.Value);
+            data.Vm.EstaCerrado = respuestas.Any(r => r.Facturado);
+        }
+        data.Vm.EstadoProceso = data.Vm.EstaCerrado ? "Cerrado" : "Abierto";
         return View(data.Vm);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReabrirNomina(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (empresaId == null || sucursalId == null)
+        {
+            TempData["ExportMessage"] = "Debe seleccionar empresa y filial para reabrir nomina.";
+            return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        var (inicio, fin) = ResolveRango(desde, hasta);
+        var count = await ClearCierreAsync(false, empresaId.Value, sucursalId.Value, inicio, fin);
+        if (count == 0)
+        {
+            TempData["ExportMessage"] = "No hay nominas cerradas para reabrir.";
+            return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        TempData["Success"] = "Nomina reabierta correctamente.";
+        return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReabrirFacturacion(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (empresaId == null || sucursalId == null)
+        {
+            TempData["ExportMessage"] = "Debe seleccionar empresa y filial para reabrir facturacion.";
+            return RedirectToAction(nameof(Facturacion), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        var (inicio, fin) = ResolveRango(desde, hasta);
+        var count = await ClearCierreAsync(true, empresaId.Value, sucursalId.Value, inicio, fin);
+        if (count == 0)
+        {
+            TempData["ExportMessage"] = "No hay facturas cerradas para reabrir.";
+            return RedirectToAction(nameof(Facturacion), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        TempData["Success"] = "Facturacion reabierta correctamente.";
+        return RedirectToAction(nameof(Facturacion), new { empresaId, sucursalId, desde, hasta });
     }
 
     [Authorize(Roles = "Admin")]
@@ -497,25 +541,78 @@ public class ReportesController : Controller
             r.FechaFacturado = timestamp;
         }
         await _db.SaveChangesAsync();
+        TempData["Success"] = "Facturacion creada correctamente.";
+        return RedirectToAction(nameof(Facturacion), new { empresaId, sucursalId, desde, hasta });
+    }
 
-        var exportItems = data.Items
-            .Select(i => i with { Facturado = true, FechaFacturado = timestamp })
-            .ToList();
-        var export = BuildCierreFacturacionExport(exportItems);
-        var formatKey = string.IsNullOrWhiteSpace(format) ? "excel" : format.Trim().ToLowerInvariant();
-        switch (formatKey)
-        {
-            case "csv":
-                return File(ExportHelper.BuildCsv(export.Headers, export.Rows), "text/csv",
-                    $"facturacion-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.csv");
-            case "pdf":
-                return File(ExportHelper.BuildPdf("Facturacion", export.Headers, export.Rows), "application/pdf",
-                    $"facturacion-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.pdf");
-            default:
-                return File(ExportHelper.BuildExcel("Facturacion", export.Headers, export.Rows),
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    $"facturacion-{data.Vm.Inicio:yyyyMMdd}-{data.Vm.Fin:yyyyMMdd}.xlsx");
-        }
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> NominasMantenimiento(int page = 1, int pageSize = 20)
+    {
+        var vm = await BuildCierreListadoAsync(false, false, page, pageSize);
+        vm.Titulo = "Nominas";
+        vm.MostrarCrear = true;
+        vm.AccionCrear = nameof(CierreNomina);
+        vm.AccionEditar = nameof(CierreNomina);
+        vm.AccionDetalle = nameof(Nominas);
+        vm.AccionEliminar = nameof(EliminarNomina);
+        return View(vm);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> FacturacionMantenimiento(int page = 1, int pageSize = 20)
+    {
+        var vm = await BuildCierreListadoAsync(true, false, page, pageSize);
+        vm.Titulo = "Facturacion";
+        vm.MostrarCrear = true;
+        vm.AccionCrear = nameof(Facturacion);
+        vm.AccionEditar = nameof(Facturacion);
+        vm.AccionDetalle = nameof(Facturas);
+        vm.AccionEliminar = nameof(EliminarFacturacion);
+        return View(vm);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> NominasHistorico(int page = 1, int pageSize = 20)
+    {
+        var vm = await BuildCierreListadoAsync(false, true, page, pageSize);
+        vm.Titulo = "Historico de nominas";
+        vm.MostrarCrear = false;
+        vm.AccionDetalle = nameof(Nominas);
+        return View(vm);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> FacturasHistorico(int page = 1, int pageSize = 20)
+    {
+        var vm = await BuildCierreListadoAsync(true, true, page, pageSize);
+        vm.Titulo = "Historico de facturas";
+        vm.MostrarCrear = false;
+        vm.AccionDetalle = nameof(Facturas);
+        return View(vm);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EliminarNomina(int empresaId, int sucursalId, DateOnly desde, DateOnly hasta, int page = 1, int pageSize = 20)
+    {
+        var count = await ClearCierreAsync(false, empresaId, sucursalId, desde, hasta);
+        TempData["Success"] = count > 0 ? "Nomina eliminada correctamente." : "No hay nominas cerradas para eliminar.";
+        return RedirectToAction(nameof(NominasMantenimiento), new { page, pageSize });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EliminarFacturacion(int empresaId, int sucursalId, DateOnly desde, DateOnly hasta, int page = 1, int pageSize = 20)
+    {
+        var count = await ClearCierreAsync(true, empresaId, sucursalId, desde, hasta);
+        TempData["Success"] = count > 0 ? "Facturacion eliminada correctamente." : "No hay facturas cerradas para eliminar.";
+        return RedirectToAction(nameof(FacturacionMantenimiento), new { page, pageSize });
     }
 
     [Authorize(Roles = "Admin")]
@@ -527,6 +624,7 @@ public class ReportesController : Controller
         vm.ExportExcelAction = nameof(NominasExcel);
         vm.ExportCsvAction = nameof(NominasCsv);
         vm.ExportPdfAction = nameof(NominasPdf);
+        vm.EstadoProceso = "Cerrado";
         return View(vm);
     }
 
@@ -539,6 +637,7 @@ public class ReportesController : Controller
         vm.ExportExcelAction = nameof(FacturasExcel);
         vm.ExportCsvAction = nameof(FacturasCsv);
         vm.ExportPdfAction = nameof(FacturasPdf);
+        vm.EstadoProceso = "Cerrado";
         return View(vm);
     }
 
@@ -844,7 +943,7 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> Distribucion(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> Distribucion(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
         DateOnly inicio;
         DateOnly fin;
@@ -878,6 +977,48 @@ public class ReportesController : Controller
             sucursalesBase = sucursalesBase.Where(s => s.EmpresaId == empresaId);
         var sucursales = await sucursalesBase.OrderBy(s => s.Nombre).ToListAsync();
         var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
+        var localizacionesBase = _db.Localizaciones.AsQueryable();
+        if (empresaId != null)
+            localizacionesBase = localizacionesBase.Where(l => l.EmpresaId == empresaId);
+        if (sucursalId != null)
+            localizacionesBase = localizacionesBase.Where(l => l.SucursalId == sucursalId);
+        var localizaciones = await localizacionesBase.OrderBy(l => l.Nombre).ToListAsync();
+
+        if (empresaId == null || sucursalId == null)
+        {
+            return View(new DistribucionVM
+            {
+                Inicio = inicio,
+                Fin = fin,
+                EmpresaId = empresaId,
+                SucursalId = sucursalId,
+                EmpleadoId = empleadoId,
+                LocalizacionId = localizacionId,
+                Empresas = empresas,
+                Sucursales = sucursales,
+                Empleados = empleados,
+                Localizaciones = localizaciones,
+                MensajeValidacion = "Selecciona empresa y filial para ver el reporte."
+            });
+        }
+
+        if (empleadoId != null && localizacionId == null)
+        {
+            return View(new DistribucionVM
+            {
+                Inicio = inicio,
+                Fin = fin,
+                EmpresaId = empresaId,
+                SucursalId = sucursalId,
+                EmpleadoId = empleadoId,
+                LocalizacionId = localizacionId,
+                Empresas = empresas,
+                Sucursales = sucursales,
+                Empleados = empleados,
+                Localizaciones = localizaciones,
+                MensajeValidacion = "Para filtrar por empleado, selecciona una localizacion."
+            });
+        }
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
@@ -899,6 +1040,8 @@ public class ReportesController : Controller
         baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
         if (empleadoId != null)
             baseQuery = baseQuery.Where(r => r.EmpleadoId == empleadoId);
+        if (localizacionId != null)
+            baseQuery = baseQuery.Where(r => r.LocalizacionEntregaId == localizacionId);
 
         var respuestas = await baseQuery.ToListAsync();
         respuestas = respuestas
@@ -1078,9 +1221,11 @@ public class ReportesController : Controller
             EmpresaId = empresaId,
             SucursalId = sucursalId,
             EmpleadoId = empleadoId,
+            LocalizacionId = localizacionId,
             Empresas = empresas,
             Sucursales = sucursales,
             Empleados = empleados,
+            Localizaciones = localizaciones,
             ResumenFiliales = resumen,
             DetalleEmpleados = detalle,
             PorLocalizacion = porLocalizacion,
@@ -1688,9 +1833,9 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> DistribucionCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> DistribucionCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        var result = await Distribucion(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var result = await Distribucion(empresaId, sucursalId, empleadoId, localizacionId, desde, hasta) as ViewResult;
         var vm = (DistribucionVM)result!.Model!;
 
         var headers = new[]
@@ -1719,9 +1864,9 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> DistribucionExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> DistribucionExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
-        var result = await Distribucion(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var result = await Distribucion(empresaId, sucursalId, empleadoId, localizacionId, desde, hasta) as ViewResult;
         var vm = (DistribucionVM)result!.Model!;
 
         var headers = new[]
@@ -1750,9 +1895,9 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> DistribucionPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, DateOnly? desde = null, DateOnly? hasta = null, string? vista = null)
+    public async Task<IActionResult> DistribucionPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, DateOnly? desde = null, DateOnly? hasta = null, string? vista = null)
     {
-        var result = await Distribucion(empresaId, sucursalId, empleadoId, desde, hasta) as ViewResult;
+        var result = await Distribucion(empresaId, sucursalId, empleadoId, localizacionId, desde, hasta) as ViewResult;
         var vm = (DistribucionVM)result!.Model!;
 
         var export = BuildDistribucionExport(vm, vista);
@@ -2030,6 +2175,91 @@ private sealed class CierreFacturacionData
     public List<RespuestaFormulario> Respuestas { get; init; } = new();
 }
 
+private (DateOnly Inicio, DateOnly Fin) ResolveRango(DateOnly? desde, DateOnly? hasta)
+{
+    if (desde.HasValue && hasta.HasValue)
+    {
+        var inicio = desde.Value;
+        var fin = hasta.Value;
+        if (fin < inicio)
+            (inicio, fin) = (fin, inicio);
+        return (inicio, fin);
+    }
+
+    if (desde.HasValue)
+    {
+        var inicio = desde.Value;
+        return (inicio, inicio.AddDays(4));
+    }
+
+    if (hasta.HasValue)
+    {
+        var fin = hasta.Value;
+        return (fin.AddDays(-4), fin);
+    }
+
+    return GetDefaultReportRange(_fechas.Hoy());
+}
+
+private async Task<List<RespuestaFormulario>> BuildCierreBaseAsync(DateOnly inicio, DateOnly fin, int empresaId, int sucursalId)
+{
+    var baseQuery = _db.RespuestasFormulario
+        .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal)
+        .Include(r => r.SucursalEntrega)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+        .Where(r => r.OpcionMenu != null
+            && r.OpcionMenu.Menu != null
+            && r.OpcionMenu.Menu.FechaInicio <= fin
+            && r.OpcionMenu.Menu.FechaTermino >= inicio);
+
+    baseQuery = baseQuery.Where(r =>
+        (r.SucursalEntrega != null && r.SucursalEntrega.EmpresaId == empresaId) ||
+        (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.Sucursal != null && r.Empleado.Sucursal.EmpresaId == empresaId));
+
+    baseQuery = baseQuery.Where(r =>
+        (r.SucursalEntrega != null && r.SucursalEntrega.Id == sucursalId) ||
+        (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.SucursalId == sucursalId));
+
+    var respuestas = await baseQuery.ToListAsync();
+    return respuestas
+        .Where(r =>
+        {
+            if (r.OpcionMenu?.Menu == null) return false;
+            var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana);
+            return fecha >= inicio && fecha <= fin;
+        })
+        .ToList();
+}
+
+private async Task<int> ClearCierreAsync(bool esFacturacion, int empresaId, int sucursalId, DateOnly inicio, DateOnly fin)
+{
+    var respuestas = await BuildCierreBaseAsync(inicio, fin, empresaId, sucursalId);
+    if (esFacturacion)
+        respuestas = respuestas.Where(r => r.Facturado).ToList();
+    else
+        respuestas = respuestas.Where(r => r.CierreNomina).ToList();
+
+    if (respuestas.Count == 0) return 0;
+
+    foreach (var r in respuestas)
+    {
+        if (esFacturacion)
+        {
+            r.Facturado = false;
+            r.FechaFacturado = null;
+        }
+        else
+        {
+            r.CierreNomina = false;
+            r.FechaCierreNomina = null;
+            r.Facturado = false;
+            r.FechaFacturado = null;
+        }
+    }
+    await _db.SaveChangesAsync();
+    return respuestas.Count;
+}
+
 private async Task<CierreFacturacionData> BuildCierreFacturacionAsync(int? empresaId, int? sucursalId, DateOnly? desde, DateOnly? hasta, bool esFacturacion)
 {
     DateOnly inicio;
@@ -2056,6 +2286,30 @@ private async Task<CierreFacturacionData> BuildCierreFacturacionAsync(int? empre
     else
     {
         (inicio, fin) = GetDefaultReportRange(_fechas.Hoy());
+    }
+
+    if (empresaId == null || sucursalId == null)
+    {
+        var empresasFallback = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
+        var sucursalesFallback = empresaId != null
+            ? await _db.Sucursales.Where(s => s.EmpresaId == empresaId).OrderBy(s => s.Nombre).ToListAsync()
+            : await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
+        return new CierreFacturacionData
+        {
+            Vm = new CierreFacturacionVM
+            {
+                Inicio = inicio,
+                Fin = fin,
+                EmpresaId = empresaId,
+                SucursalId = sucursalId,
+                Empresas = empresasFallback,
+                Sucursales = sucursalesFallback,
+                ResumenFiliales = new List<CierreFacturacionVM.ResumenFilialRow>(),
+                DetalleEmpleados = new List<CierreFacturacionVM.DetalleEmpleadoRow>()
+            },
+            Items = new List<CierreItem>(),
+            Respuestas = new List<RespuestaFormulario>()
+        };
     }
 
     var empresasQuery = _db.Empresas.AsQueryable();
@@ -2462,6 +2716,76 @@ private async Task<CierreFacturacionDetalleVM> BuildCierreFacturacionDetalleAsyn
     };
 }
 
+private async Task<CierreListadoVM> BuildCierreListadoAsync(bool esFacturacion, bool soloCerrados, int page, int pageSize)
+{
+    if (page < 1) page = 1;
+    if (pageSize <= 0) pageSize = 20;
+
+    var baseQuery = _db.RespuestasFormulario
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+        .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
+        .Include(r => r.SucursalEntrega).ThenInclude(s => s!.Empresa)
+        .Where(r => r.OpcionMenu != null && r.OpcionMenu.Menu != null);
+
+    if (esFacturacion)
+        baseQuery = baseQuery.Where(r => r.CierreNomina);
+
+    var respuestas = await baseQuery.ToListAsync();
+    var rows = respuestas
+        .Select(r =>
+        {
+            var sucursal = r.SucursalEntrega ?? r.Empleado?.Sucursal;
+            var empresa = r.SucursalEntrega?.Empresa ?? r.Empleado?.Sucursal?.Empresa;
+            return new
+            {
+                Empresa = empresa,
+                Sucursal = sucursal,
+                Inicio = r.OpcionMenu!.Menu!.FechaInicio,
+                Fin = r.OpcionMenu.Menu.FechaTermino,
+                Cerrado = esFacturacion ? r.Facturado : r.CierreNomina
+            };
+        })
+        .Where(x => x.Empresa != null && x.Sucursal != null)
+        .GroupBy(x => new { EmpresaId = x.Empresa!.Id, SucursalId = x.Sucursal!.Id, x.Inicio, x.Fin })
+        .Select(g =>
+        {
+            var first = g.First();
+            return new CierreListadoVM.Row
+            {
+                EmpresaId = g.Key.EmpresaId,
+                SucursalId = g.Key.SucursalId,
+                Empresa = first.Empresa!.Nombre ?? "Empresa",
+                Filial = first.Sucursal!.Nombre,
+                Inicio = g.Key.Inicio,
+                Fin = g.Key.Fin,
+                TotalSelecciones = g.Count(),
+                Cerrado = g.All(x => x.Cerrado)
+            };
+        })
+        .ToList();
+
+    if (soloCerrados)
+        rows = rows.Where(r => r.Cerrado).ToList();
+
+    rows = rows
+        .OrderByDescending(r => r.Inicio)
+        .ThenBy(r => r.Empresa)
+        .ThenBy(r => r.Filial)
+        .ToList();
+
+    var total = rows.Count;
+    var items = rows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+    var paged = new PagedResult<CierreListadoVM.Row>
+    {
+        Items = items,
+        Page = page,
+        PageSize = pageSize,
+        TotalItems = total
+    };
+
+    return new CierreListadoVM { Paginado = paged };
+}
+
 private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows) BuildDetalleExport(CierreFacturacionDetalleVM vm)
 {
     var headers = new[]
@@ -2497,39 +2821,6 @@ private static (string Title, string Suffix, IReadOnlyList<string> Headers, List
         switch (normalized)
         {
             case "detalle":
-                return ("Distribucion detalle por empleado", "detalle", new[]
-                {
-                    "Fecha","Filial","Empleado","Tanda","Opcion","Seleccion","Cantidad","Monto total","Empresa paga","Empleado paga","ITBIS empresa","ITBIS empleado"
-                }, vm.DetalleEmpleados.Select(r => (IReadOnlyList<string>)new[]
-                {
-                    r.Fecha.ToString("yyyy-MM-dd"),
-                    r.Filial,
-                    r.Empleado,
-                    r.Tanda,
-                    r.Opcion,
-                    r.Seleccion,
-                    r.Cantidad.ToString(),
-                    r.MontoTotal.ToString("C"),
-                    r.EmpresaPaga.ToString("C"),
-                    r.EmpleadoPaga.ToString("C"),
-                    r.ItbisEmpresa.ToString("C"),
-                    r.ItbisEmpleado.ToString("C")
-                }).ToList());
-            case "localizacion":
-                return ("Distribucion por localizacion", "localizacion", new[]
-                {
-                    "Localizacion","Opcion","Seleccion","Cantidad","Monto total","Empresa paga","Empleado paga"
-                }, vm.PorLocalizacion.Select(r => (IReadOnlyList<string>)new[]
-                {
-                    r.Localizacion,
-                    r.Opcion,
-                    r.Seleccion,
-                    r.Cantidad.ToString(),
-                    r.MontoTotal.ToString("C"),
-                    r.EmpresaPaga.ToString("C"),
-                    r.EmpleadoPaga.ToString("C")
-                }).ToList());
-            case "cocina":
                 {
                     var headers = new[]
                     {
@@ -2591,7 +2882,47 @@ private static (string Title, string Suffix, IReadOnlyList<string> Headers, List
                         "Entregado", string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty, string.Empty
                     });
 
-                    return ("Localizacion (cocina)", "cocina", headers, rows);
+                    return ("Detalle por localizacion", "detalle", headers, rows);
+                }
+            case "localizacion":
+                return ("Distribucion por localizacion", "localizacion", new[]
+                {
+                    "Localizacion","Opcion","Seleccion","Cantidad","Monto total","Empresa paga","Empleado paga"
+                }, vm.PorLocalizacion.Select(r => (IReadOnlyList<string>)new[]
+                {
+                    r.Localizacion,
+                    r.Opcion,
+                    r.Seleccion,
+                    r.Cantidad.ToString(),
+                    r.MontoTotal.ToString("C"),
+                    r.EmpresaPaga.ToString("C"),
+                    r.EmpleadoPaga.ToString("C")
+                }).ToList());
+            case "cocina":
+                {
+                    var headers = new[]
+                    {
+                        "Localizacion","Opcion 1","Opcion 2","Opcion 3","Opcion 4","Opcion 5","Adicional","Total Opcion","Total Adic"
+                    };
+                    var rows = new List<IReadOnlyList<string>>();
+                    foreach (var r in vm.PorLocalizacionCocina)
+                    {
+                        rows.Add(new[]
+                        {
+                            r.Localizacion,
+                            r.Opcion1.ToString(),
+                            r.Opcion2.ToString(),
+                            r.Opcion3.ToString(),
+                            r.Opcion4.ToString(),
+                            r.Opcion5.ToString(),
+                            r.Adicionales.ToString(),
+                            r.TotalOpciones.ToString(),
+                            r.Adicionales.ToString()
+                        });
+
+                    }
+
+                    return ("Cocina (totales)", "cocina", headers, rows);
                 }
             default:
                 return ("Distribucion resumen por filial", "resumen", new[]

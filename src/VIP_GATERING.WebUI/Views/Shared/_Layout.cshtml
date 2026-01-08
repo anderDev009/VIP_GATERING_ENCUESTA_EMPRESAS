@@ -73,10 +73,34 @@
                             }
                             <a asp-controller="Reportes" asp-action="Selecciones" class="nav-dropdown__item">Selecciones</a>
                             <a asp-controller="Reportes" asp-action="Seleccionados" class="nav-dropdown__item">Seleccionados pendientes</a>
-                            <a asp-controller="Reportes" asp-action="CierreNomina" class="nav-dropdown__item">Cierre nomina</a>
-                            <a asp-controller="Reportes" asp-action="Facturacion" class="nav-dropdown__item">Facturacion</a>
-                            <a asp-controller="Reportes" asp-action="Nominas" class="nav-dropdown__item">Nominas cerradas</a>
-                            <a asp-controller="Reportes" asp-action="Facturas" class="nav-dropdown__item">Facturas</a>
+                        </div>
+                    </div>
+                }
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <div class="nav-dropdown">
+                        <button type="button" class="btn-primary nav-dropdown__trigger">
+                            Nominas
+                            <span class="nav-dropdown__chevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="nav-dropdown__menu">
+                            <a asp-controller="Reportes" asp-action="NominasMantenimiento" class="nav-dropdown__item">Mantenimiento</a>
+                            <a asp-controller="Reportes" asp-action="NominasHistorico" class="nav-dropdown__item">Historico</a>
+                        </div>
+                    </div>
+                }
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <div class="nav-dropdown">
+                        <button type="button" class="btn-primary nav-dropdown__trigger">
+                            Facturacion
+                            <span class="nav-dropdown__chevron" aria-hidden="true">&#9662;</span>
+                        </button>
+                        <div class="nav-dropdown__menu">
+                            <a asp-controller="Reportes" asp-action="FacturacionMantenimiento" class="nav-dropdown__item">Mantenimiento</a>
+                            <a asp-controller="Reportes" asp-action="FacturasHistorico" class="nav-dropdown__item">Historico</a>
                         </div>
                     </div>
                 }

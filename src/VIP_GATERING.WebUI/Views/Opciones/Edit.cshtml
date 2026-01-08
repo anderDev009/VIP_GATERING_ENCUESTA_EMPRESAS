@@ -60,9 +60,10 @@
         </select>
         <div class="text-xs text-slate-500 mt-1">Tip: escribe para filtrar y usa Enter para elegir multiples.</div>
     </div>
-    <div class="text-sm text-slate-600">
-        <span class="font-semibold">ITBIS:</span> siempre incluido.
-    </div>
+    <label class="flex items-center gap-2 text-sm text-slate-700">
+        <input asp-for="LlevaItbis" type="checkbox" class="border rounded" />
+        ITBIS incluido
+    </label>
     <div>
         <label class="block text-sm">Imagen</label>
         @if (!string.IsNullOrWhiteSpace(Model.ImagenUrl))

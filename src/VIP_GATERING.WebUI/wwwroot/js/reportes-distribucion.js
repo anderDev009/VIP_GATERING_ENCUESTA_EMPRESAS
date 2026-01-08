@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'tab-resumen': 'resumen',
     'tab-detalle': 'detalle',
     'tab-localizacion': 'localizacion',
-    'tab-localizacion-cocina': 'cocina'
+    'tab-cocina': 'cocina'
   };
 
   const syncExportLink = (link, target) => {
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const syncTotales = (target) => {
     if (!totales) return;
-    const hide = target === 'tab-localizacion-cocina';
+    const hide = target === 'tab-cocina';
     totales.classList.toggle('hidden', hide);
   };
 

@@ -8,6 +8,8 @@ public class CierreFacturacionVM
     public string AccionGenerar { get; set; } = string.Empty;
     public string TipoExport { get; set; } = string.Empty;
     public string AccionLabel { get; set; } = string.Empty;
+    public string EstadoProceso { get; set; } = "Abierto";
+    public bool EstaCerrado { get; set; }
 
     public DateOnly Inicio { get; set; }
     public DateOnly Fin { get; set; }

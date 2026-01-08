@@ -10,10 +10,13 @@ public class DistribucionVM
     public int? EmpresaId { get; set; }
     public int? SucursalId { get; set; }
     public int? EmpleadoId { get; set; }
+    public int? LocalizacionId { get; set; }
+    public string? MensajeValidacion { get; set; }
 
     public IEnumerable<Empresa> Empresas { get; set; } = Enumerable.Empty<Empresa>();
     public IEnumerable<Sucursal> Sucursales { get; set; } = Enumerable.Empty<Sucursal>();
     public IEnumerable<Empleado> Empleados { get; set; } = Enumerable.Empty<Empleado>();
+    public IEnumerable<Localizacion> Localizaciones { get; set; } = Enumerable.Empty<Localizacion>();
 
     public List<ResumenFilialRow> ResumenFiliales { get; set; } = new();
     public List<DetalleEmpleadoRow> DetalleEmpleados { get; set; } = new();

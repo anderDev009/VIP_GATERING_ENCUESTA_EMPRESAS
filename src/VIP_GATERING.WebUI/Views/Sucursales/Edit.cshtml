@@ -103,17 +103,7 @@
     </div>
 </form>
 
-<script>
-    (function () {
-        const radios = document.querySelectorAll('input[name="subsidioScope"]');
-        const custom = document.getElementById('subsidio-custom');
-        function toggle() {
-            const val = document.querySelector('input[name="subsidioScope"]:checked');
-            if (!val) return;
-            custom.classList.toggle('hidden', val.value !== 'custom');
-        }
-        radios.forEach(r => r.addEventListener('change', toggle));
-        toggle();
-    })();
-</script>
+@section Scripts {
+    <script src="~/js/sucursales-subsidio.js" defer></script>
+}
 
