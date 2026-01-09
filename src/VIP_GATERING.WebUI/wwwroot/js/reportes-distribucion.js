@@ -1,5 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
   const distribucionTabs = document.querySelectorAll('.tab-pill');
+  const filterForm = document.querySelector('form[method="get"]');
+  const filterInputs = filterForm
+    ? filterForm.querySelectorAll('select[name], input[type="date"][name]')
+    : [];
   const totales = document.getElementById('reportes-totales');
   const exportPdf = document.querySelector('[data-export-pdf]');
   const exportCsv = document.querySelector('[data-export-csv]');
@@ -8,8 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const tabExportMap = {
     'tab-resumen': 'resumen',
-    'tab-detalle': 'detalle',
+    'tab-detalle-pedidos': 'detalle',
     'tab-localizacion': 'localizacion',
+    'tab-distribucion-detalle': 'distribucion-detalle',
     'tab-cocina': 'cocina'
   };
 
@@ -32,9 +37,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const syncTotales = (target) => {
     if (!totales) return;
-    const hide = target === 'tab-cocina';
+    const hide = target === 'tab-cocina' || target === 'tab-distribucion-detalle';
     totales.classList.toggle('hidden', hide);
   };
+
+  filterInputs.forEach((input) => {
+    input.addEventListener('change', () => {
+      if (filterForm) {
+        filterForm.submit();
+      }
+    });
+  });
 
   distribucionTabs.forEach((btn) => {
     btn.addEventListener('click', () => {

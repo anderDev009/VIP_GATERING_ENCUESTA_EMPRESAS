@@ -123,20 +123,6 @@ else
     }
 }
 
-<script>
-    (() => {
-        const tabButtons = document.querySelectorAll('.tab-pill');
-        tabButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const targetId = btn.getAttribute('data-tab-target');
-                if (!targetId) return;
-                document.querySelectorAll('[data-tab-panel]').forEach(p => p.classList.remove('is-active'));
-                const target = document.getElementById(targetId);
-                if (target) target.classList.add('is-active');
-                tabButtons.forEach(b => b.classList.remove('is-active'));
-                btn.classList.add('is-active');
-            });
-        });
-        if (tabButtons.length > 0) tabButtons[0].classList.add('is-active');
-    })();
-</script>
+@section Scripts {
+    <script src="~/js/menu-vista-previa.js" defer></script>
+}

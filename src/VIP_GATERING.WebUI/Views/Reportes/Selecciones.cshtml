@@ -56,9 +56,12 @@
     <div class="flex gap-3 md:col-span-4">
         <button type="submit" class="btn-primary">Filtrar</button>
         <a class="btn-outline" asp-action="Selecciones">Limpiar</a>
-        <a class="btn-outline" asp-action="SeleccionesExcel" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar Excel</a>
-        <a class="btn-outline" asp-action="SeleccionesCsv" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar CSV</a>
-        <a class="btn-outline" asp-action="SeleccionesPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar PDF</a>
+        @if (!isEmpleado)
+        {
+            <a class="btn-outline" asp-action="SeleccionesExcel" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar Excel</a>
+            <a class="btn-outline" asp-action="SeleccionesCsv" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar CSV</a>
+            <a class="btn-outline" asp-action="SeleccionesPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-desde='@Model.Inicio.ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToString("yyyy-MM-dd")'>Exportar PDF</a>
+        }
     </div>
     <!-- <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3">
         <div class="text-sm text-slate-600">Total costo</div>
@@ -72,7 +75,6 @@
     </div> -->
     <input type="hidden" name="_" value="@DateTime.UtcNow.Ticks" />
  </form>
-<script>history.scrollRestoration = 'manual';</script>
 
 <!-- <h2 class="font-semibold mb-2">Subtotales por Filial</h2>
 <table class="mb-6">

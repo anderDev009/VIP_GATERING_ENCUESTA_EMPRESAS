@@ -2,9 +2,15 @@
 @{
     ViewData["Title"] = "Distribucion";
     var showData = string.IsNullOrWhiteSpace(Model.MensajeValidacion)
-        && Model.EmpresaId != null
-        && Model.SucursalId != null
         && (Model.EmpleadoId == null || Model.LocalizacionId != null);
+
+    var empresaNombre = Model.Empresas.FirstOrDefault(e => e.Id == Model.EmpresaId)?.Nombre ?? "Todas";
+    var sucursalNombre = Model.Sucursales.FirstOrDefault(s => s.Id == Model.SucursalId)?.Nombre ?? "Todas";
+    var empleadoNombre = Model.Empleados.FirstOrDefault(e => e.Id == Model.EmpleadoId)?.Nombre
+        ?? Model.Empleados.FirstOrDefault(e => e.Id == Model.EmpleadoId)?.Codigo
+        ?? "Todos";
+    var localizacionNombre = Model.Localizaciones.FirstOrDefault(l => l.Id == Model.LocalizacionId)?.Nombre ?? "Todas";
+    var tandaNombre = Model.Horarios.FirstOrDefault(h => h.Id == Model.HorarioId)?.Nombre ?? "Todas";
 }
 
 <h1 class="text-xl font-semibold mb-4">Distribucion desde @Model.Inicio.ToString("dd/MM/yyyy") hasta @Model.Fin.ToString("dd/MM/yyyy")</h1>
@@ -28,7 +34,7 @@
     <div class="md:col-span-2">
         <label class="text-xs uppercase tracking-widest text-slate-400">Empresa</label>
         <select name="empresaId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
-            <option value="">Todas</option>
+            <option value="" selected="@(Model.EmpresaId == null ? "selected" : null)">Todas</option>
             @foreach (var e in Model.Empresas)
             {
                 <option value="@e.Id" selected="@(Model.EmpresaId == e.Id ? "selected" : null)">@e.Nombre</option>
@@ -38,7 +44,7 @@
     <div class="md:col-span-2">
         <label class="text-xs uppercase tracking-widest text-slate-400">Filial</label>
         <select name="sucursalId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
-            <option value="">Todas</option>
+            <option value="" selected="@(Model.SucursalId == null ? "selected" : null)">Todas</option>
             @foreach (var s in Model.Sucursales)
             {
                 <option value="@s.Id" selected="@(Model.SucursalId == s.Id ? "selected" : null)">@s.Nombre</option>
@@ -48,7 +54,7 @@
     <div class="md:col-span-2">
         <label class="text-xs uppercase tracking-widest text-slate-400">Empleado</label>
         <select name="empleadoId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
-            <option value="">Todos</option>
+            <option value="" selected="@(Model.EmpleadoId == null ? "selected" : null)">Todos</option>
             @foreach (var e in Model.Empleados)
             {
                 var nombre = !string.IsNullOrWhiteSpace(e.Nombre) ? e.Nombre : e.Codigo;
@@ -59,7 +65,7 @@
     <div class="md:col-span-2">
         <label class="text-xs uppercase tracking-widest text-slate-400">Localizacion</label>
         <select name="localizacionId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
-            <option value="">Todas</option>
+            <option value="" selected="@(Model.LocalizacionId == null ? "selected" : null)">Todas</option>
             @foreach (var l in Model.Localizaciones)
             {
                 <option value="@l.Id" selected="@(Model.LocalizacionId == l.Id ? "selected" : null)">@l.Nombre</option>
@@ -67,18 +73,37 @@
         </select>
         <div class="mt-1 text-xs text-slate-400">Si filtras por empleado, selecciona una localizacion.</div>
     </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Tanda</label>
+        <select name="horarioId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="" selected="@(Model.HorarioId == null ? "selected" : null)">Todas</option>
+            @foreach (var h in Model.Horarios)
+            {
+                <option value="@h.Id" selected="@(Model.HorarioId == h.Id ? "selected" : null)">@h.Nombre</option>
+            }
+        </select>
+    </div>
     <div class="flex gap-3 md:col-span-4">
         <button type="submit" class="btn-primary">Filtrar</button>
         <a class="btn-outline" asp-action="Distribucion">Limpiar</a>
         @if (showData)
         {
-            <a class="btn-outline" data-export-excel asp-action="DistribucionExcel" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-desde='@Model.Inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")'>Exportar Excel</a>
-            <a class="btn-outline" data-export-csv asp-action="DistribucionCsv" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-desde='@Model.Inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")'>Exportar CSV</a>
-            <a class="btn-outline" data-export-pdf asp-action="DistribucionPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-desde='@Model.Inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")'>Exportar PDF</a>
+            <a class="btn-outline" data-export-excel asp-action="DistribucionExcel" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-horarioId="@Model.HorarioId" asp-route-desde='@Model.Inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")'>Exportar Excel</a>
+            <a class="btn-outline" data-export-csv asp-action="DistribucionCsv" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-horarioId="@Model.HorarioId" asp-route-desde='@Model.Inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")'>Exportar CSV</a>
+            <a class="btn-outline" data-export-pdf asp-action="DistribucionPdf" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-horarioId="@Model.HorarioId" asp-route-desde='@Model.Inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")' asp-route-hasta='@Model.Fin.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")'>Exportar PDF</a>
         }
     </div>
     @if (showData)
     {
+        <div class="md:col-span-4 text-sm text-slate-600">
+            <span class="font-semibold">Filtros:</span>
+            Fecha @Model.Inicio.ToString("dd/MM/yyyy") a @Model.Fin.ToString("dd/MM/yyyy"),
+            Empresa: @empresaNombre,
+            Filial: @sucursalNombre,
+            Empleado: @empleadoNombre,
+            Localizacion: @localizacionNombre,
+            Tanda: @tandaNombre.
+        </div>
         <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3" id="reportes-totales">
             <div class="text-sm text-slate-600">Total base: <span class="font-semibold">@Model.TotalBase.ToString("C")</span></div>
             <div class="text-sm text-slate-600">ITBIS: <span class="font-semibold">@Model.TotalItbis.ToString("C")</span></div>
@@ -96,8 +121,9 @@
         <div class="tab-switch__label">Vista</div>
         <div class="tab-switch__group">
             <button type="button" class="tab-pill is-active" data-tab-target="tab-resumen">Resumen por filial</button>
-            <button type="button" class="tab-pill" data-tab-target="tab-detalle">Detalle</button>
+            <button type="button" class="tab-pill" data-tab-target="tab-detalle-pedidos">Detalle por empleado</button>
             <button type="button" class="tab-pill" data-tab-target="tab-localizacion">Distribucion por localizacion</button>
+            <button type="button" class="tab-pill" data-tab-target="tab-distribucion-detalle">Detalle distribucion</button>
             <button type="button" class="tab-pill" data-tab-target="tab-cocina">Cocina</button>
         </div>
     </div>
@@ -110,6 +136,10 @@
                 <th class="text-right">Base</th>
                 <th class="text-right">ITBIS</th>
                 <th class="text-right">Total</th>
+                <th class="text-right">ITBIS empresa</th>
+                <th class="text-right">ITBIS empleado</th>
+                <th class="text-right">Monto adicional</th>
+                <th class="text-right">ITBIS adicional</th>
                 <th class="text-right">Empresa paga</th>
                 <th class="text-right">Empleado paga</th>
             </tr>
@@ -122,28 +152,103 @@
                     <td class="text-right">@r.Base.ToString("C")</td>
                     <td class="text-right">@r.Itbis.ToString("C")</td>
                     <td class="text-right">@r.Total.ToString("C")</td>
+                    <td class="text-right">@r.ItbisEmpresa.ToString("C")</td>
+                    <td class="text-right">@r.ItbisEmpleado.ToString("C")</td>
+                    <td class="text-right">@r.MontoAdicional.ToString("C")</td>
+                    <td class="text-right">@r.ItbisAdicional.ToString("C")</td>
                     <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
                     <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
                 </tr>
             }
             </tbody>
-            <tfoot>
-            <tr>
-                <th>Total</th>
-                <th class="text-right">@Model.TotalBase.ToString("C")</th>
-                <th class="text-right">@Model.TotalItbis.ToString("C")</th>
-                <th class="text-right">@Model.TotalGeneral.ToString("C")</th>
-                <th class="text-right">@Model.TotalEmpresa.ToString("C")</th>
-                <th class="text-right">@Model.TotalEmpleado.ToString("C")</th>
-            </tr>
-            </tfoot>
         </table>
     </div>
 
-    <div id="tab-detalle" class="tab-panel space-y-3" data-tab-panel>
+    <div id="tab-detalle-pedidos" class="tab-panel space-y-3" data-tab-panel>
         <table>
             <thead>
             <tr>
+                <th>Fecha</th>
+                <th>Filial</th>
+                <th>Localizacion</th>
+                <th>Empleado</th>
+                <th>Tanda</th>
+                <th>Opcion</th>
+                <th>Seleccion</th>
+                <th class="text-right">Base</th>
+                <th class="text-right">ITBIS</th>
+                <th class="text-right">Total</th>
+                <th class="text-right">Empresa paga</th>
+                <th class="text-right">Empleado paga</th>
+                <th class="text-right">ITBIS empresa</th>
+                <th class="text-right">ITBIS empleado</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.DetalleEmpleados)
+            {
+                var empleado = string.IsNullOrWhiteSpace(r.EmpleadoCodigo) ? r.Empleado : $"{r.EmpleadoCodigo} - {r.Empleado}";
+                <tr>
+                    <td>@r.Fecha.ToString("yyyy-MM-dd")</td>
+                    <td>@r.Filial</td>
+                    <td>@r.Localizacion</td>
+                    <td>@empleado</td>
+                    <td>@r.Tanda</td>
+                    <td>@r.Opcion</td>
+                    <td>@r.Seleccion</td>
+                    <td class="text-right">@r.Base.ToString("C")</td>
+                    <td class="text-right">@r.Itbis.ToString("C")</td>
+                    <td class="text-right">@r.Total.ToString("C")</td>
+                    <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
+                    <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+                    <td class="text-right">@r.ItbisEmpresa.ToString("C")</td>
+                    <td class="text-right">@r.ItbisEmpleado.ToString("C")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <div id="tab-localizacion" class="tab-panel space-y-3" data-tab-panel>
+        <table>
+            <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Filial</th>
+                <th>Localizacion</th>
+                <th>Opcion</th>
+                <th>Seleccion</th>
+                <th class="text-right">Cantidad</th>
+                <th class="text-right">Monto total</th>
+                <th class="text-right">Monto empresa</th>
+                <th class="text-right">Monto empleado</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.PorLocalizacion)
+            {
+                <tr>
+                    <td>@r.Fecha.ToString("yyyy-MM-dd")</td>
+                    <td>@r.Filial</td>
+                    <td>@r.Localizacion</td>
+                    <td>@r.Opcion</td>
+                    <td>@r.Seleccion</td>
+                    <td class="text-right">@r.Cantidad</td>
+                    <td class="text-right">@r.MontoTotal.ToString("C")</td>
+                    <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
+                    <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <div id="tab-distribucion-detalle" class="tab-panel space-y-3" data-tab-panel>
+        <table>
+            <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Filial</th>
                 <th>Localizacion</th>
                 <th>Opcion 1</th>
                 <th>Opcion 2</th>
@@ -151,17 +256,19 @@
                 <th>Opcion 4</th>
                 <th>Opcion 5</th>
                 <th>Adicional</th>
-                <th>Total Opcion</th>
-                <th>Total Adic</th>
+                <th>Total opcion</th>
+                <th>Total adic</th>
             </tr>
             </thead>
             <tbody>
             @foreach (var r in Model.PorLocalizacionCocina)
             {
                 var detalles = Model.PorLocalizacionCocinaDetalle
-                    .Where(d => d.Localizacion == r.Localizacion)
+                    .Where(d => d.Fecha == r.Fecha && d.Filial == r.Filial && d.Localizacion == r.Localizacion)
                     .ToList();
                 <tr>
+                    <td>@r.Fecha.ToString("yyyy-MM-dd")</td>
+                    <td>@r.Filial</td>
                     <td>@r.Localizacion</td>
                     <td class="text-right">@r.Opcion1</td>
                     <td class="text-right">@r.Opcion2</td>
@@ -176,6 +283,8 @@
                 {
                     <tr>
                         <td class="text-sm font-semibold">Detalle</td>
+                        <td class="text-sm text-slate-600">Filial</td>
+                        <td class="text-sm text-slate-600">Fecha</td>
                         <td class="text-sm text-slate-600">Codigo</td>
                         <td class="text-sm text-slate-600">Nombre</td>
                         <td class="text-sm text-slate-600">Seleccion</td>
@@ -187,6 +296,8 @@
                     {
                         <tr>
                             <td></td>
+                            <td class="text-sm">@d.Filial</td>
+                            <td class="text-sm">@d.Fecha.ToString("yyyy-MM-dd")</td>
                             <td class="text-sm">@d.EmpleadoCodigo</td>
                             <td class="text-sm">@d.EmpleadoNombre</td>
                             <td class="text-sm">@d.Seleccion</td>
@@ -216,38 +327,12 @@
         </div>
     </div>
 
-    <div id="tab-localizacion" class="tab-panel space-y-3" data-tab-panel>
-        <table>
-            <thead>
-            <tr>
-                <th>Localizacion</th>
-                <th>Opcion</th>
-                <th class="text-right">Cantidad</th>
-                <th class="text-right">Monto total</th>
-                <th class="text-right">Monto empresa</th>
-                <th class="text-right">Monto empleado</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach (var r in Model.PorLocalizacion)
-            {
-                <tr>
-                    <td>@r.Localizacion</td>
-                    <td>@r.Seleccion</td>
-                    <td class="text-right">@r.Cantidad</td>
-                    <td class="text-right">@r.MontoTotal.ToString("C")</td>
-                    <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
-                    <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-
     <div id="tab-cocina" class="tab-panel space-y-3" data-tab-panel>
         <table>
             <thead>
             <tr>
+                <th>Fecha</th>
+                <th>Filial</th>
                 <th>Localizacion</th>
                 <th>Opcion 1</th>
                 <th>Opcion 2</th>
@@ -255,14 +340,16 @@
                 <th>Opcion 4</th>
                 <th>Opcion 5</th>
                 <th>Adicional</th>
-                <th>Total Opcion</th>
-                <th>Total Adic</th>
+                <th>Total opcion</th>
+                <th>Total adic</th>
             </tr>
             </thead>
             <tbody>
             @foreach (var r in Model.PorLocalizacionCocina)
             {
                 <tr>
+                    <td>@r.Fecha.ToString("yyyy-MM-dd")</td>
+                    <td>@r.Filial</td>
                     <td>@r.Localizacion</td>
                     <td class="text-right">@r.Opcion1</td>
                     <td class="text-right">@r.Opcion2</td>
@@ -275,19 +362,6 @@
                 </tr>
             }
             </tbody>
-            <tfoot>
-            <tr>
-                <th>Total</th>
-                <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion1)</th>
-                <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion2)</th>
-                <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion3)</th>
-                <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion4)</th>
-                <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Opcion5)</th>
-                <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Adicionales)</th>
-                <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.TotalOpciones)</th>
-                <th class="text-right">@Model.PorLocalizacionCocina.Sum(x => x.Adicionales)</th>
-            </tr>
-            </tfoot>
         </table>
     </div>
 }
