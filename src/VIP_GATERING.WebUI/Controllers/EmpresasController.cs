@@ -106,6 +106,20 @@ public class EmpresasController : Controller
     {
         var ent = await _db.Empresas.FindAsync(id);
         if (ent == null) return NotFound();
+        ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
+        var sucursalIds = await _db.Sucursales.Where(s => s.EmpresaId == id).Select(s => s.Id).ToListAsync();
+        var horariosEmpresa = await _db.SucursalesHorarios
+            .Where(sh => sucursalIds.Contains(sh.SucursalId))
+            .ToListAsync();
+        ViewBag.EmpresaSelHorarios = horariosEmpresa
+            .Select(h => h.HorarioId)
+            .Distinct()
+            .ToList();
+        ViewBag.EmpresaHorarioTimes = horariosEmpresa
+            .GroupBy(h => h.HorarioId)
+            .ToDictionary(
+                g => g.Key,
+                g => (Inicio: g.First().HoraInicio?.ToString("HH:mm"), Fin: g.First().HoraFin?.ToString("HH:mm")));
         return View(ent);
     }
 
@@ -113,7 +127,13 @@ public class EmpresasController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id, Empresa model)
     {
-        if (!ModelState.IsValid) return View(model);
+        if (!ModelState.IsValid)
+        {
+            ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
+            ViewBag.EmpresaSelHorarios = new List<int>();
+            ViewBag.EmpresaHorarioTimes = new Dictionary<int, (string? Inicio, string? Fin)>();
+            return View(model);
+        }
         var ent = await _db.Empresas.FindAsync(id);
         if (ent == null) return NotFound();
         ent.Nombre = model.Nombre;
@@ -125,6 +145,7 @@ public class EmpresasController : Controller
         ent.SubsidioTipo = model.SubsidioTipo;
         ent.SubsidioValor = model.SubsidioValor;
         await _db.SaveChangesAsync();
+        await UpsertEmpresaHorariosAsync(ent.Id);
         TempData["Success"] = "Empresa actualizada.";
         return RedirectToAction(nameof(Index));
     }
@@ -148,6 +169,48 @@ public class EmpresasController : Controller
             TempData["Success"] = "Empresa eliminada.";
         }
         return RedirectToAction(nameof(Index));
+    }
+
+    private async Task UpsertEmpresaHorariosAsync(int empresaId)
+    {
+        var seleccion = Request.Form["empresa_horarios"].ToArray();
+        if (seleccion == null) return;
+
+        var sucursalIds = await _db.Sucursales.Where(s => s.EmpresaId == empresaId).Select(s => s.Id).ToListAsync();
+        if (sucursalIds.Count == 0) return;
+
+        var actuales = await _db.SucursalesHorarios
+            .Where(sh => sucursalIds.Contains(sh.SucursalId))
+            .ToListAsync();
+        _db.SucursalesHorarios.RemoveRange(actuales);
+
+        var horarioIds = seleccion
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct()
+            .Select(value => int.Parse(value!))
+            .ToList();
+
+        foreach (var sucursalId in sucursalIds)
+        {
+            foreach (var hid in horarioIds)
+            {
+                _db.SucursalesHorarios.Add(new SucursalHorario
+                {
+                    SucursalId = sucursalId,
+                    HorarioId = hid,
+                    HoraInicio = ParseHora(Request.Form[$"empresa_horario_inicio_{hid}"]),
+                    HoraFin = ParseHora(Request.Form[$"empresa_horario_fin_{hid}"])
+                });
+            }
+        }
+
+        await _db.SaveChangesAsync();
+    }
+
+    private static TimeOnly? ParseHora(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return TimeOnly.TryParse(value, out var parsed) ? parsed : null;
     }
 }
 

@@ -147,6 +147,18 @@ using (var scope = app.Services.CreateScope())
         "ADD COLUMN IF NOT EXISTS \"NumeroFactura\" text NULL;");
     await db.Database.ExecuteSqlRawAsync(
         "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"UsuarioCierreNomina\" text NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"UsuarioFacturacion\" text NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"SucursalesHorarios\" " +
+        "ADD COLUMN IF NOT EXISTS \"HoraInicio\" time NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"SucursalesHorarios\" " +
+        "ADD COLUMN IF NOT EXISTS \"HoraFin\" time NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
         "ADD COLUMN IF NOT EXISTS \"BaseSnapshot\" numeric NULL;");
     await db.Database.ExecuteSqlRawAsync(
         "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +

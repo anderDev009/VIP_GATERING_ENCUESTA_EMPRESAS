@@ -99,6 +99,7 @@ public class SucursalesController : Controller
     {
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
+        ViewBag.HorarioTimes = new Dictionary<int, (string? Inicio, string? Fin)>();
         return View(new Sucursal());
     }
 
@@ -111,6 +112,7 @@ public class SucursalesController : Controller
         {
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Horarios = await _db.Horarios.OrderBy(h => h.Orden).ToListAsync();
+            ViewBag.HorarioTimes = new Dictionary<int, (string? Inicio, string? Fin)>();
             return View(model);
         }
         await _db.Sucursales.AddAsync(model);
@@ -134,7 +136,15 @@ public class SucursalesController : Controller
                 horarioIds = (await _db.Horarios.Where(h => h.Activo).Select(h => h.Id).ToListAsync());
         }
         foreach (var hid in horarioIds)
-            await _db.SucursalesHorarios.AddAsync(new SucursalHorario { SucursalId = model.Id, HorarioId = hid });
+        {
+            await _db.SucursalesHorarios.AddAsync(new SucursalHorario
+            {
+                SucursalId = model.Id,
+                HorarioId = hid,
+                HoraInicio = ParseHora(Request.Form[$"horario_inicio_{hid}"]),
+                HoraFin = ParseHora(Request.Form[$"horario_fin_{hid}"])
+            });
+        }
         await _db.SaveChangesAsync();
         TempData["Success"] = "Filial creado.";
         return RedirectToAction(nameof(Index), new { empresaId = model.EmpresaId });
@@ -147,6 +157,11 @@ public class SucursalesController : Controller
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
         ViewBag.SelHorarios = await _db.SucursalesHorarios.Where(sh => sh.SucursalId == ent.Id).Select(sh => sh.HorarioId).ToListAsync();
+        ViewBag.HorarioTimes = await _db.SucursalesHorarios
+            .Where(sh => sh.SucursalId == ent.Id)
+            .ToDictionaryAsync(
+                sh => sh.HorarioId,
+                sh => (Inicio: sh.HoraInicio?.ToString("HH:mm"), Fin: sh.HoraFin?.ToString("HH:mm")));
         return View(ent);
     }
 
@@ -162,6 +177,11 @@ public class SucursalesController : Controller
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Horarios = await _db.Horarios.OrderBy(h => h.Orden).ToListAsync();
             ViewBag.SelHorarios = await _db.SucursalesHorarios.Where(sh => sh.SucursalId == ent.Id).Select(sh => sh.HorarioId).ToListAsync();
+            ViewBag.HorarioTimes = await _db.SucursalesHorarios
+                .Where(sh => sh.SucursalId == ent.Id)
+                .ToDictionaryAsync(
+                    sh => sh.HorarioId,
+                    sh => (Inicio: sh.HoraInicio?.ToString("HH:mm"), Fin: sh.HoraFin?.ToString("HH:mm")));
             return View(model);
         }
         ent.Nombre = model.Nombre;
@@ -180,7 +200,15 @@ public class SucursalesController : Controller
             foreach (var val in seleccion.Distinct())
             {
                 if (int.TryParse(val, out var hid))
-                    await _db.SucursalesHorarios.AddAsync(new SucursalHorario { SucursalId = ent.Id, HorarioId = hid });
+                {
+                    await _db.SucursalesHorarios.AddAsync(new SucursalHorario
+                    {
+                        SucursalId = ent.Id,
+                        HorarioId = hid,
+                        HoraInicio = ParseHora(Request.Form[$"horario_inicio_{hid}"]),
+                        HoraFin = ParseHora(Request.Form[$"horario_fin_{hid}"])
+                    });
+                }
             }
             await _db.SaveChangesAsync();
         }
@@ -249,6 +277,12 @@ public class SucursalesController : Controller
             target.SubsidioTipo = null;
             target.SubsidioValor = null;
         }
+    }
+
+    private static TimeOnly? ParseHora(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return TimeOnly.TryParse(value, out var parsed) ? parsed : null;
     }
 }
 

@@ -438,12 +438,14 @@ public class ReportesController : Controller
             return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
         }
 
+        var usuarioProceso = User.Identity?.Name ?? "Sistema";
         var timestamp = DateTime.UtcNow;
         EnsureSnapshots(data.Respuestas);
         foreach (var r in data.Respuestas)
         {
             r.CierreNomina = true;
             r.FechaCierreNomina = timestamp;
+            r.UsuarioCierreNomina = usuarioProceso;
         }
         await _db.SaveChangesAsync();
         TempData["Success"] = "Nomina creada correctamente.";
@@ -533,12 +535,14 @@ public class ReportesController : Controller
             return RedirectToAction(nameof(Facturacion), new { empresaId, sucursalId, desde, hasta });
         }
 
+        var usuarioProceso = User.Identity?.Name ?? "Sistema";
         var timestamp = DateTime.UtcNow;
         EnsureSnapshots(data.Respuestas);
         foreach (var r in data.Respuestas)
         {
             r.Facturado = true;
             r.FechaFacturado = timestamp;
+            r.UsuarioFacturacion = usuarioProceso;
         }
         await _db.SaveChangesAsync();
         TempData["Success"] = "Facturacion creada correctamente.";
@@ -995,32 +999,35 @@ public class ReportesController : Controller
         var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
         var horarios = await _db.Horarios.OrderBy(h => h.Orden).ThenBy(h => h.Nombre).ToListAsync();
         List<Localizacion> localizaciones;
-        var localizacionesBase = _db.Localizaciones.AsQueryable();
+        var localizacionesBase = _db.Localizaciones.AsNoTracking().AsQueryable();
         if (empresaId != null)
             localizacionesBase = localizacionesBase.Where(l => l.EmpresaId == empresaId);
         if (sucursalId != null)
             localizacionesBase = localizacionesBase.Where(l => l.SucursalId == sucursalId);
-        localizaciones = await localizacionesBase.OrderBy(l => l.Nombre).ToListAsync();
+        var localizacionesRaw = await localizacionesBase
+            .OrderBy(l => l.Nombre)
+            .ToListAsync();
 
-        if (empleadoId != null && localizacionId == null)
+        if (sucursalId == null)
         {
-            return View(new DistribucionVM
-            {
-                Inicio = inicio,
-                Fin = fin,
-                EmpresaId = empresaId,
-                SucursalId = sucursalId,
-                EmpleadoId = empleadoId,
-                LocalizacionId = localizacionId,
-                HorarioId = horarioId,
-                Empresas = empresas,
-                Sucursales = sucursales,
-                Empleados = empleados,
-                Localizaciones = localizaciones,
-                Horarios = horarios,
-                MensajeValidacion = "Para filtrar por empleado, selecciona una localizacion."
-            });
+            localizaciones = localizacionesRaw
+                .GroupBy(l => l.Nombre, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderBy(x => x.Id).First())
+                .OrderBy(l => l.Nombre)
+                .ToList();
         }
+        else
+        {
+            localizaciones = localizacionesRaw
+                .GroupBy(l => (l.EmpresaId, l.SucursalId, l.Nombre))
+                .Select(g => g.OrderBy(x => x.Id).First())
+                .OrderBy(l => l.Nombre)
+                .ToList();
+        }
+
+        var localizacionNombreFiltro = localizacionId != null
+            ? localizaciones.FirstOrDefault(l => l.Id == localizacionId)?.Nombre
+            : null;
 
         var baseQuery = _db.RespuestasFormulario
             .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
@@ -1043,7 +1050,12 @@ public class ReportesController : Controller
         if (empleadoId != null)
             baseQuery = baseQuery.Where(r => r.EmpleadoId == empleadoId);
         if (localizacionId != null)
-            baseQuery = baseQuery.Where(r => r.LocalizacionEntregaId == localizacionId);
+        {
+            if (sucursalId == null && !string.IsNullOrWhiteSpace(localizacionNombreFiltro))
+                baseQuery = baseQuery.Where(r => r.LocalizacionEntrega != null && r.LocalizacionEntrega.Nombre == localizacionNombreFiltro);
+            else
+                baseQuery = baseQuery.Where(r => r.LocalizacionEntregaId == localizacionId);
+        }
         if (horarioId != null)
             baseQuery = baseQuery.Where(r => r.OpcionMenu != null && r.OpcionMenu.HorarioId == horarioId);
 
@@ -1894,6 +1906,144 @@ public class ReportesController : Controller
         return File(pdf, "application/pdf", $"distribucion-{export.Suffix}-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
     }
 
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> ReporteMaestro(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, string? tipo = null, string? estado = null, int page = 1, int pageSize = 50)
+    {
+        if (empresaId <= 0) empresaId = null;
+        if (sucursalId <= 0) sucursalId = null;
+        if (localizacionId <= 0) localizacionId = null;
+        if (empleadoId <= 0) empleadoId = null;
+        tipo = string.IsNullOrWhiteSpace(tipo) ? null : tipo.Trim().ToLowerInvariant();
+        estado = string.IsNullOrWhiteSpace(estado) ? null : estado.Trim().ToLowerInvariant();
+
+        DateOnly inicio;
+        DateOnly fin;
+        if (desde.HasValue && hasta.HasValue)
+        {
+            inicio = desde.Value;
+            fin = hasta.Value;
+            if (fin < inicio)
+            {
+                (inicio, fin) = (fin, inicio);
+            }
+        }
+        else if (desde.HasValue)
+        {
+            inicio = desde.Value;
+            fin = inicio.AddDays(4);
+        }
+        else if (hasta.HasValue)
+        {
+            fin = hasta.Value;
+            inicio = fin.AddDays(-4);
+        }
+        else
+        {
+            (inicio, fin) = GetDefaultReportRange(_fechas.Hoy());
+        }
+
+        var empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
+        List<Sucursal> sucursales;
+        if (empresaId != null)
+        {
+            sucursales = await _db.Sucursales
+                .Where(s => s.EmpresaId == empresaId)
+                .OrderBy(s => s.Nombre)
+                .ToListAsync();
+        }
+        else
+        {
+            sucursales = await _db.Sucursales
+                .OrderBy(s => s.Nombre)
+                .ToListAsync();
+        }
+        var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
+
+        var localizacionesRaw = await BuildLocalizacionesFiltroAsync(empresaId, sucursalId);
+        List<Localizacion> localizaciones;
+        if (sucursalId == null)
+        {
+            localizaciones = localizacionesRaw
+                .GroupBy(l => l.Nombre, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderBy(x => x.Id).First())
+                .OrderBy(l => l.Nombre)
+                .ToList();
+        }
+        else
+        {
+            localizaciones = localizacionesRaw
+                .GroupBy(l => (l.EmpresaId, l.SucursalId, l.Nombre))
+                .Select(g => g.OrderBy(x => x.Id).First())
+                .OrderBy(l => l.Nombre)
+                .ToList();
+        }
+
+        var rows = await BuildReporteMaestroRowsAsync(inicio, fin, empresaId, sucursalId, localizacionId, empleadoId, tipo, estado, localizaciones);
+        if (page < 1) page = 1;
+        if (pageSize <= 0) pageSize = 50;
+        var total = rows.Count;
+        var items = rows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        var vm = new ReporteMaestroVM
+        {
+            Inicio = inicio,
+            Fin = fin,
+            EmpresaId = empresaId,
+            SucursalId = sucursalId,
+            LocalizacionId = localizacionId,
+            EmpleadoId = empleadoId,
+            Tipo = tipo,
+            Estado = estado,
+            Empresas = empresas,
+            Sucursales = sucursales,
+            Localizaciones = localizaciones,
+            Empleados = empleados,
+            Paginado = new PagedResult<ReporteMaestroVM.Row>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalItems = total
+            }
+        };
+
+        return View(vm);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> ReporteMaestroCsv(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, string? tipo = null, string? estado = null)
+    {
+        var vm = await ReporteMaestro(desde, hasta, empresaId, sucursalId, localizacionId, empleadoId, tipo, estado, 1, int.MaxValue) as ViewResult;
+        var model = (ReporteMaestroVM)vm!.Model!;
+        var export = BuildReporteMaestroExport(model.Paginado.Items);
+        var bytes = ExportHelper.BuildCsv(export.Headers, export.Rows);
+        return File(bytes, "text/csv", $"reporte-maestro-{model.Inicio:yyyyMMdd}-{model.Fin:yyyyMMdd}.csv");
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> ReporteMaestroExcel(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, string? tipo = null, string? estado = null)
+    {
+        var vm = await ReporteMaestro(desde, hasta, empresaId, sucursalId, localizacionId, empleadoId, tipo, estado, 1, int.MaxValue) as ViewResult;
+        var model = (ReporteMaestroVM)vm!.Model!;
+        var export = BuildReporteMaestroExport(model.Paginado.Items);
+        var bytes = ExportHelper.BuildExcel("Reporte Maestro", export.Headers, export.Rows);
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"reporte-maestro-{model.Inicio:yyyyMMdd}-{model.Fin:yyyyMMdd}.xlsx");
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> ReporteMaestroPdf(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, string? tipo = null, string? estado = null)
+    {
+        var vm = await ReporteMaestro(desde, hasta, empresaId, sucursalId, localizacionId, empleadoId, tipo, estado, 1, int.MaxValue) as ViewResult;
+        var model = (ReporteMaestroVM)vm!.Model!;
+        var export = BuildReporteMaestroExport(model.Paginado.Items);
+        var pdf = ExportHelper.BuildPdf($"Reporte Maestro {model.Inicio:yyyy-MM-dd} a {model.Fin:yyyy-MM-dd}", export.Headers, export.Rows);
+        return File(pdf, "application/pdf", $"reporte-maestro-{model.Inicio:yyyyMMdd}-{model.Fin:yyyyMMdd}.pdf");
+    }
+
     [Authorize(Roles = "Empleado")]
     [HttpGet]
     public async Task<IActionResult> EstadoCuentaCsv(DateOnly? desde = null, DateOnly? hasta = null)
@@ -2238,13 +2388,16 @@ private async Task<int> ClearCierreAsync(bool esFacturacion, int empresaId, int 
         {
             r.Facturado = false;
             r.FechaFacturado = null;
+            r.UsuarioFacturacion = null;
         }
         else
         {
             r.CierreNomina = false;
             r.FechaCierreNomina = null;
+            r.UsuarioCierreNomina = null;
             r.Facturado = false;
             r.FechaFacturado = null;
+            r.UsuarioFacturacion = null;
         }
     }
     await _db.SaveChangesAsync();
@@ -2984,5 +3137,232 @@ private static (string Title, string Suffix, IReadOnlyList<string> Headers, List
                 return ("Distribucion resumen por filial", "resumen", headers, AddFilterRows(headers, rows));
             }
     }
+}
+
+private async Task<List<Localizacion>> BuildLocalizacionesFiltroAsync(int? empresaId, int? sucursalId)
+{
+    var query = _db.Localizaciones.AsNoTracking().AsQueryable();
+    if (empresaId != null)
+        query = query.Where(l => l.EmpresaId == empresaId);
+    if (sucursalId != null)
+        query = query.Where(l => l.SucursalId == sucursalId);
+    return await query.OrderBy(l => l.Nombre).ToListAsync();
+}
+
+private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, int? localizacionId, int? empleadoId, string? tipo, string? estado, IReadOnlyList<Localizacion> localizaciones)
+{
+    var localizacionNombreFiltro = localizacionId != null
+        ? localizaciones.FirstOrDefault(l => l.Id == localizacionId)?.Nombre
+        : null;
+
+    var baseQuery = _db.RespuestasFormulario
+        .Include(r => r.Empleado).ThenInclude(e => e!.Sucursal).ThenInclude(s => s!.Empresa)
+        .Include(r => r.SucursalEntrega).ThenInclude(s => s!.Empresa)
+        .Include(r => r.LocalizacionEntrega)
+        .Include(r => r.AdicionalOpcion)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.Horario)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionA)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionB)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionC)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionD)
+        .Include(r => r.OpcionMenu).ThenInclude(om => om!.OpcionE)
+        .Where(r => r.OpcionMenu != null
+            && r.OpcionMenu.Menu != null
+            && r.OpcionMenu.Menu.FechaInicio <= fin
+            && r.OpcionMenu.Menu.FechaTermino >= inicio);
+
+    baseQuery = AplicarFiltrosEmpresaSucursal(baseQuery, empresaId, sucursalId);
+    if (empleadoId != null)
+        baseQuery = baseQuery.Where(r => r.EmpleadoId == empleadoId);
+    if (localizacionId != null)
+    {
+        if (sucursalId == null && !string.IsNullOrWhiteSpace(localizacionNombreFiltro))
+            baseQuery = baseQuery.Where(r => r.LocalizacionEntrega != null && r.LocalizacionEntrega.Nombre == localizacionNombreFiltro);
+        else
+            baseQuery = baseQuery.Where(r => r.LocalizacionEntregaId == localizacionId);
+    }
+    if (!string.IsNullOrWhiteSpace(estado))
+    {
+        baseQuery = estado switch
+        {
+            "abierto" => baseQuery.Where(r => !r.CierreNomina),
+            "cerrado" => baseQuery.Where(r => r.CierreNomina),
+            "facturado" => baseQuery.Where(r => r.Facturado),
+            _ => baseQuery
+        };
+    }
+
+    var respuestas = await baseQuery.ToListAsync();
+    respuestas = respuestas
+        .Where(r =>
+        {
+            if (r.OpcionMenu == null || r.OpcionMenu.Menu == null) return false;
+            var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana);
+            return fecha >= inicio && fecha <= fin;
+        })
+        .ToList();
+
+    var sucursalIds = respuestas
+        .Select(r => r.SucursalEntregaId)
+        .Distinct()
+        .ToList();
+    var horarioIds = respuestas
+        .Where(r => r.OpcionMenu?.HorarioId != null)
+        .Select(r => r.OpcionMenu!.HorarioId!.Value)
+        .Distinct()
+        .ToList();
+    var horarioTimes = await _db.SucursalesHorarios
+        .Where(sh => sucursalIds.Contains(sh.SucursalId) && horarioIds.Contains(sh.HorarioId))
+        .ToDictionaryAsync(
+            sh => (sh.SucursalId, sh.HorarioId),
+            sh => (Inicio: sh.HoraInicio?.ToString("HH:mm"), Fin: sh.HoraFin?.ToString("HH:mm")));
+
+    var culture = CultureInfo.CurrentCulture;
+    var rows = new List<ReporteMaestroVM.Row>();
+    foreach (var r in respuestas)
+    {
+        if (r.OpcionMenu == null || r.Empleado == null) continue;
+        var fecha = ObtenerFechaDiaSemana(r.OpcionMenu.Menu!.FechaInicio, r.OpcionMenu.DiaSemana);
+        var sucEmpleado = r.Empleado.Sucursal;
+        var empresaEmpleado = sucEmpleado?.Empresa;
+        var sucEntrega = r.SucursalEntrega ?? sucEmpleado;
+        if (sucEmpleado == null || empresaEmpleado == null || sucEntrega == null) continue;
+
+        var localizacion = r.LocalizacionEntrega?.Nombre ?? "Sin asignar";
+        var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
+        var empleadoCodigo = r.Empleado.Codigo ?? string.Empty;
+        var horarioNombre = r.OpcionMenu.Horario?.Nombre ?? "Sin horario";
+        var horarioKey = r.OpcionMenu.HorarioId.HasValue ? (sucEntrega.Id, r.OpcionMenu.HorarioId.Value) : (0, 0);
+        var horarioInicio = string.Empty;
+        var horarioFin = string.Empty;
+        if (horarioKey != (0, 0) && horarioTimes.TryGetValue(horarioKey, out var rango))
+        {
+            horarioInicio = rango.Inicio ?? string.Empty;
+            horarioFin = rango.Fin ?? string.Empty;
+        }
+
+        string periodo;
+        if (fecha.Day <= 15)
+            periodo = $"{fecha:yyyy-MM} Q1";
+        else
+            periodo = $"{fecha:yyyy-MM} Q2";
+
+        void AddRow(string tipoRegistro, string opcionLabel, string plato, decimal baseValor, decimal itbis, decimal total, decimal empresaPaga, decimal empleadoPaga, decimal itbisEmpresa, decimal itbisEmpleado)
+        {
+            var subsidioAplicado = empresaPaga > 0 ? "Si" : "No";
+            var porcentajeSubsidio = total > 0 ? Math.Round((empresaPaga / total) * 100m, 2) : 0m;
+            rows.Add(new ReporteMaestroVM.Row
+            {
+                Fecha = fecha,
+                DiaSemana = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
+                Hora = string.Empty,
+                Periodo = periodo,
+                Horario = horarioNombre,
+                HorarioInicio = horarioInicio,
+                HorarioFin = horarioFin,
+                Empresa = empresaEmpleado.Nombre ?? string.Empty,
+                Filial = sucEntrega.Nombre ?? string.Empty,
+                Localizacion = localizacion,
+                EmpleadoCodigo = empleadoCodigo,
+                EmpleadoNombre = empleadoNombre,
+                Tipo = tipoRegistro,
+                Opcion = opcionLabel,
+                Plato = plato,
+                Cantidad = 1,
+                PrecioUnitario = baseValor,
+                SubtotalBase = baseValor,
+                ItbisTotal = itbis,
+                Total = total,
+                SubsidioAplicado = subsidioAplicado,
+                PorcentajeSubsidio = porcentajeSubsidio,
+                EmpresaPaga = empresaPaga,
+                ItbisEmpresa = itbisEmpresa,
+                EmpleadoPaga = empleadoPaga,
+                ItbisEmpleado = itbisEmpleado,
+                NumeroCierre = r.FechaCierreNomina?.ToString("yyyy-MM-dd") ?? string.Empty,
+                EstadoNomina = r.CierreNomina ? "Cerrada" : "Abierta",
+                NumeroFactura = r.NumeroFactura ?? string.Empty,
+                EstadoFacturacion = r.Facturado ? "Facturada" : "Pendiente",
+                UsuarioProceso = r.Facturado
+                    ? (r.UsuarioFacturacion ?? string.Empty)
+                    : (r.CierreNomina ? (r.UsuarioCierreNomina ?? string.Empty) : string.Empty)
+            });
+        }
+
+        if (tipo == null || tipo == "menu")
+        {
+            var opcion = GetOpcionSeleccionada(r.OpcionMenu, r.Seleccion);
+            if (opcion != null)
+            {
+                var montos = r.BaseSnapshot.HasValue
+                    ? (r.BaseSnapshot.Value, r.ItbisSnapshot ?? 0m, r.TotalSnapshot ?? 0m, r.EmpresaPagaSnapshot ?? 0m, r.EmpleadoPagaSnapshot ?? 0m, r.ItbisEmpresaSnapshot ?? 0m, r.ItbisEmpleadoSnapshot ?? 0m)
+                    : CalcularMontos(opcion, r.Empleado, sucEmpleado, empresaEmpleado, true);
+                AddRow("Menu", MapSeleccion(r.Seleccion), opcion.Nombre ?? "Sin definir", montos.Item1, montos.Item2, montos.Item3, montos.Item4, montos.Item5, montos.Item6, montos.Item7);
+            }
+        }
+
+        if ((tipo == null || tipo == "adicional") && r.AdicionalOpcion != null)
+        {
+            var adicional = r.AdicionalOpcion;
+            var montosAd = r.AdicionalBaseSnapshot.HasValue
+                ? (r.AdicionalBaseSnapshot.Value, r.AdicionalItbisSnapshot ?? 0m, r.AdicionalTotalSnapshot ?? 0m, r.AdicionalEmpresaPagaSnapshot ?? 0m, r.AdicionalEmpleadoPagaSnapshot ?? 0m, r.AdicionalItbisEmpresaSnapshot ?? 0m, r.AdicionalItbisEmpleadoSnapshot ?? 0m)
+                : CalcularMontos(adicional, r.Empleado, sucEmpleado, empresaEmpleado, false);
+            AddRow("Adicional", "Adicional", adicional.Nombre ?? "Sin definir", montosAd.Item1, montosAd.Item2, montosAd.Item3, montosAd.Item4, montosAd.Item5, montosAd.Item6, montosAd.Item7);
+        }
+    }
+
+    return rows
+        .OrderBy(r => r.Fecha)
+        .ThenBy(r => r.Empresa)
+        .ThenBy(r => r.Filial)
+        .ThenBy(r => r.EmpleadoNombre)
+        .ThenBy(r => r.Tipo)
+        .ToList();
+}
+
+private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows) BuildReporteMaestroExport(IReadOnlyList<ReporteMaestroVM.Row> rows)
+{
+    var headers = new[]
+    {
+        "Fecha","Dia","Hora","Periodo","Horario","Hora inicio","Hora fin","Empresa","Filial","Localizacion","Codigo empleado","Empleado","Tipo","Opcion","Plato","Cantidad","Precio unitario","Subtotal base","ITBIS total","Total","Subsidio aplicado","% subsidio","Monto empresa","ITBIS empresa","Monto empleado","ITBIS empleado","Numero cierre","Estado nomina","Numero factura","Estado facturacion","Usuario proceso"
+    };
+
+    var data = rows.Select(r => (IReadOnlyList<string>)new[]
+    {
+        r.Fecha.ToString("yyyy-MM-dd"),
+        r.DiaSemana,
+        r.Hora,
+        r.Periodo,
+        r.Horario,
+        r.HorarioInicio,
+        r.HorarioFin,
+        r.Empresa,
+        r.Filial,
+        r.Localizacion,
+        r.EmpleadoCodigo,
+        r.EmpleadoNombre,
+        r.Tipo,
+        r.Opcion,
+        r.Plato,
+        r.Cantidad.ToString(),
+        r.PrecioUnitario.ToString("C"),
+        r.SubtotalBase.ToString("C"),
+        r.ItbisTotal.ToString("C"),
+        r.Total.ToString("C"),
+        r.SubsidioAplicado,
+        r.PorcentajeSubsidio.ToString("0.00"),
+        r.EmpresaPaga.ToString("C"),
+        r.ItbisEmpresa.ToString("C"),
+        r.EmpleadoPaga.ToString("C"),
+        r.ItbisEmpleado.ToString("C"),
+        r.NumeroCierre,
+        r.EstadoNomina,
+        r.NumeroFactura,
+        r.EstadoFacturacion,
+        r.UsuarioProceso
+    }).ToList();
+
+    return (headers, data);
 }
 }

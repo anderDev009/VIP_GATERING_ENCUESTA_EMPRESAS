@@ -1,0 +1,173 @@
+@model VIP_GATERING.WebUI.Models.Reportes.ReporteMaestroVM
+@{
+    ViewData["Title"] = "Reporte maestro";
+}
+
+<h1 class="text-xl font-semibold mb-4">Reporte maestro desde @Model.Inicio.ToString("dd/MM/yyyy") hasta @Model.Fin.ToString("dd/MM/yyyy")</h1>
+
+<form method="get" class="mb-6 grid gap-4 md:grid-cols-4 items-end">
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Desde</label>
+        <input type="date" name="desde" value="@Model.Inicio.ToString("yyyy-MM-dd")" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" />
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Hasta</label>
+        <input type="date" name="hasta" value="@Model.Fin.ToString("yyyy-MM-dd")" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" />
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Empresa</label>
+        <select name="empresaId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="" selected="@(Model.EmpresaId == null ? "selected" : null)">Todas</option>
+            @foreach (var e in Model.Empresas)
+            {
+                <option value="@e.Id" selected="@(Model.EmpresaId == e.Id ? "selected" : null)">@e.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Filial</label>
+        <select name="sucursalId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="" selected="@(Model.SucursalId == null ? "selected" : null)">Todas</option>
+            @foreach (var s in Model.Sucursales)
+            {
+                <option value="@s.Id" selected="@(Model.SucursalId == s.Id ? "selected" : null)">@s.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Localizacion</label>
+        <select name="localizacionId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="" selected="@(Model.LocalizacionId == null ? "selected" : null)">Todas</option>
+            @foreach (var l in Model.Localizaciones)
+            {
+                <option value="@l.Id" selected="@(Model.LocalizacionId == l.Id ? "selected" : null)">@l.Nombre</option>
+            }
+        </select>
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Empleado</label>
+        <select name="empleadoId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="" selected="@(Model.EmpleadoId == null ? "selected" : null)">Todos</option>
+            @foreach (var e in Model.Empleados)
+            {
+                var nombre = !string.IsNullOrWhiteSpace(e.Nombre) ? e.Nombre : e.Codigo;
+                <option value="@e.Id" selected="@(Model.EmpleadoId == e.Id ? "selected" : null)">@nombre</option>
+            }
+        </select>
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Tipo</label>
+        <select name="tipo" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Tipo) ? "selected" : null)">Todos</option>
+            <option value="menu" selected="@(Model.Tipo == "menu" ? "selected" : null)">Menu</option>
+            <option value="adicional" selected="@(Model.Tipo == "adicional" ? "selected" : null)">Adicional</option>
+        </select>
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Estado</label>
+        <select name="estado" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Estado) ? "selected" : null)">Todos</option>
+            <option value="abierto" selected="@(Model.Estado == "abierto" ? "selected" : null)">Abierto</option>
+            <option value="cerrado" selected="@(Model.Estado == "cerrado" ? "selected" : null)">Cerrado</option>
+            <option value="facturado" selected="@(Model.Estado == "facturado" ? "selected" : null)">Facturado</option>
+        </select>
+    </div>
+    <div class="flex gap-3 md:col-span-4 flex-wrap">
+        <button type="submit" class="btn-primary">Filtrar</button>
+        <a class="btn-outline" asp-action="ReporteMaestro">Limpiar</a>
+        <a class="btn-outline" asp-action="ReporteMaestroExcel" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-tipo="@Model.Tipo" asp-route-estado="@Model.Estado">Exportar Excel</a>
+        <a class="btn-outline" asp-action="ReporteMaestroCsv" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-tipo="@Model.Tipo" asp-route-estado="@Model.Estado">Exportar CSV</a>
+        <a class="btn-outline" asp-action="ReporteMaestroPdf" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-tipo="@Model.Tipo" asp-route-estado="@Model.Estado">Exportar PDF</a>
+    </div>
+    <input type="hidden" name="page" value="@Model.Paginado.Page" />
+    <input type="hidden" name="pageSize" value="@Model.Paginado.PageSize" />
+</form>
+
+@if (!Model.Paginado.Items.Any())
+{
+    <div class="page-panel alert">No hay registros para los filtros seleccionados.</div>
+}
+else
+{
+    <div class="overflow-x-auto">
+        <table>
+            <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Dia</th>
+                <th>Periodo</th>
+                <th>Horario</th>
+                <th>Hora inicio</th>
+                <th>Hora fin</th>
+                <th>Empresa</th>
+                <th>Filial</th>
+                <th>Localizacion</th>
+                <th>Codigo</th>
+                <th>Empleado</th>
+                <th>Tipo</th>
+                <th>Opcion</th>
+                <th>Plato</th>
+                <th class="text-right">Cantidad</th>
+                <th class="text-right">Precio</th>
+                <th class="text-right">Base</th>
+                <th class="text-right">ITBIS</th>
+                <th class="text-right">Total</th>
+                <th>Subsidio</th>
+                <th class="text-right">% subsidio</th>
+                <th class="text-right">Empresa paga</th>
+                <th class="text-right">ITBIS empresa</th>
+                <th class="text-right">Empleado paga</th>
+                <th class="text-right">ITBIS empleado</th>
+                <th>Cierre</th>
+                <th>Estado nomina</th>
+                <th>Factura</th>
+                <th>Estado facturacion</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Paginado.Items)
+            {
+                <tr>
+                    <td>@r.Fecha.ToString("yyyy-MM-dd")</td>
+                    <td>@r.DiaSemana</td>
+                    <td>@r.Periodo</td>
+                    <td>@r.Horario</td>
+                    <td>@r.HorarioInicio</td>
+                    <td>@r.HorarioFin</td>
+                    <td>@r.Empresa</td>
+                    <td>@r.Filial</td>
+                    <td>@r.Localizacion</td>
+                    <td>@r.EmpleadoCodigo</td>
+                    <td>@r.EmpleadoNombre</td>
+                    <td>@r.Tipo</td>
+                    <td>@r.Opcion</td>
+                    <td>@r.Plato</td>
+                    <td class="text-right">@r.Cantidad</td>
+                    <td class="text-right">@r.PrecioUnitario.ToString("C")</td>
+                    <td class="text-right">@r.SubtotalBase.ToString("C")</td>
+                    <td class="text-right">@r.ItbisTotal.ToString("C")</td>
+                    <td class="text-right">@r.Total.ToString("C")</td>
+                    <td>@r.SubsidioAplicado</td>
+                    <td class="text-right">@r.PorcentajeSubsidio.ToString("0.00")%</td>
+                    <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
+                    <td class="text-right">@r.ItbisEmpresa.ToString("C")</td>
+                    <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+                    <td class="text-right">@r.ItbisEmpleado.ToString("C")</td>
+                    <td>@r.NumeroCierre</td>
+                    <td>@r.EstadoNomina</td>
+                    <td>@r.NumeroFactura</td>
+                    <td>@r.EstadoFacturacion</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @await Html.PartialAsync("_Pagination", new VIP_GATERING.WebUI.Models.PagedResult<object>
+    {
+        Items = Model.Paginado.Items.Cast<object>().ToList(),
+        Page = Model.Paginado.Page,
+        PageSize = Model.Paginado.PageSize,
+        TotalItems = Model.Paginado.TotalItems
+    })
+}

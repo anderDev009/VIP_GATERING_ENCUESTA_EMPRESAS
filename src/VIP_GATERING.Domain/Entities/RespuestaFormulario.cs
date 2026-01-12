@@ -30,6 +30,8 @@ public class RespuestaFormulario
     public bool Facturado { get; set; }
     public DateTime? FechaFacturado { get; set; }
     public string? NumeroFactura { get; set; }
+    public string? UsuarioCierreNomina { get; set; }
+    public string? UsuarioFacturacion { get; set; }
 
     public decimal? BaseSnapshot { get; set; }
     public decimal? ItbisSnapshot { get; set; }
