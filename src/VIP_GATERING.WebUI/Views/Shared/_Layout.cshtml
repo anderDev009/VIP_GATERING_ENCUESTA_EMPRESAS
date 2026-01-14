@@ -45,6 +45,7 @@
                             <a asp-controller="Empleados" asp-action="Index" class="nav-dropdown__item">Empleado</a>
                         <a asp-controller="Opciones" asp-action="Index" class="nav-dropdown__item">Platos</a>
                         <a asp-controller="Menu" asp-action="Sucursales" class="nav-dropdown__item">Menu</a>
+                        <a asp-controller="Menu" asp-action="ImportarSelecciones" class="nav-dropdown__item">Importar selecciones</a>
                         @if (User.IsInRole("Admin"))
                         {
                             <a asp-controller="Security" asp-action="Index" class="nav-dropdown__item">Seguridad</a>

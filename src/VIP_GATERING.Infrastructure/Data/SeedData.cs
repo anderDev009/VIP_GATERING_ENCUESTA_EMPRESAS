@@ -524,7 +524,8 @@ public static class SeedData
                 OpcionMenuId = opcionMenu.Id,
                 Seleccion = seleccion,
                 SucursalEntregaId = empleado.SucursalId,
-                LocalizacionEntregaId = localizacionId
+                LocalizacionEntregaId = localizacionId,
+                FechaSeleccion = DateTime.UtcNow
             });
         }
         else
@@ -532,6 +533,8 @@ public static class SeedData
             existing.Seleccion = seleccion;
             existing.SucursalEntregaId = empleado.SucursalId;
             existing.LocalizacionEntregaId = localizacionId;
+            if (existing.FechaSeleccion == null)
+                existing.FechaSeleccion = DateTime.UtcNow;
         }
     }
 

@@ -63,8 +63,11 @@
     </form>
 </section>
 
-<script>history.scrollRestoration = 'manual';</script>
+@section Scripts {
+    <script src="~/js/reportes-scroll.js" defer></script>
+}
 
+<div class="report-scroll">
 <table>
     <thead>
     <tr>
@@ -106,4 +109,5 @@
     </tr>
     </tfoot>
 </table>
+</div>
 

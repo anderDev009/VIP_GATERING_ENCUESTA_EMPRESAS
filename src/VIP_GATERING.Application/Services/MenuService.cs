@@ -307,7 +307,8 @@ public class MenuService : IMenuService
                 Seleccion = seleccion,
                 SucursalEntregaId = sucursalEntregaId,
                 LocalizacionEntregaId = localizacion?.Id,
-                AdicionalOpcionId = adicionalOpcionId
+                AdicionalOpcionId = adicionalOpcionId,
+                FechaSeleccion = DateTime.UtcNow
             }, ct);
         }
         else
@@ -316,6 +317,7 @@ public class MenuService : IMenuService
             actual.SucursalEntregaId = sucursalEntregaId;
             actual.LocalizacionEntregaId = localizacion?.Id;
             actual.AdicionalOpcionId = adicionalOpcionId;
+            actual.FechaSeleccion = DateTime.UtcNow;
         }
         await _uow.SaveChangesAsync(ct);
     }

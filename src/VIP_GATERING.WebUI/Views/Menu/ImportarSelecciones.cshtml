@@ -1,0 +1,103 @@
+@model VIP_GATERING.WebUI.Models.MenuImportVM
+@{
+    ViewData["Title"] = "Importar selecciones";
+    var empresas = (IEnumerable<VIP_GATERING.Domain.Entities.Empresa>)(ViewBag.Empresas ?? new List<VIP_GATERING.Domain.Entities.Empresa>());
+}
+
+<section class="page-card">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Importar selecciones desde Excel</h1>
+            <p class="page-subtitle">Carga las selecciones de almuerzo por empleado para un rango de semana.</p>
+        </div>
+    </div>
+
+    <form asp-action="ImportarSelecciones" method="post" enctype="multipart/form-data" class="space-y-4">
+        @Html.AntiForgeryToken()
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="form-label">Desde</label>
+                <input class="form-input" type="date" name="Inicio" value="@Model.Inicio.ToString("yyyy-MM-dd")" required />
+            </div>
+            <div>
+                <label class="form-label">Hasta</label>
+                <input class="form-input" type="date" name="Fin" value="@Model.Fin.ToString("yyyy-MM-dd")" required />
+            </div>
+            <div class="md:col-span-2">
+                <label class="form-label">Empresa (opcional)</label>
+                <select class="form-input" name="EmpresaId">
+                    <option value="">Todas</option>
+                    @foreach (var empresa in empresas)
+                    {
+                        <option value="@empresa.Id" selected="@(Model.EmpresaId == empresa.Id ? "selected" : null)">@empresa.Nombre</option>
+                    }
+                </select>
+                <p class="form-helper">Si hay nombres de localizacion repetidos, filtra por empresa para evitar ambiguos.</p>
+            </div>
+            <div class="md:col-span-2">
+                <label class="form-label">Archivo Excel</label>
+                <input class="form-input" type="file" name="Archivo" accept=".xlsx" required />
+            </div>
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit" class="btn-primary">Importar</button>
+            <a asp-action="Sucursales" class="btn-outline">Cancelar</a>
+        </div>
+    </form>
+</section>
+
+@if (Model.TotalFilas > 0 || Model.Errores.Count > 0 || Model.Advertencias.Count > 0)
+{
+    <section class="page-card mt-6">
+        <h2 class="page-title text-lg">Resultado de la importacion</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div class="stat-card">
+                <div class="stat-label">Filas procesadas</div>
+                <div class="stat-value">@Model.FilasProcesadas / @Model.TotalFilas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Empleados creados</div>
+                <div class="stat-value">@Model.EmpleadosCreados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Usuarios creados</div>
+                <div class="stat-value">@Model.UsuariosCreados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Selecciones guardadas</div>
+                <div class="stat-value">@Model.SeleccionesGuardadas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Selecciones saltadas</div>
+                <div class="stat-value">@Model.SeleccionesSaltadas</div>
+            </div>
+        </div>
+
+        @if (Model.Advertencias.Count > 0)
+        {
+            <div class="mt-4">
+                <h3 class="text-sm font-semibold">Advertencias</h3>
+                <ul class="list-disc pl-5 text-sm text-slate-600 mt-2 space-y-1">
+                    @foreach (var aviso in Model.Advertencias)
+                    {
+                        <li>@aviso</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (Model.Errores.Count > 0)
+        {
+            <div class="mt-4">
+                <h3 class="text-sm font-semibold text-rose-600">Errores</h3>
+                <ul class="list-disc pl-5 text-sm text-rose-600 mt-2 space-y-1">
+                    @foreach (var error in Model.Errores)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
+    </section>
+}

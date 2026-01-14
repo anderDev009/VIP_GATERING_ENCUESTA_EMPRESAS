@@ -101,30 +101,9 @@
 
 @await Html.PartialAsync("_Pagination", new VIP_GATERING.WebUI.Models.PagedResult<object>{ Items = Model.Items.Cast<object>().ToList(), Page=Model.Page, PageSize=Model.PageSize, TotalItems=Model.TotalItems })
 
-<script>
-    (() => {
-        const empresa = document.getElementById('filterEmpresa');
-        const sucursal = document.getElementById('filterSucursal');
-        if (!empresa || !sucursal) return;
-
-        const refresh = () => {
-            const empresaId = empresa.value;
-            Array.from(sucursal.options).forEach(opt => {
-                if (!opt.value) return;
-                const show = !empresaId || opt.dataset.empresa === empresaId;
-                opt.style.display = show ? '' : 'none';
-            });
-            const current = sucursal.options[sucursal.selectedIndex];
-            if (current && current.style.display === 'none') {
-                const firstVisible = Array.from(sucursal.options).find(o => !o.value || o.style.display !== 'none');
-                if (firstVisible) sucursal.value = firstVisible.value;
-            }
-        };
-
-        empresa.addEventListener('change', refresh);
-        refresh();
-    })();
-</script>
+@section Scripts {
+    <script src="~/js/localizaciones-filter.js" defer></script>
+}
 
 
 

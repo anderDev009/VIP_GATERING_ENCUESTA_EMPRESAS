@@ -15,7 +15,7 @@
         }
         else
         {
-            <span class="btn-outline" style="opacity:.5;pointer-events:none">Anterior</span>
+            <span class="btn-outline is-disabled">Anterior</span>
         }
         <span class="px-2 py-2">Pagina @Model.Page de @Model.TotalPages</span>
         @if (Model.Page < Model.TotalPages)
@@ -24,8 +24,7 @@
         }
         else
         {
-            <span class="btn-outline" style="opacity:.5;pointer-events:none">Siguiente</span>
+            <span class="btn-outline is-disabled">Siguiente</span>
         }
     </div>
 </div>
-

@@ -152,6 +152,9 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
         "ADD COLUMN IF NOT EXISTS \"UsuarioFacturacion\" text NULL;");
     await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
+        "ADD COLUMN IF NOT EXISTS \"FechaSeleccion\" timestamp with time zone NULL;");
+    await db.Database.ExecuteSqlRawAsync(
         "ALTER TABLE IF EXISTS \"SucursalesHorarios\" " +
         "ADD COLUMN IF NOT EXISTS \"HoraInicio\" time NULL;");
     await db.Database.ExecuteSqlRawAsync(

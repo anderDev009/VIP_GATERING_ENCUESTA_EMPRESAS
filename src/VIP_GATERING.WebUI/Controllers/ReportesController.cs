@@ -3256,7 +3256,7 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
             {
                 Fecha = fecha,
                 DiaSemana = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
-                Hora = string.Empty,
+                Hora = r.FechaSeleccion.HasValue ? r.FechaSeleccion.Value.ToLocalTime().ToString("HH:mm") : string.Empty,
                 Periodo = periodo,
                 Horario = horarioNombre,
                 HorarioInicio = horarioInicio,

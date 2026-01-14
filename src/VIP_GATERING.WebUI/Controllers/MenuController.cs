@@ -4,10 +4,15 @@ using Microsoft.EntityFrameworkCore;
 using VIP_GATERING.Application.Services;
 using VIP_GATERING.Domain.Entities;
 using VIP_GATERING.Infrastructure.Data;
+using VIP_GATERING.Infrastructure.Identity;
 using VIP_GATERING.WebUI.Models;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using VIP_GATERING.WebUI.Services;
+using ClosedXML.Excel;
+using Microsoft.AspNetCore.Identity;
+using System.Globalization;
+using System.Text;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
@@ -20,10 +25,13 @@ public class MenuController : Controller
     private readonly ILogger<MenuController> _logger;
     private readonly IMenuCloneService _cloneService;
     private readonly IEncuestaCierreService _cierre;
-    public MenuController(AppDbContext db, IMenuService menuService, ILogger<MenuController> logger, IMenuCloneService cloneService, IEncuestaCierreService cierre)
-    { _db = db; _menuService = menuService; _logger = logger; _cloneService = cloneService; _cierre = cierre; }
+    private readonly UserManager<ApplicationUser> _userManager;
+    public MenuController(AppDbContext db, IMenuService menuService, ILogger<MenuController> logger, IMenuCloneService cloneService, IEncuestaCierreService cierre, UserManager<ApplicationUser> userManager)
+    { _db = db; _menuService = menuService; _logger = logger; _cloneService = cloneService; _cierre = cierre; _userManager = userManager; }
 
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(200);
+    private const int ImportErrorLimit = 50;
+    private const int ImportWarningLimit = 50;
 
     // Sucursales con buscador para administrar menus
     [HttpGet]
@@ -383,6 +391,306 @@ public class MenuController : Controller
         return RedirectToAction(nameof(Administrar), new { fecha });
     }
 
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> ImportarSelecciones(DateTime? fecha, int? empresaId)
+    {
+        var baseDate = fecha?.Date ?? DateTime.UtcNow.Date;
+        if (fecha == null && baseDate.DayOfWeek == DayOfWeek.Sunday)
+            baseDate = baseDate.AddDays(1);
+        int diff = ((int)baseDate.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var lunes = baseDate.AddDays(-diff);
+        var inicio = DateOnly.FromDateTime(lunes);
+        var fin = inicio.AddDays(4);
+
+        ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
+        return View(new MenuImportVM
+        {
+            Inicio = inicio,
+            Fin = fin,
+            EmpresaId = empresaId
+        });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportarSelecciones(MenuImportVM model)
+    {
+        ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
+        if (model.Archivo == null || model.Archivo.Length == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Debes seleccionar un archivo Excel.");
+            return View(model);
+        }
+        if (model.Inicio > model.Fin)
+        {
+            ModelState.AddModelError(string.Empty, "El rango de fechas es invalido.");
+            return View(model);
+        }
+
+        var errores = new List<string>();
+        var advertencias = new List<string>();
+        int totalFilas = 0;
+        int filasProcesadas = 0;
+        int empleadosCreados = 0;
+        int usuariosCreados = 0;
+        int seleccionesGuardadas = 0;
+        int seleccionesSaltadas = 0;
+
+        var empresaFiltro = model.EmpresaId;
+        var empleados = await _db.Empleados
+            .Include(e => e.Sucursal)
+            .Where(e => !e.Borrado && (empresaFiltro == null || (e.Sucursal != null && e.Sucursal.EmpresaId == empresaFiltro)))
+            .ToListAsync();
+        var empleadosPorCodigo = empleados
+            .Where(e => !string.IsNullOrWhiteSpace(e.Codigo))
+            .ToDictionary(e => NormalizeKey(e.Codigo!), e => e);
+        var empleadosPorNombre = empleados
+            .Where(e => !string.IsNullOrWhiteSpace(e.Nombre))
+            .ToDictionary(e => NormalizeKey(e.Nombre!), e => e);
+
+        var localizaciones = await _db.Localizaciones
+            .Include(l => l.Sucursal).ThenInclude(s => s!.Empresa)
+            .Where(l => empresaFiltro == null || (l.Sucursal != null && l.Sucursal.EmpresaId == empresaFiltro))
+            .ToListAsync();
+        var localizacionesPorNombre = localizaciones
+            .GroupBy(l => NormalizeKey(l.Nombre))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var sucursales = await _db.Sucursales
+            .Include(s => s.Empresa)
+            .Where(s => empresaFiltro == null || s.EmpresaId == empresaFiltro)
+            .ToListAsync();
+        var sucursalesPorNombre = sucursales
+            .GroupBy(s => NormalizeKey(s.Nombre))
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
+        var horarioAlmuerzo = horarios.FirstOrDefault(h => NormalizeKey(h.Nombre).Contains("almuerzo")) ?? horarios.FirstOrDefault();
+        if (horarioAlmuerzo == null)
+        {
+            ModelState.AddModelError(string.Empty, "No hay horarios activos para asignar el almuerzo.");
+            return View(model);
+        }
+
+        var menuCache = new Dictionary<(int EmpresaId, int? SucursalId), Menu>();
+        var opcionesCache = new Dictionary<int, Dictionary<DayOfWeek, OpcionMenu>>();
+
+        using var stream = model.Archivo.OpenReadStream();
+        using var workbook = new XLWorkbook(stream);
+        var worksheet = workbook.Worksheets.FirstOrDefault();
+        if (worksheet == null)
+        {
+            ModelState.AddModelError(string.Empty, "El archivo Excel no contiene hojas.");
+            return View(model);
+        }
+
+        var headerRow = worksheet.FirstRowUsed();
+        if (headerRow == null)
+        {
+            ModelState.AddModelError(string.Empty, "No se encontro la fila de encabezados.");
+            return View(model);
+        }
+
+        var headerMap = BuildHeaderMap(headerRow);
+        if (!TryGetColumn(headerMap, out var colNombre, "nombre", "completo")
+            || !TryGetColumn(headerMap, out var colCodigo, "codigo")
+            || !TryGetColumn(headerMap, out var colLocalidad, "localidad")
+            || !TryGetColumn(headerMap, out var colLunes, "opcion", "lunes")
+            || !TryGetColumn(headerMap, out var colMartes, "opcion", "martes")
+            || !TryGetColumn(headerMap, out var colMiercoles, "opcion", "miercoles")
+            || !TryGetColumn(headerMap, out var colJueves, "opcion", "jueves")
+            || !TryGetColumn(headerMap, out var colViernes, "opcion", "viernes"))
+        {
+            ModelState.AddModelError(string.Empty, "Faltan columnas requeridas. Verifica los encabezados del archivo.");
+            return View(model);
+        }
+        TryGetColumn(headerMap, out var colCodigoUni, "codigouni");
+        TryGetColumn(headerMap, out var colContrasena, "contrasena");
+
+        var firstDataRow = headerRow.RowBelow();
+        var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? firstDataRow.RowNumber();
+
+        for (var rowNumber = firstDataRow.RowNumber(); rowNumber <= lastRow; rowNumber++)
+        {
+            var row = worksheet.Row(rowNumber);
+            if (row.IsEmpty()) continue;
+            totalFilas++;
+
+            var nombre = row.Cell(colNombre).GetString().Trim();
+            var codigo = row.Cell(colCodigo).GetString().Trim();
+            var localidad = row.Cell(colLocalidad).GetString().Trim();
+            var codigoUni = colCodigoUni > 0 ? row.Cell(colCodigoUni).GetString().Trim() : string.Empty;
+            var contrasena = colContrasena > 0 ? row.Cell(colContrasena).GetString().Trim() : string.Empty;
+
+            if (string.IsNullOrWhiteSpace(nombre) && string.IsNullOrWhiteSpace(codigo))
+            {
+                seleccionesSaltadas++;
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(localidad))
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: falta la localidad.");
+                seleccionesSaltadas++;
+                continue;
+            }
+
+            var localizacion = FindLocalizacion(localizacionesPorNombre, localidad, advertencias, rowNumber);
+            var sucursal = localizacion?.Sucursal ?? FindSucursal(sucursalesPorNombre, localidad, advertencias, rowNumber);
+            if (sucursal == null)
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: no se encontro filial para la localidad '{localidad}'.");
+                seleccionesSaltadas++;
+                continue;
+            }
+
+            var empresaId = sucursal.EmpresaId;
+            var empleado = FindEmpleado(empleadosPorCodigo, empleadosPorNombre, codigo, nombre);
+            if (empleado == null)
+            {
+                empleado = new Empleado
+                {
+                    Nombre = nombre,
+                    Codigo = string.IsNullOrWhiteSpace(codigo) ? null : codigo,
+                    SucursalId = sucursal.Id,
+                    EsSubsidiado = true,
+                    Estado = EmpleadoEstado.Habilitado
+                };
+                await _db.Empleados.AddAsync(empleado);
+                await _db.SaveChangesAsync();
+                empleadosCreados++;
+                if (!string.IsNullOrWhiteSpace(empleado.Codigo))
+                    empleadosPorCodigo[NormalizeKey(empleado.Codigo)] = empleado;
+                if (!string.IsNullOrWhiteSpace(empleado.Nombre))
+                    empleadosPorNombre[NormalizeKey(empleado.Nombre)] = empleado;
+            }
+            else if (empleado.SucursalId == 0)
+            {
+                empleado.SucursalId = sucursal.Id;
+                await _db.SaveChangesAsync();
+            }
+            else if (empleado.SucursalId != sucursal.Id)
+            {
+                var hasSucursal = await _db.EmpleadosSucursales
+                    .AnyAsync(es => es.EmpleadoId == empleado.Id && es.SucursalId == sucursal.Id);
+                if (!hasSucursal)
+                {
+                    await _db.EmpleadosSucursales.AddAsync(new EmpleadoSucursal
+                    {
+                        EmpleadoId = empleado.Id,
+                        SucursalId = sucursal.Id
+                    });
+                    await _db.SaveChangesAsync();
+                    AddLimitedWarning(advertencias, $"Fila {rowNumber}: empleado '{empleado.Nombre ?? empleado.Codigo}' agregado a filial {sucursal.Nombre}.");
+                }
+            }
+
+            if (localizacion != null)
+            {
+                var existsLoc = await _db.EmpleadosLocalizaciones
+                    .AnyAsync(el => el.EmpleadoId == empleado.Id && el.LocalizacionId == localizacion.Id);
+                if (!existsLoc)
+                {
+                    await _db.EmpleadosLocalizaciones.AddAsync(new EmpleadoLocalizacion
+                    {
+                        EmpleadoId = empleado.Id,
+                        LocalizacionId = localizacion.Id
+                    });
+                    await _db.SaveChangesAsync();
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(codigoUni) || !string.IsNullOrWhiteSpace(contrasena))
+            {
+                var userResult = await EnsureIdentityUserAsync(empleado, codigoUni, contrasena);
+                if (userResult.Created)
+                    usuariosCreados++;
+                else if (!string.IsNullOrWhiteSpace(userResult.Error))
+                    AddLimitedWarning(advertencias, $"Fila {rowNumber}: {userResult.Error}");
+            }
+
+            var menuKey = (empresaId, (int?)sucursal.Id);
+            if (!menuCache.TryGetValue(menuKey, out var menu))
+            {
+                menu = await _menuService.GetEffectiveMenuForSemanaAsync(model.Inicio, model.Fin, empresaId, sucursal.Id);
+                menuCache[menuKey] = menu;
+            }
+
+            if (!opcionesCache.TryGetValue(menu.Id, out var opcionesDia))
+            {
+                var opcionesMenu = await _db.OpcionesMenu
+                    .Include(o => o.Horario)
+                    .Where(o => o.MenuId == menu.Id)
+                    .ToListAsync();
+                opcionesDia = BuildOpcionesPorDia(opcionesMenu, horarioAlmuerzo.Id);
+                opcionesCache[menu.Id] = opcionesDia;
+            }
+
+            var selections = new (int Col, DayOfWeek Dia)[]
+            {
+                (colLunes, DayOfWeek.Monday),
+                (colMartes, DayOfWeek.Tuesday),
+                (colMiercoles, DayOfWeek.Wednesday),
+                (colJueves, DayOfWeek.Thursday),
+                (colViernes, DayOfWeek.Friday)
+            };
+
+            foreach (var (col, dia) in selections)
+            {
+                var valor = row.Cell(col).GetString().Trim();
+                var seleccion = ParseSeleccion(valor);
+                if (seleccion == null)
+                {
+                    if (!string.IsNullOrWhiteSpace(valor))
+                        seleccionesSaltadas++;
+                    continue;
+                }
+
+                if (!opcionesDia.TryGetValue(dia, out var opcionMenu))
+                {
+                    AddLimitedError(errores, $"Fila {rowNumber}: no existe menu para {dia}.");
+                    seleccionesSaltadas++;
+                    continue;
+                }
+
+                try
+                {
+                    await _menuService.RegistrarSeleccionAsync(
+                        empleado.Id,
+                        opcionMenu.Id,
+                        seleccion.Value,
+                        sucursal.Id,
+                        localizacion?.Id,
+                        null);
+                    seleccionesGuardadas++;
+                }
+                catch (Exception ex)
+                {
+                    AddLimitedError(errores, $"Fila {rowNumber}: {ex.Message}");
+                    seleccionesSaltadas++;
+                }
+            }
+
+            filasProcesadas++;
+        }
+
+        model.TotalFilas = totalFilas;
+        model.FilasProcesadas = filasProcesadas;
+        model.EmpleadosCreados = empleadosCreados;
+        model.UsuariosCreados = usuariosCreados;
+        model.SeleccionesGuardadas = seleccionesGuardadas;
+        model.SeleccionesSaltadas = seleccionesSaltadas;
+        model.Errores = errores;
+        model.Advertencias = advertencias;
+
+        if (errores.Count == 0)
+            TempData["Success"] = $"Importacion completada: {seleccionesGuardadas} selecciones guardadas.";
+        else
+            TempData["Error"] = $"Importacion completada con {errores.Count} errores.";
+        return View(model);
+    }
+
     // POST: Guardar todos los dias en un solo envio
     [Authorize(Roles = "Admin")]
     [HttpPost]
@@ -623,6 +931,219 @@ public class MenuController : Controller
             });
         }
         return list;
+    }
+
+    private static Dictionary<string, int> BuildHeaderMap(IXLRow headerRow)
+    {
+        var map = new Dictionary<string, int>();
+        var lastCell = headerRow.LastCellUsed()?.Address.ColumnNumber ?? 0;
+        for (var col = 1; col <= lastCell; col++)
+        {
+            var raw = headerRow.Cell(col).GetString().Trim();
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+            var key = NormalizeKey(raw);
+            map[key] = col;
+        }
+        return map;
+    }
+
+    private static bool TryGetColumn(Dictionary<string, int> headerMap, out int col, params string[] tokens)
+    {
+        if (tokens.Length == 0)
+        {
+            col = 0;
+            return false;
+        }
+        foreach (var entry in headerMap)
+        {
+            var match = true;
+            foreach (var token in tokens)
+            {
+                if (string.IsNullOrWhiteSpace(token)) continue;
+                if (!entry.Key.Contains(token))
+                {
+                    match = false;
+                    break;
+                }
+            }
+            if (match)
+            {
+                col = entry.Value;
+                return true;
+            }
+        }
+        col = 0;
+        return false;
+    }
+
+    private static string NormalizeKey(string value)
+    {
+        var cleaned = RemoveDiacritics(value ?? string.Empty).ToLowerInvariant();
+        var sb = new StringBuilder(cleaned.Length);
+        foreach (var ch in cleaned)
+        {
+            if (char.IsLetterOrDigit(ch))
+                sb.Append(ch);
+        }
+        return sb.ToString();
+    }
+
+    private static string RemoveDiacritics(string value)
+    {
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder();
+        foreach (var ch in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+                sb.Append(ch);
+        }
+        return sb.ToString().Normalize(NormalizationForm.FormC);
+    }
+
+    private static Empleado? FindEmpleado(Dictionary<string, Empleado> porCodigo, Dictionary<string, Empleado> porNombre, string codigo, string nombre)
+    {
+        if (!string.IsNullOrWhiteSpace(codigo))
+        {
+            var key = NormalizeKey(codigo);
+            if (porCodigo.TryGetValue(key, out var encontrado))
+                return encontrado;
+        }
+        if (!string.IsNullOrWhiteSpace(nombre))
+        {
+            var key = NormalizeKey(nombre);
+            if (porNombre.TryGetValue(key, out var encontrado))
+                return encontrado;
+        }
+        return null;
+    }
+
+    private static Localizacion? FindLocalizacion(Dictionary<string, List<Localizacion>> lookup, string nombre, List<string> advertencias, int rowNumber)
+    {
+        var key = NormalizeKey(nombre);
+        if (!lookup.TryGetValue(key, out var list) || list.Count == 0)
+            return null;
+        if (list.Count > 1)
+            AddLimitedWarning(advertencias, $"Fila {rowNumber}: hay {list.Count} localizaciones con nombre '{nombre}', se usara la primera.");
+        return list[0];
+    }
+
+    private static Sucursal? FindSucursal(Dictionary<string, List<Sucursal>> lookup, string nombre, List<string> advertencias, int rowNumber)
+    {
+        var key = NormalizeKey(nombre);
+        if (!lookup.TryGetValue(key, out var list) || list.Count == 0)
+            return null;
+        if (list.Count > 1)
+            AddLimitedWarning(advertencias, $"Fila {rowNumber}: hay {list.Count} filiales con nombre '{nombre}', se usara la primera.");
+        return list[0];
+    }
+
+    private static Dictionary<DayOfWeek, OpcionMenu> BuildOpcionesPorDia(IEnumerable<OpcionMenu> opciones, int horarioPreferidoId)
+    {
+        var result = new Dictionary<DayOfWeek, OpcionMenu>();
+        foreach (var dia in opciones.GroupBy(o => o.DiaSemana))
+        {
+            var preferido = dia.FirstOrDefault(o => o.HorarioId == horarioPreferidoId);
+            result[dia.Key] = preferido ?? dia.OrderBy(o => o.Horario?.Orden ?? int.MaxValue).First();
+        }
+        return result;
+    }
+
+    private static char? ParseSeleccion(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        var normalized = NormalizeKey(value);
+        if (normalized.Contains("ninguno") || normalized.Contains("no"))
+            return null;
+        if (normalized.Contains("opcion"))
+            normalized = normalized.Replace("opcion", string.Empty);
+        var digits = new string(normalized.Where(char.IsDigit).ToArray());
+        if (int.TryParse(digits, out var slot))
+        {
+            return slot switch
+            {
+                1 => 'A',
+                2 => 'B',
+                3 => 'C',
+                4 => 'D',
+                5 => 'E',
+                _ => null
+            };
+        }
+        return normalized switch
+        {
+            "a" => 'A',
+            "b" => 'B',
+            "c" => 'C',
+            "d" => 'D',
+            "e" => 'E',
+            _ => null
+        };
+    }
+
+    private async Task<(bool Created, string? Error)> EnsureIdentityUserAsync(Empleado empleado, string codigoUni, string contrasena)
+    {
+        var username = !string.IsNullOrWhiteSpace(codigoUni)
+            ? codigoUni.Trim()
+            : (empleado.Codigo ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(username))
+            return (false, "Usuario sin codigo para crear credenciales.");
+
+        if (await _userManager.FindByNameAsync(username) != null)
+            return (false, $"Ya existe un usuario con el nombre {username}.");
+
+        if (await _db.Set<ApplicationUser>().AnyAsync(u => u.EmpleadoId == empleado.Id))
+            return (false, "El empleado ya tiene usuario asignado.");
+
+        var sucursalData = await _db.Sucursales
+            .Where(s => s.Id == empleado.SucursalId)
+            .Select(s => new { s.EmpresaId })
+            .FirstOrDefaultAsync();
+
+        var usuario = new ApplicationUser
+        {
+            UserName = username,
+            EmailConfirmed = true,
+            EmpleadoId = empleado.Id,
+            EmpresaId = sucursalData?.EmpresaId
+        };
+
+        var password = !string.IsNullOrWhiteSpace(contrasena)
+            ? contrasena.Trim()
+            : BuildDefaultPassword(username, empleado.Id);
+
+        var result = await _userManager.CreateAsync(usuario, password);
+        if (!result.Succeeded)
+            return (false, $"No se pudo crear el usuario: {string.Join("; ", result.Errors.Select(e => e.Description))}");
+
+        if (!await _userManager.IsInRoleAsync(usuario, "Empleado"))
+            await _userManager.AddToRoleAsync(usuario, "Empleado");
+
+        return (true, null);
+    }
+
+    private static string BuildDefaultPassword(string codigo, int empleadoId)
+    {
+        var codigoToken = NormalizeKey(codigo);
+        if (string.IsNullOrWhiteSpace(codigoToken))
+            codigoToken = empleadoId.ToString().PadLeft(6, '0');
+        var password = $"UNI{codigoToken}@";
+        if (password.Length < 6)
+            password = password.PadRight(6, '0');
+        return password;
+    }
+
+    private static void AddLimitedError(List<string> errores, string mensaje)
+    {
+        if (errores.Count < ImportErrorLimit)
+            errores.Add(mensaje);
+    }
+
+    private static void AddLimitedWarning(List<string> advertencias, string mensaje)
+    {
+        if (advertencias.Count < ImportWarningLimit)
+            advertencias.Add(mensaje);
     }
 }
 

@@ -102,4 +102,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  document.querySelectorAll('[data-confirm]').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      const message = btn.getAttribute('data-confirm');
+      if (message && !window.confirm(message)) {
+        event.preventDefault();
+      }
+    });
+  });
 });
