@@ -601,9 +601,9 @@ public class MenuController : Controller
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(codigoUni) || !string.IsNullOrWhiteSpace(contrasena))
+            if (!string.IsNullOrWhiteSpace(codigo) || !string.IsNullOrWhiteSpace(codigoUni) || !string.IsNullOrWhiteSpace(contrasena))
             {
-                var userResult = await EnsureIdentityUserAsync(empleado, codigoUni, contrasena);
+                var userResult = await EnsureIdentityUserAsync(empleado, codigo, codigoUni, contrasena);
                 if (userResult.Created)
                     usuariosCreados++;
                 else if (!string.IsNullOrWhiteSpace(userResult.Error))
@@ -1082,11 +1082,9 @@ public class MenuController : Controller
         };
     }
 
-    private async Task<(bool Created, string? Error)> EnsureIdentityUserAsync(Empleado empleado, string codigoUni, string contrasena)
+    private async Task<(bool Created, string? Error)> EnsureIdentityUserAsync(Empleado empleado, string codigo, string codigoUni, string contrasena)
     {
-        var username = !string.IsNullOrWhiteSpace(codigoUni)
-            ? codigoUni.Trim()
-            : (empleado.Codigo ?? string.Empty).Trim();
+        var username = BuildUsernameFromCodigo(codigo, codigoUni, empleado.Codigo);
 
         if (string.IsNullOrWhiteSpace(username))
             return (false, "Usuario sin codigo para crear credenciales.");
@@ -1133,6 +1131,23 @@ public class MenuController : Controller
         if (password.Length < 6)
             password = password.PadRight(6, '0');
         return password;
+    }
+
+    private static string BuildUsernameFromCodigo(string codigo, string codigoUni, string? codigoEmpleado)
+    {
+        var candidate = !string.IsNullOrWhiteSpace(codigo)
+            ? codigo.Trim()
+            : (!string.IsNullOrWhiteSpace(codigoEmpleado) ? codigoEmpleado.Trim() : string.Empty);
+        if (string.IsNullOrWhiteSpace(candidate) && !string.IsNullOrWhiteSpace(codigoUni))
+            candidate = codigoUni.Trim();
+        if (string.IsNullOrWhiteSpace(candidate))
+            return string.Empty;
+        var normalized = NormalizeKey(candidate);
+        if (normalized.StartsWith("uni"))
+            normalized = normalized.Substring(3);
+        if (normalized.StartsWith("u"))
+            normalized = normalized.Substring(1);
+        return normalized.ToUpperInvariant();
     }
 
     private static void AddLimitedError(List<string> errores, string mensaje)
