@@ -15,7 +15,7 @@ public interface IMenuService
     Task<IReadOnlyList<OpcionMenu>> ObtenerOpcionesEmpleadoAsync(int empleadoId, CancellationToken ct = default);
     Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, CancellationToken ct = default);
     Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? adicionalOpcionId, CancellationToken ct = default);
-    Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? localizacionEntregaId, int? adicionalOpcionId, CancellationToken ct = default);
+    Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? localizacionEntregaId, int? adicionalOpcionId, TimeOnly? horaAlmuerzo, CancellationToken ct = default);
 }
 
 public class MenuService : IMenuService
@@ -219,15 +219,15 @@ public class MenuService : IMenuService
         var empleado = await _empleados.GetByIdAsync(empleadoId, ct);
         if (empleado == null) throw new ArgumentException("Empleado no existe", nameof(empleadoId));
 
-        await RegistrarSeleccionAsync(empleadoId, opcionMenuId, seleccion, empleado.SucursalId, null, null, ct);
+        await RegistrarSeleccionAsync(empleadoId, opcionMenuId, seleccion, empleado.SucursalId, null, null, null, ct);
     }
 
     public async Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? adicionalOpcionId, CancellationToken ct = default)
     {
-        await RegistrarSeleccionAsync(empleadoId, opcionMenuId, seleccion, sucursalEntregaId, null, adicionalOpcionId, ct);
+        await RegistrarSeleccionAsync(empleadoId, opcionMenuId, seleccion, sucursalEntregaId, null, adicionalOpcionId, null, ct);
     }
 
-    public async Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? localizacionEntregaId, int? adicionalOpcionId, CancellationToken ct = default)
+    public async Task RegistrarSeleccionAsync(int empleadoId, int opcionMenuId, char seleccion, int sucursalEntregaId, int? localizacionEntregaId, int? adicionalOpcionId, TimeOnly? horaAlmuerzo, CancellationToken ct = default)
     {
         var opcionMenu = await _opcionesMenu.GetByIdAsync(opcionMenuId, ct);
         if (opcionMenu == null) throw new ArgumentException("OpcionMenu no existe", nameof(opcionMenuId));
@@ -308,7 +308,8 @@ public class MenuService : IMenuService
                 SucursalEntregaId = sucursalEntregaId,
                 LocalizacionEntregaId = localizacion?.Id,
                 AdicionalOpcionId = adicionalOpcionId,
-                FechaSeleccion = DateTime.UtcNow
+                FechaSeleccion = DateTime.UtcNow,
+                HoraAlmuerzo = horaAlmuerzo
             }, ct);
         }
         else
@@ -318,6 +319,7 @@ public class MenuService : IMenuService
             actual.LocalizacionEntregaId = localizacion?.Id;
             actual.AdicionalOpcionId = adicionalOpcionId;
             actual.FechaSeleccion = DateTime.UtcNow;
+            actual.HoraAlmuerzo = horaAlmuerzo;
         }
         await _uow.SaveChangesAsync(ct);
     }

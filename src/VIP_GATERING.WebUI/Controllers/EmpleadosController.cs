@@ -561,7 +561,7 @@ public class EmpleadosController : Controller
                 if (adicionalOpcionId != null && !setAdicionales.Contains(adicionalOpcionId.Value))
                     adicionalOpcionId = null;
 
-                await _menuService.RegistrarSeleccionAsync(empleadoId, d.OpcionMenuId, d.Seleccion.Value, sucursalEntregaId, localizacionEntregaId, adicionalOpcionId);
+                await _menuService.RegistrarSeleccionAsync(empleadoId, d.OpcionMenuId, d.Seleccion.Value, sucursalEntregaId, localizacionEntregaId, adicionalOpcionId, null);
             }
         }
 
@@ -770,6 +770,7 @@ public class EmpleadosController : Controller
     }
 
 
+
     private static string BuildUserName(string empresaNombre, string? empleadoCodigo, int empleadoId)
     {
         var codigo = ToToken(empleadoCodigo);
@@ -956,6 +957,7 @@ public class EmpleadosController : Controller
             {
                 OpcionMenuId = o.Id,
                 DiaSemana = o.DiaSemana,
+                HorarioId = o.HorarioId,
                 HorarioNombre = o.Horario?.Nombre,
                 A = o.OpcionA?.Nombre,
                 B = o.OpcionB?.Nombre,

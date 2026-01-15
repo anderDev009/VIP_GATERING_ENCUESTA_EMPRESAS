@@ -33,6 +33,7 @@ public class RespuestaFormulario
     public string? UsuarioCierreNomina { get; set; }
     public string? UsuarioFacturacion { get; set; }
     public DateTime? FechaSeleccion { get; set; }
+    public TimeOnly? HoraAlmuerzo { get; set; }
 
     public decimal? BaseSnapshot { get; set; }
     public decimal? ItbisSnapshot { get; set; }

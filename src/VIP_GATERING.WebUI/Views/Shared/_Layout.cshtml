@@ -18,7 +18,12 @@
     <div class="app-shell">
         <header class="app-header">
             <div>
-                <a asp-controller="Home" asp-action="Index" class="app-logo">VIP CATERING</a>
+                <a asp-controller="Home" asp-action="Index" class="app-logo">
+                    <span class="app-logo__badge">
+                        <img src="~/images/logo-vip.png" alt="VIP Catering Gourmet" class="app-logo__img" />
+                    </span>
+                    <span class="app-logo__text">VIP CATERING</span>
+                </a>
             </div>
             <nav class="app-nav">
                 <a asp-controller="Empleado" asp-action="MiSemana" class="btn-primary">Mi semana</a>

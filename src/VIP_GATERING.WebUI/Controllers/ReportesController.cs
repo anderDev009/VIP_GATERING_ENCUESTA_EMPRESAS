@@ -997,7 +997,7 @@ public class ReportesController : Controller
                 .ToListAsync();
         }
         var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
-        var horarios = await _db.Horarios.OrderBy(h => h.Orden).ThenBy(h => h.Nombre).ToListAsync();
+        var horarios = await ObtenerHorariosFiltroAsync(empresaId, sucursalId);
         List<Localizacion> localizaciones;
         var localizacionesBase = _db.Localizaciones.AsNoTracking().AsQueryable();
         if (empresaId != null)
@@ -1068,6 +1068,10 @@ public class ReportesController : Controller
                 return fecha >= inicio && fecha <= fin;
             })
             .ToList();
+        if (empleadoId != null)
+        {
+            respuestas = respuestas.Where(r => r.EmpleadoId == empleadoId.Value).ToList();
+        }
 
         const decimal itbisRate = 0.18m;
         var items = new List<(DateOnly Fecha, int FilialId, string Filial, int EmpleadoId, string Empleado, string EmpleadoCodigo, string Tanda, string Opcion, string Seleccion, string Localizacion, decimal Base, decimal Itbis, decimal Total, decimal EmpresaPaga, decimal EmpleadoPaga, decimal ItbisEmpresa, decimal ItbisEmpleado, bool EsAdicional)>();
@@ -1118,6 +1122,11 @@ public class ReportesController : Controller
 
             if (r.AdicionalOpcion != null)
                 AddItem(r.AdicionalOpcion, r.AdicionalOpcion.Nombre ?? "Sin definir", "Adicional", false, true);
+        }
+
+        if (empleadoId != null)
+        {
+            items = items.Where(i => i.EmpleadoId == empleadoId.Value).ToList();
         }
 
         var resumen = items
@@ -2177,6 +2186,60 @@ private IQueryable<RespuestaFormulario> AplicarFiltrosEmpresaSucursales(IQueryab
         if (sucursalId != null)
             query = query.Where(e => e.SucursalId == sucursalId);
         return await query.OrderBy(e => e.Nombre ?? e.Codigo).ToListAsync();
+    }
+
+    private async Task<List<Horario>> ObtenerHorariosFiltroAsync(int? empresaId, int? sucursalId)
+    {
+        if (sucursalId != null)
+        {
+            var ids = await _db.SucursalesHorarios
+                .Where(sh => sh.SucursalId == sucursalId)
+                .Select(sh => sh.HorarioId)
+                .Distinct()
+                .ToListAsync();
+            if (ids.Count == 0)
+            {
+                return await _db.Horarios
+                    .Where(h => h.Activo)
+                    .OrderBy(h => h.Orden)
+                    .ThenBy(h => h.Nombre)
+                    .ToListAsync();
+            }
+            return await _db.Horarios
+                .Where(h => ids.Contains(h.Id))
+                .OrderBy(h => h.Orden)
+                .ThenBy(h => h.Nombre)
+                .ToListAsync();
+        }
+
+        if (empresaId != null)
+        {
+            var ids = await _db.SucursalesHorarios
+                .Include(sh => sh.Sucursal)
+                .Where(sh => sh.Sucursal != null && sh.Sucursal.EmpresaId == empresaId)
+                .Select(sh => sh.HorarioId)
+                .Distinct()
+                .ToListAsync();
+            if (ids.Count == 0)
+            {
+                return await _db.Horarios
+                    .Where(h => h.Activo)
+                    .OrderBy(h => h.Orden)
+                    .ThenBy(h => h.Nombre)
+                    .ToListAsync();
+            }
+            return await _db.Horarios
+                .Where(h => ids.Contains(h.Id))
+                .OrderBy(h => h.Orden)
+                .ThenBy(h => h.Nombre)
+                .ToListAsync();
+        }
+
+        return await _db.Horarios
+            .Where(h => h.Activo)
+            .OrderBy(h => h.Orden)
+            .ThenBy(h => h.Nombre)
+            .ToListAsync();
     }
 
     private SubsidioContext BuildSubsidioContext(bool opcionSubsidiada, Empleado empleado, Sucursal sucursal, Empresa empresa) =>

@@ -662,6 +662,7 @@ public class MenuController : Controller
                         seleccion.Value,
                         sucursal.Id,
                         localizacion?.Id,
+                        null,
                         null);
                     seleccionesGuardadas++;
                 }

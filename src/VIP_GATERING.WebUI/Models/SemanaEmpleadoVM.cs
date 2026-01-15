@@ -31,7 +31,11 @@ public class SemanaEmpleadoVM
     public string? SucursalNombre { get; set; }
     public string? SucursalEntregaNombre { get; set; }
     public string? LocalizacionEntregaNombre { get; set; }
+    public string? HoraAlmuerzoSeleccionada { get; set; }
+    public string? HoraAlmuerzoInicio { get; set; }
+    public string? HoraAlmuerzoFin { get; set; }
     public List<DiaEmpleadoVM> Dias { get; set; } = new();
+    public List<HorarioHoraVM> HorariosHoras { get; set; } = new();
     public decimal TotalEmpleado { get; set; }
     public decimal? TotalEmpresa { get; set; }
 }
@@ -48,6 +52,7 @@ public class DiaEmpleadoVM
 {
     public int OpcionMenuId { get; set; }
     public DayOfWeek DiaSemana { get; set; }
+    public int? HorarioId { get; set; }
     public string? HorarioNombre { get; set; }
     public string? A { get; set; }
     public string? B { get; set; }
@@ -69,6 +74,15 @@ public class DiaEmpleadoVM
     public int? AdicionalOpcionId { get; set; }
     [RegularExpression("[ABCDE]", ErrorMessage = "Seleccione A, B, C, D o E")]
     public char? Seleccion { get; set; }
+}
+
+public class HorarioHoraVM
+{
+    public int HorarioId { get; set; }
+    public string HorarioNombre { get; set; } = string.Empty;
+    public string? HoraInicio { get; set; }
+    public string? HoraFin { get; set; }
+    public string? HoraSeleccionada { get; set; }
 }
 
 public class AdicionalDisponibleVM

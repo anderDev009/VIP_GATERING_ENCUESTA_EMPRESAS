@@ -43,3 +43,13 @@
 .report-scroll{width:100%;overflow:auto;max-height:70vh;-webkit-overflow-scrolling:touch}
 .report-scroll table{min-width:720px}
 
+
+.app-logo{gap:.65rem;text-transform:none;letter-spacing:.12em}
+.app-logo:before{content:none}
+.app-logo__img{width:56px;height:56px;object-fit:contain}
+.app-logo__text{font-size:1.05rem;font-weight:800;color:var(--ink-900)}
+
+
+.app-logo__badge{width:64px;height:64px;border-radius:50%;background:#fff;border:1px solid var(--border);box-shadow:0 12px 24px rgba(12,17,35,.12);display:flex;align-items:center;justify-content:center}
+.app-logo__img{width:46px;height:46px;object-fit:contain}
+

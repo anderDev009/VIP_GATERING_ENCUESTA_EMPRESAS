@@ -23,4 +23,6 @@ public class Empleado
     public decimal? SubsidioValor { get; set; }
     public EmpleadoEstado Estado { get; set; } = EmpleadoEstado.Habilitado;
     public bool EsJefe { get; set; } = false;
+    public TimeOnly? HoraAlmuerzo { get; set; }
+    public bool HoraAlmuerzoBloqueada { get; set; } = false;
 }
