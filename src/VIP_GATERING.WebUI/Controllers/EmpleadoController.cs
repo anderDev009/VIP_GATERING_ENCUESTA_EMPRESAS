@@ -238,9 +238,12 @@ public class EmpleadoController : Controller
                 if (localizacionEntregaId != bloqueoSemana.LocalizacionEntregaId)
                 {
                     var localizacionBloqueada = localizacionesEntregaInfo.FirstOrDefault(l => l.Id == bloqueoSemana.LocalizacionEntregaId.Value);
-                    var localizacionBloqueadaNombre = localizacionBloqueada?.Nombre ?? "otra localizacion";
-                    TempData["Info"] = $"Ya tienes selecciones registradas para esta semana en {localizacionBloqueadaNombre}. Borra todas tus selecciones para poder cambiar de localizacion.";
-                    return RedirectToAction(nameof(MiSemana), new { semana = semanaClave, localizacionId = bloqueoSemana.LocalizacionEntregaId });
+                    if (localizacionBloqueada != null)
+                    {
+                        var localizacionBloqueadaNombre = localizacionBloqueada.Nombre;
+                        TempData["Info"] = $"Ya tienes selecciones registradas para esta semana en {localizacionBloqueadaNombre}. Borra todas tus selecciones para poder cambiar de localizacion.";
+                        return RedirectToAction(nameof(MiSemana), new { semana = semanaClave, localizacionId = bloqueoSemana.LocalizacionEntregaId });
+                    }
                 }
                 localizacionEntregaId = bloqueoSemana.LocalizacionEntregaId;
             }
