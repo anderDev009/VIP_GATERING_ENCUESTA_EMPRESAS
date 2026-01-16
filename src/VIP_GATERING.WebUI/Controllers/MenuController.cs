@@ -1135,8 +1135,31 @@ public class MenuController : Controller
         if (string.IsNullOrWhiteSpace(username))
             return (false, "Usuario sin codigo para crear credenciales.");
 
-        if (await _userManager.FindByNameAsync(username) != null)
-            return (false, $"Ya existe un usuario con el nombre {username}.");
+        var existing = await _userManager.FindByNameAsync(username);
+        if (existing != null)
+        {
+            if (existing.EmpleadoId != null && existing.EmpleadoId != empleado.Id)
+                return (false, $"El usuario {username} ya esta asignado a otro empleado.");
+
+            if (existing.EmpleadoId == null)
+            {
+                if (await _db.Set<ApplicationUser>().AnyAsync(u => u.EmpleadoId == empleado.Id && u.Id != existing.Id))
+                    return (false, "El empleado ya tiene usuario asignado.");
+
+                var empresaId = await _db.Sucursales
+                    .Where(s => s.Id == empleado.SucursalId)
+                    .Select(s => (int?)s.EmpresaId)
+                    .FirstOrDefaultAsync();
+                existing.EmpleadoId = empleado.Id;
+                existing.EmpresaId = empresaId;
+                await _userManager.UpdateAsync(existing);
+            }
+
+            if (!await _userManager.IsInRoleAsync(existing, "Empleado"))
+                await _userManager.AddToRoleAsync(existing, "Empleado");
+
+            return (false, null);
+        }
 
         if (await _db.Set<ApplicationUser>().AnyAsync(u => u.EmpleadoId == empleado.Id))
             return (false, "El empleado ya tiene usuario asignado.");
