@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using VIP_GATERING.Infrastructure.Identity;
 using System.Linq;
 using VIP_GATERING.WebUI.Models.Account;
@@ -11,9 +12,10 @@ public class AccountController : Controller
 {
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly VIP_GATERING.Infrastructure.Data.AppDbContext _db;
 
-    public AccountController(SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager)
-    { _signInManager = signInManager; _userManager = userManager; }
+    public AccountController(SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager, VIP_GATERING.Infrastructure.Data.AppDbContext db)
+    { _signInManager = signInManager; _userManager = userManager; _db = db; }
 
     [HttpGet]
     public IActionResult Login(string? returnUrl = null)
@@ -32,6 +34,24 @@ public class AccountController : Controller
             var res = await _signInManager.PasswordSignInAsync(user, model.Password, isPersistent: false, lockoutOnFailure: true);
             if (res.Succeeded)
             {
+                if (user.EmpleadoId == null && !string.IsNullOrWhiteSpace(user.UserName))
+                {
+                    var username = user.UserName.Trim().ToUpperInvariant();
+                    var empleado = await _db.Empleados
+                        .Where(e => e.Codigo != null && e.Codigo.ToUpper() == username)
+                        .Select(e => new { e.Id, e.SucursalId })
+                        .FirstOrDefaultAsync();
+                    if (empleado != null)
+                    {
+                        var empresaId = await _db.Sucursales
+                            .Where(s => s.Id == empleado.SucursalId)
+                            .Select(s => (int?)s.EmpresaId)
+                            .FirstOrDefaultAsync();
+                        user.EmpleadoId = empleado.Id;
+                        user.EmpresaId = empresaId;
+                        await _userManager.UpdateAsync(user);
+                    }
+                }
                 var claims = await _userManager.GetClaimsAsync(user);
                 var mustChange = claims.Any(c => c.Type == "must_change_password" && c.Value == "1");
                 if (mustChange)
