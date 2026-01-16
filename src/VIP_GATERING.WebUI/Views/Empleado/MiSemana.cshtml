@@ -185,21 +185,23 @@ else if (Model.Bloqueado)
                 <div class="control-field">
                     <label>Horario de @g.Key</label>
                     <div class="control-input">
-                        <input class="w-full" type="time"
-                               name="HorasHorario[@horarioInfo.HorarioId]"
-                               value="@horarioInfo.HoraSeleccionada"
-                               min="@horarioInfo.HoraInicio"
-                               max="@horarioInfo.HoraFin"
-                               @((Model.Bloqueado || noHabilitado) ? "disabled" : "") />
+                        @if (horarioInfo.HorasDisponibles != null && horarioInfo.HorasDisponibles.Count > 0)
+                        {
+                            <select class="w-full" name="HorasHorario[@horarioInfo.HorarioId]"
+                                    @((Model.Bloqueado || noHabilitado) ? "disabled" : "")>
+                                <option value="">-- Selecciona --</option>
+                                @foreach (var slot in horarioInfo.HorasDisponibles)
+                                {
+                                    <option value="@slot" selected="@(horarioInfo.HoraSeleccionada == slot ? "selected" : null)">@slot</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <input class="w-full" type="text" value="Sin horarios configurados" disabled />
+                        }
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(horarioInfo.HoraInicio) && !string.IsNullOrWhiteSpace(horarioInfo.HoraFin))
-                    {
-                        <p class="control-hint">Selecciona una hora entre @horarioInfo.HoraInicio y @horarioInfo.HoraFin.</p>
-                    }
-                    else
-                    {
-                        <p class="control-hint">Selecciona la hora preferida para este horario.</p>
-                    }
+                    <p class="control-hint">Selecciona una hora disponible para este horario.</p>
                 </div>
             }
             <table class="menu-table">

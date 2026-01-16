@@ -54,6 +54,7 @@ public class DiaEmpleadoVM
     public DayOfWeek DiaSemana { get; set; }
     public int? HorarioId { get; set; }
     public string? HorarioNombre { get; set; }
+    public bool DiaCerrado { get; set; }
     public string? A { get; set; }
     public string? B { get; set; }
     public string? C { get; set; }
@@ -83,6 +84,7 @@ public class HorarioHoraVM
     public string? HoraInicio { get; set; }
     public string? HoraFin { get; set; }
     public string? HoraSeleccionada { get; set; }
+    public List<string> HorasDisponibles { get; set; } = new();
 }
 
 public class AdicionalDisponibleVM

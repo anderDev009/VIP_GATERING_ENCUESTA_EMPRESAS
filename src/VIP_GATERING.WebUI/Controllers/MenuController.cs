@@ -538,6 +538,34 @@ public class MenuController : Controller
 
             var localizacion = FindLocalizacion(localizacionesPorNombre, localidad, advertencias, rowNumber);
             var sucursal = localizacion?.Sucursal ?? FindSucursal(sucursalesPorNombre, localidad, advertencias, rowNumber);
+            if (localizacion == null)
+            {
+                var locKey = NormalizeKey(localidad);
+                if (locKey == NormalizeKey("Torre Universal"))
+                {
+                    sucursal = sucursales.FirstOrDefault(s =>
+                        NormalizeKey(s.Nombre) == NormalizeKey("SEGUROS UNIVERSAL"));
+                }
+            }
+            if (localizacion == null && sucursal != null)
+            {
+                localizacion = new Localizacion
+                {
+                    Nombre = localidad,
+                    SucursalId = sucursal.Id,
+                    EmpresaId = sucursal.EmpresaId
+                };
+                await _db.Localizaciones.AddAsync(localizacion);
+                await _db.SaveChangesAsync();
+                localizaciones.Add(localizacion);
+                var key = NormalizeKey(localidad);
+                if (!localizacionesPorNombre.TryGetValue(key, out var list))
+                {
+                    list = new List<Localizacion>();
+                    localizacionesPorNombre[key] = list;
+                }
+                list.Add(localizacion);
+            }
             if (sucursal == null)
             {
                 AddLimitedError(errores, $"Fila {rowNumber}: no se encontro filial para la localidad '{localidad}'.");
@@ -723,6 +751,7 @@ public class MenuController : Controller
                 var mD = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.D$", RegexOptions.None, RegexTimeout);
                 var mE = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.E$", RegexOptions.None, RegexTimeout);
                 var mMax = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.OpcionesMaximas$", RegexOptions.None, RegexTimeout);
+                var mCerrado = Regex.Match(k, "^Dias\\[(\\d+)\\]\\.DiaCerrado$", RegexOptions.None, RegexTimeout);
                 if (mId.Success && int.TryParse(mId.Groups[1].Value, out var i1)) idxs.Add(i1);
                 if (mA.Success && int.TryParse(mA.Groups[1].Value, out var i2)) idxs.Add(i2);
                 if (mB.Success && int.TryParse(mB.Groups[1].Value, out var i3)) idxs.Add(i3);
@@ -730,6 +759,7 @@ public class MenuController : Controller
                 if (mD.Success && int.TryParse(mD.Groups[1].Value, out var i5)) idxs.Add(i5);
                 if (mE.Success && int.TryParse(mE.Groups[1].Value, out var i6)) idxs.Add(i6);
                 if (mMax.Success && int.TryParse(mMax.Groups[1].Value, out var i7)) idxs.Add(i7);
+                if (mCerrado.Success && int.TryParse(mCerrado.Groups[1].Value, out var i8)) idxs.Add(i8);
             }
             var dias = new List<DiaEdicion>();
             foreach (var i in idxs.OrderBy(x => x))
@@ -743,7 +773,12 @@ public class MenuController : Controller
                 int max = 3;
                 if (int.TryParse(form[$"Dias[{i}].OpcionesMaximas"], out var maxForm))
                     max = Math.Clamp(maxForm, 1, 5);
-                dias.Add(new DiaEdicion { OpcionMenuId = omId, A = ga, B = gb, C = gc, D = gd, E = ge, OpcionesMaximas = max });
+                var cerradoVal = form[$"Dias[{i}].DiaCerrado"].FirstOrDefault();
+                var diaCerrado = !string.IsNullOrWhiteSpace(cerradoVal)
+                    && (string.Equals(cerradoVal, "true", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(cerradoVal, "on", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(cerradoVal, "1", StringComparison.OrdinalIgnoreCase));
+                dias.Add(new DiaEdicion { OpcionMenuId = omId, A = ga, B = gb, C = gc, D = gd, E = ge, OpcionesMaximas = max, DiaCerrado = diaCerrado });
                 _logger.LogInformation("[POST Guardar] idx={Idx} omId={Om} A={A} B={B} C={C} D={D} E={E} Max={Max}", i, omId, ga, gb, gc, gd, ge, max);
             }
             model.Dias = dias;
@@ -798,6 +833,16 @@ public class MenuController : Controller
                 dia.OpcionIdC = max >= 3 ? d.C : null;
                 dia.OpcionIdD = max >= 4 ? d.D : null;
                 dia.OpcionIdE = max >= 5 ? d.E : null;
+                dia.DiaCerrado = d.DiaCerrado;
+            }
+            var diasCerrados = model.Dias.Where(d => d.DiaCerrado).Select(d => d.OpcionMenuId).ToList();
+            if (diasCerrados.Count > 0)
+            {
+                var respuestasCerrar = await _db.RespuestasFormulario
+                    .Where(r => diasCerrados.Contains(r.OpcionMenuId))
+                    .ToListAsync();
+                if (respuestasCerrar.Count > 0)
+                    _db.RespuestasFormulario.RemoveRange(respuestasCerrar);
             }
             // Actualizar adicionales fijos del menÃº (se cobran 100% al empleado)
             var nuevosIds = (model.AdicionalesIds ?? new List<int>())
@@ -923,6 +968,7 @@ public class MenuController : Controller
                 HorarioId = dia.HorarioId,
                 HorarioNombre = string.IsNullOrWhiteSpace(nombreHorario) ? "Horario general" : nombreHorario!,
                 HorarioOrden = dia.Horario?.Orden ?? int.MaxValue,
+                DiaCerrado = custom?.DiaCerrado ?? dia.DiaCerrado,
                 A = custom?.A ?? dia.OpcionIdA,
                 B = custom?.B ?? dia.OpcionIdB,
                 C = custom?.C ?? dia.OpcionIdC,

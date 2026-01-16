@@ -71,6 +71,13 @@ public class MenuCloneService : IMenuCloneService
                 dSuc.OpcionIdD = dEmp.OpcionIdD;
                 dSuc.OpcionIdE = dEmp.OpcionIdE;
                 dSuc.OpcionesMaximas = dEmp.OpcionesMaximas;
+                dSuc.DiaCerrado = dEmp.DiaCerrado;
+                if (dEmp.DiaCerrado)
+                {
+                    var respuestasCerrar = await _respuestas.ListAsync(r => r.OpcionMenuId == dSuc.Id, ct);
+                    foreach (var r in respuestasCerrar)
+                        _respuestas.Remove(r);
+                }
             }
 
             var adicionalesSucursal = await _menusAdicionales.ListAsync(a => a.MenuId == menuSucursal.Id, ct);

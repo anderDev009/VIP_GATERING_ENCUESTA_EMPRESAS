@@ -170,6 +170,12 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE IF EXISTS \"Empleados\" " +
         "ADD COLUMN IF NOT EXISTS \"HoraAlmuerzoBloqueada\" boolean NOT NULL DEFAULT false;");
     await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"Sucursales\" " +
+        "ADD COLUMN IF NOT EXISTS \"HorariosEspecificos\" boolean NOT NULL DEFAULT false;");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"OpcionesMenu\" " +
+        "ADD COLUMN IF NOT EXISTS \"DiaCerrado\" boolean NOT NULL DEFAULT false;");
+    await db.Database.ExecuteSqlRawAsync(
         "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
         "ADD COLUMN IF NOT EXISTS \"BaseSnapshot\" numeric NULL;");
     await db.Database.ExecuteSqlRawAsync(
@@ -211,6 +217,15 @@ using (var scope = app.Services.CreateScope())
     await db.Database.ExecuteSqlRawAsync(
         "ALTER TABLE IF EXISTS \"RespuestasFormulario\" " +
         "ADD COLUMN IF NOT EXISTS \"AdicionalItbisEmpleadoSnapshot\" numeric NULL;");
+    await db.Database.ExecuteSqlRawAsync(
+        "CREATE TABLE IF NOT EXISTS \"SucursalesHorariosSlots\" (" +
+        "\"Id\" serial PRIMARY KEY, " +
+        "\"SucursalId\" integer NOT NULL, " +
+        "\"HorarioId\" integer NOT NULL, " +
+        "\"Hora\" time NOT NULL);");
+    await db.Database.ExecuteSqlRawAsync(
+        "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_SucursalesHorariosSlots_SucursalId_HorarioId_Hora\" " +
+        "ON \"SucursalesHorariosSlots\" (\"SucursalId\", \"HorarioId\", \"Hora\");");
     await SeedData.EnsureSeedAsync(db, app.Environment.ContentRootPath);
     // Ensure Identity roles and demo users
     var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();

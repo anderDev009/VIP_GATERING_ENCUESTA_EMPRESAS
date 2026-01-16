@@ -107,7 +107,10 @@ public class EmpresasController : Controller
         var ent = await _db.Empresas.FindAsync(id);
         if (ent == null) return NotFound();
         ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
-        var sucursalIds = await _db.Sucursales.Where(s => s.EmpresaId == id).Select(s => s.Id).ToListAsync();
+        var sucursalIds = await _db.Sucursales
+            .Where(s => s.EmpresaId == id && !s.HorariosEspecificos)
+            .Select(s => s.Id)
+            .ToListAsync();
         var horariosEmpresa = await _db.SucursalesHorarios
             .Where(sh => sucursalIds.Contains(sh.SucursalId))
             .ToListAsync();
@@ -115,11 +118,14 @@ public class EmpresasController : Controller
             .Select(h => h.HorarioId)
             .Distinct()
             .ToList();
-        ViewBag.EmpresaHorarioTimes = horariosEmpresa
-            .GroupBy(h => h.HorarioId)
-            .ToDictionary(
+        ViewBag.EmpresaHorarioSlots = await _db.SucursalesHorariosSlots
+            .Where(sh => sucursalIds.Contains(sh.SucursalId))
+            .GroupBy(sh => sh.HorarioId)
+            .ToDictionaryAsync(
                 g => g.Key,
-                g => (Inicio: g.First().HoraInicio?.ToString("HH:mm"), Fin: g.First().HoraFin?.ToString("HH:mm")));
+                g => string.Join(", ", g.OrderBy(x => x.Hora)
+                    .Select(x => x.Hora.ToString("HH:mm"))
+                    .Distinct()));
         return View(ent);
     }
 
@@ -131,7 +137,7 @@ public class EmpresasController : Controller
         {
             ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
             ViewBag.EmpresaSelHorarios = new List<int>();
-            ViewBag.EmpresaHorarioTimes = new Dictionary<int, (string? Inicio, string? Fin)>();
+            ViewBag.EmpresaHorarioSlots = new Dictionary<int, string>();
             return View(model);
         }
         var ent = await _db.Empresas.FindAsync(id);
@@ -176,13 +182,20 @@ public class EmpresasController : Controller
         var seleccion = Request.Form["empresa_horarios"].ToArray();
         if (seleccion == null) return;
 
-        var sucursalIds = await _db.Sucursales.Where(s => s.EmpresaId == empresaId).Select(s => s.Id).ToListAsync();
+        var sucursalIds = await _db.Sucursales
+            .Where(s => s.EmpresaId == empresaId && !s.HorariosEspecificos)
+            .Select(s => s.Id)
+            .ToListAsync();
         if (sucursalIds.Count == 0) return;
 
         var actuales = await _db.SucursalesHorarios
             .Where(sh => sucursalIds.Contains(sh.SucursalId))
             .ToListAsync();
         _db.SucursalesHorarios.RemoveRange(actuales);
+        var actualesSlots = await _db.SucursalesHorariosSlots
+            .Where(sh => sucursalIds.Contains(sh.SucursalId))
+            .ToListAsync();
+        _db.SucursalesHorariosSlots.RemoveRange(actualesSlots);
 
         var horarioIds = seleccion
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -197,20 +210,39 @@ public class EmpresasController : Controller
                 _db.SucursalesHorarios.Add(new SucursalHorario
                 {
                     SucursalId = sucursalId,
-                    HorarioId = hid,
-                    HoraInicio = ParseHora(Request.Form[$"empresa_horario_inicio_{hid}"]),
-                    HoraFin = ParseHora(Request.Form[$"empresa_horario_fin_{hid}"])
+                    HorarioId = hid
                 });
+                var slots = ParseHorarioSlots(Request.Form[$"empresa_horario_slots_{hid}"]);
+                foreach (var slot in slots)
+                {
+                    _db.SucursalesHorariosSlots.Add(new SucursalHorarioSlot
+                    {
+                        SucursalId = sucursalId,
+                        HorarioId = hid,
+                        Hora = slot
+                    });
+                }
             }
         }
 
         await _db.SaveChangesAsync();
     }
 
-    private static TimeOnly? ParseHora(string? value)
+    private static List<TimeOnly> ParseHorarioSlots(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        return TimeOnly.TryParse(value, out var parsed) ? parsed : null;
+        if (string.IsNullOrWhiteSpace(value)) return new List<TimeOnly>();
+        var tokens = value.Split(new[] { ',', ';', '\n', '\r', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        var slots = new List<TimeOnly>();
+        foreach (var token in tokens)
+        {
+            var trimmed = token.Trim();
+            if (TimeOnly.TryParse(trimmed, out var parsed))
+            {
+                if (!slots.Contains(parsed))
+                    slots.Add(parsed);
+            }
+        }
+        return slots.OrderBy(s => s).ToList();
     }
 }
 

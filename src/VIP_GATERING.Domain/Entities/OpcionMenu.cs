@@ -29,5 +29,7 @@ public class OpcionMenu
     public int? HorarioId { get; set; }
     public Horario? Horario { get; set; }
 
+    public bool DiaCerrado { get; set; } = false;
+
     public ICollection<RespuestaFormulario> Respuestas { get; set; } = new List<RespuestaFormulario>();
 }

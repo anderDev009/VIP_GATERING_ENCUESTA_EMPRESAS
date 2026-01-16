@@ -97,7 +97,7 @@ else
                 <th>Fecha</th>
                 <th>Dia</th>
                 <th>Hora</th>
-                <th>Periodo</th>
+                <th>Semana</th>
                 <th>Horario</th>
                 <th>Hora inicio</th>
                 <th>Hora fin</th>
@@ -110,8 +110,7 @@ else
                 <th>Opcion</th>
                 <th>Plato</th>
                 <th class="text-right">Cantidad</th>
-                <th class="text-right">Precio</th>
-                <th class="text-right">Base</th>
+                <th class="text-right">Precio unitario base</th>
                 <th class="text-right">ITBIS</th>
                 <th class="text-right">Total</th>
                 <th>Subsidio</th>
@@ -147,7 +146,6 @@ else
                     <td>@r.Plato</td>
                     <td class="text-right">@r.Cantidad</td>
                     <td class="text-right">@r.PrecioUnitario.ToString("C")</td>
-                    <td class="text-right">@r.SubtotalBase.ToString("C")</td>
                     <td class="text-right">@r.ItbisTotal.ToString("C")</td>
                     <td class="text-right">@r.Total.ToString("C")</td>
                     <td>@r.SubsidioAplicado</td>

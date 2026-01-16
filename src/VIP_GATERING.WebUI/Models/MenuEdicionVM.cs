@@ -35,6 +35,7 @@ public class DiaEdicion
     public int? HorarioId { get; set; }
     public string HorarioNombre { get; set; } = "Horario general";
     public int HorarioOrden { get; set; }
+    public bool DiaCerrado { get; set; }
     public int? A { get; set; }
     public int? B { get; set; }
     public int? C { get; set; }

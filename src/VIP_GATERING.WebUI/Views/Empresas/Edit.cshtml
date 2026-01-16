@@ -3,7 +3,7 @@
     ViewData["Title"] = "Editar Empresa";
     var horarios = ViewBag.Horarios as IEnumerable<VIP_GATERING.Domain.Entities.Horario> ?? Array.Empty<VIP_GATERING.Domain.Entities.Horario>();
     var selHorarios = ViewBag.EmpresaSelHorarios as List<int> ?? new List<int>();
-    var horarioTimes = ViewBag.EmpresaHorarioTimes as Dictionary<int, (string? Inicio, string? Fin)> ?? new();
+    var horarioSlots = ViewBag.EmpresaHorarioSlots as Dictionary<int, string> ?? new();
 }
 <h1 class="text-2xl font-semibold mb-4 max-w-lg mx-auto">Editar Empresa</h1>
 
@@ -62,19 +62,15 @@
         <div class="grid gap-3">
             @foreach (var h in horarios)
             {
-                var times = horarioTimes.TryGetValue(h.Id, out var value) ? value : (Inicio: null, Fin: null);
+                var slots = horarioSlots.TryGetValue(h.Id, out var value) ? value : string.Empty;
                 <div class="flex flex-wrap items-center gap-3">
                     <label class="flex items-center gap-2 min-w-[140px]">
                         <input type="checkbox" name="empresa_horarios" value="@h.Id" @(selHorarios.Contains(h.Id) ? "checked" : "") />
                         <span>@h.Nombre</span>
                     </label>
-                    <div class="flex items-center gap-2 text-sm">
-                        <span>Inicio</span>
-                        <input type="time" name="empresa_horario_inicio_@h.Id" value="@times.Inicio" class="border rounded p-2" />
-                    </div>
-                    <div class="flex items-center gap-2 text-sm">
-                        <span>Fin</span>
-                        <input type="time" name="empresa_horario_fin_@h.Id" value="@times.Fin" class="border rounded p-2" />
+                    <div class="flex-1 min-w-[220px]">
+                        <label class="block text-xs text-slate-500">Horas permitidas (ej: 12:00, 12:30, 13:00)</label>
+                        <input type="text" name="empresa_horario_slots_@h.Id" value="@slots" class="w-full border rounded p-2" />
                     </div>
                 </div>
             }

@@ -79,9 +79,16 @@
                         new { Clave = "D", Nombre = d.D, Imagen = d.ImagenD },
                         new { Clave = "E", Nombre = d.E, Imagen = d.ImagenE }
                     }.Take(d.OpcionesMaximas <= 0 ? 3 : d.OpcionesMaximas).ToList();
+                    var diaCerrado = d.DiaCerrado;
 
                     <div class="card">
-                        <div class="px-4 py-3 border-b font-medium">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana) - @d.HorarioNombre</div>
+                        <div class="px-4 py-3 border-b font-medium flex items-center gap-2">
+                            <span>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana) - @d.HorarioNombre</span>
+                            @if (diaCerrado)
+                            {
+                                <span class="chip chip--soft">Dia cerrado</span>
+                            }
+                        </div>
                         <div class="p-4">
                             @if (!opcionesDia.Any(o => !string.IsNullOrWhiteSpace(o.Nombre)))
                             {
@@ -99,7 +106,8 @@
                                                    name="Dias[@i].Seleccion"
                                                    value="@opc.Clave"
                                                    class="option-card__input"
-                                                   @(seleccionada ? "checked" : "") />
+                                                   @(seleccionada ? "checked" : "")
+                                                   @(diaCerrado ? "disabled" : "") />
                                             <div class="option-card__content">
                                                 <div class="option-card__header">
                                                     <span class="chip chip--muted">Plato @opc.Clave</span>

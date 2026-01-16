@@ -10,6 +10,7 @@ public class Sucursal
     public bool? SubsidiaEmpleados { get; set; }
     public SubsidioTipo? SubsidioTipo { get; set; }
     public decimal? SubsidioValor { get; set; }
+    public bool HorariosEspecificos { get; set; } = false;
 
     public int EmpresaId { get; set; }
     public Empresa? Empresa { get; set; }

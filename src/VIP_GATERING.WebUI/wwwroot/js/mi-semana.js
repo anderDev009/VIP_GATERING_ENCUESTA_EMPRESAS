@@ -165,6 +165,35 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', (event) => {
       if (form.dataset.confirmed === '1') return;
       event.preventDefault();
+      const missingHorarios = [];
+      document.querySelectorAll('[data-tab-panel]').forEach((panel) => {
+        const hasSelection = panel.querySelectorAll('input[type="radio"][name*="Dias"]:checked').length > 0;
+        if (!hasSelection) return;
+        const select = panel.querySelector('select[name^="HorasHorario["]');
+        if (!select) return;
+        if (!select.value) {
+          const label = panel.querySelector('.control-field label');
+          const labelText = label ? label.textContent.trim() : 'Horario';
+          missingHorarios.push(labelText);
+          select.classList.add('input-error');
+        } else {
+          select.classList.remove('input-error');
+        }
+      });
+      if (missingHorarios.length > 0) {
+        if (typeof Swal !== 'undefined') {
+          const items = missingHorarios.map((h) => `<li>${h}</li>`).join('');
+          Swal.fire({
+            title: 'Selecciona tu horario',
+            html: `Debes elegir una hora para guardar tu menu:<ul class="text-left mt-2">${items}</ul>`,
+            icon: 'warning',
+            confirmButtonText: 'Entendido'
+          });
+        } else {
+          alert('Debes seleccionar una hora antes de guardar el menu.');
+        }
+        return;
+      }
       const seleccionadas = document.querySelectorAll('input[type="radio"][name*="Dias"]:checked').length;
       const loc = (form.dataset.localizacion || '').trim();
       const locLabel = loc ? `Localizacion: ${loc}` : 'Localizacion: sin asignar';

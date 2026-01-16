@@ -99,7 +99,7 @@ public class SucursalesController : Controller
     {
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
-        ViewBag.HorarioTimes = new Dictionary<int, (string? Inicio, string? Fin)>();
+        ViewBag.HorarioSlots = new Dictionary<int, string>();
         return View(new Sucursal());
     }
 
@@ -112,7 +112,7 @@ public class SucursalesController : Controller
         {
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Horarios = await _db.Horarios.OrderBy(h => h.Orden).ToListAsync();
-            ViewBag.HorarioTimes = new Dictionary<int, (string? Inicio, string? Fin)>();
+            ViewBag.HorarioSlots = new Dictionary<int, string>();
             return View(model);
         }
         await _db.Sucursales.AddAsync(model);
@@ -140,10 +140,18 @@ public class SucursalesController : Controller
             await _db.SucursalesHorarios.AddAsync(new SucursalHorario
             {
                 SucursalId = model.Id,
-                HorarioId = hid,
-                HoraInicio = ParseHora(Request.Form[$"horario_inicio_{hid}"]),
-                HoraFin = ParseHora(Request.Form[$"horario_fin_{hid}"])
+                HorarioId = hid
             });
+            var slots = ParseHorarioSlots(Request.Form[$"horario_slots_{hid}"]);
+            foreach (var slot in slots)
+            {
+                await _db.SucursalesHorariosSlots.AddAsync(new SucursalHorarioSlot
+                {
+                    SucursalId = model.Id,
+                    HorarioId = hid,
+                    Hora = slot
+                });
+            }
         }
         await _db.SaveChangesAsync();
         TempData["Success"] = "Filial creado.";
@@ -157,11 +165,14 @@ public class SucursalesController : Controller
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Horarios = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
         ViewBag.SelHorarios = await _db.SucursalesHorarios.Where(sh => sh.SucursalId == ent.Id).Select(sh => sh.HorarioId).ToListAsync();
-        ViewBag.HorarioTimes = await _db.SucursalesHorarios
+        ViewBag.HorarioSlots = await _db.SucursalesHorariosSlots
             .Where(sh => sh.SucursalId == ent.Id)
+            .GroupBy(sh => sh.HorarioId)
             .ToDictionaryAsync(
-                sh => sh.HorarioId,
-                sh => (Inicio: sh.HoraInicio?.ToString("HH:mm"), Fin: sh.HoraFin?.ToString("HH:mm")));
+                g => g.Key,
+                g => string.Join(", ", g.OrderBy(x => x.Hora)
+                    .Select(x => x.Hora.ToString("HH:mm"))
+                    .Distinct()));
         return View(ent);
     }
 
@@ -177,11 +188,14 @@ public class SucursalesController : Controller
             ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
             ViewBag.Horarios = await _db.Horarios.OrderBy(h => h.Orden).ToListAsync();
             ViewBag.SelHorarios = await _db.SucursalesHorarios.Where(sh => sh.SucursalId == ent.Id).Select(sh => sh.HorarioId).ToListAsync();
-            ViewBag.HorarioTimes = await _db.SucursalesHorarios
+            ViewBag.HorarioSlots = await _db.SucursalesHorariosSlots
                 .Where(sh => sh.SucursalId == ent.Id)
+                .GroupBy(sh => sh.HorarioId)
                 .ToDictionaryAsync(
-                    sh => sh.HorarioId,
-                    sh => (Inicio: sh.HoraInicio?.ToString("HH:mm"), Fin: sh.HoraFin?.ToString("HH:mm")));
+                    g => g.Key,
+                    g => string.Join(", ", g.OrderBy(x => x.Hora)
+                        .Select(x => x.Hora.ToString("HH:mm"))
+                        .Distinct()));
             return View(model);
         }
         ent.Nombre = model.Nombre;
@@ -190,10 +204,13 @@ public class SucursalesController : Controller
         ent.SubsidiaEmpleados = model.SubsidiaEmpleados;
         ent.SubsidioTipo = model.SubsidioTipo;
         ent.SubsidioValor = model.SubsidioValor;
+        ent.HorariosEspecificos = model.HorariosEspecificos;
         await _db.SaveChangesAsync();
         // actualizar asignaciones de horarios segun formulario
         var actuales = await _db.SucursalesHorarios.Where(sh => sh.SucursalId == ent.Id).ToListAsync();
         _db.SucursalesHorarios.RemoveRange(actuales);
+        var actualesSlots = await _db.SucursalesHorariosSlots.Where(sh => sh.SucursalId == ent.Id).ToListAsync();
+        _db.SucursalesHorariosSlots.RemoveRange(actualesSlots);
         var seleccion = Request.Form["horarios"].ToArray();
         if (seleccion != null && seleccion.Length > 0)
         {
@@ -204,10 +221,18 @@ public class SucursalesController : Controller
                     await _db.SucursalesHorarios.AddAsync(new SucursalHorario
                     {
                         SucursalId = ent.Id,
-                        HorarioId = hid,
-                        HoraInicio = ParseHora(Request.Form[$"horario_inicio_{hid}"]),
-                        HoraFin = ParseHora(Request.Form[$"horario_fin_{hid}"])
+                        HorarioId = hid
                     });
+                    var slots = ParseHorarioSlots(Request.Form[$"horario_slots_{hid}"]);
+                    foreach (var slot in slots)
+                    {
+                        await _db.SucursalesHorariosSlots.AddAsync(new SucursalHorarioSlot
+                        {
+                            SucursalId = ent.Id,
+                            HorarioId = hid,
+                            Hora = slot
+                        });
+                    }
                 }
             }
             await _db.SaveChangesAsync();
@@ -279,10 +304,21 @@ public class SucursalesController : Controller
         }
     }
 
-    private static TimeOnly? ParseHora(string? value)
+    private static List<TimeOnly> ParseHorarioSlots(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        return TimeOnly.TryParse(value, out var parsed) ? parsed : null;
+        if (string.IsNullOrWhiteSpace(value)) return new List<TimeOnly>();
+        var tokens = value.Split(new[] { ',', ';', '\n', '\r', '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        var slots = new List<TimeOnly>();
+        foreach (var token in tokens)
+        {
+            var trimmed = token.Trim();
+            if (TimeOnly.TryParse(trimmed, out var parsed))
+            {
+                if (!slots.Contains(parsed))
+                    slots.Add(parsed);
+            }
+        }
+        return slots.OrderBy(s => s).ToList();
     }
 }
 

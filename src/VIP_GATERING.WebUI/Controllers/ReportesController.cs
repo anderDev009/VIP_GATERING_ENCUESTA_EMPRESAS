@@ -3305,11 +3305,7 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
             horarioFin = rango.Fin ?? string.Empty;
         }
 
-        string periodo;
-        if (fecha.Day <= 15)
-            periodo = $"{fecha:yyyy-MM} Q1";
-        else
-            periodo = $"{fecha:yyyy-MM} Q2";
+        var periodo = $"Semana {r.OpcionMenu.Menu!.FechaInicio:yyyy-MM-dd} a {r.OpcionMenu.Menu!.FechaTermino:yyyy-MM-dd}";
 
         void AddRow(string tipoRegistro, string opcionLabel, string plato, decimal baseValor, decimal itbis, decimal total, decimal empresaPaga, decimal empleadoPaga, decimal itbisEmpresa, decimal itbisEmpleado)
         {
@@ -3388,8 +3384,8 @@ private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows)
 {
     var headers = new[]
     {
-        "Fecha","Dia","Hora","Periodo","Horario","Hora inicio","Hora fin","Empresa","Filial","Localizacion","Codigo empleado","Empleado","Tipo","Opcion","Plato","Cantidad","Precio unitario","Subtotal base","ITBIS total","Total","Subsidio aplicado","% subsidio","Monto empresa","ITBIS empresa","Monto empleado","ITBIS empleado","Numero cierre","Estado nomina","Numero factura","Estado facturacion","Usuario proceso"
-    };
+        "Fecha","Dia","Hora","Semana","Horario","Hora inicio","Hora fin","Empresa","Filial","Localizacion","Codigo empleado","Empleado","Tipo","Opcion","Plato","Cantidad","Precio unitario base","ITBIS total","Total","Subsidio aplicado","% subsidio","Monto empresa","ITBIS empresa","Monto empleado","ITBIS empleado","Numero cierre","Estado nomina","Numero factura","Estado facturacion","Usuario proceso"
+      };
 
     var data = rows.Select(r => (IReadOnlyList<string>)new[]
     {
@@ -3410,7 +3406,6 @@ private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows)
         r.Plato,
         r.Cantidad.ToString(),
         r.PrecioUnitario.ToString("C"),
-        r.SubtotalBase.ToString("C"),
         r.ItbisTotal.ToString("C"),
         r.Total.ToString("C"),
         r.SubsidioAplicado,

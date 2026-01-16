@@ -956,10 +956,11 @@ public class EmpleadosController : Controller
             Dias = opciones.Select(o => new DiaEmpleadoVM
             {
                 OpcionMenuId = o.Id,
-                DiaSemana = o.DiaSemana,
-                HorarioId = o.HorarioId,
-                HorarioNombre = o.Horario?.Nombre,
-                A = o.OpcionA?.Nombre,
+                  DiaSemana = o.DiaSemana,
+                  HorarioId = o.HorarioId,
+                  HorarioNombre = o.Horario?.Nombre,
+                  DiaCerrado = o.DiaCerrado,
+                  A = o.OpcionA?.Nombre,
                 B = o.OpcionB?.Nombre,
                 C = o.OpcionC?.Nombre,
                 ImagenA = o.OpcionA?.ImagenUrl,

@@ -6,7 +6,7 @@
     var subsidia = Model.SubsidiaEmpleados ?? true;
     var subsidioTipo = Model.SubsidioTipo ?? VIP_GATERING.Domain.Entities.SubsidioTipo.Porcentaje;
     var subsidioValor = Model.SubsidioValor ?? 75m;
-    var horarioTimes = ViewBag.HorarioTimes as Dictionary<int, (string? Inicio, string? Fin)> ?? new();
+    var horarioSlots = ViewBag.HorarioSlots as Dictionary<int, string> ?? new();
 }
 <h1 class="text-2xl font-semibold mb-4 max-w-2xl mx-auto">Nuevo Filial</h1>
 
@@ -35,6 +35,10 @@
                 <option value="@e.Id">@e.Nombre</option>
             }
         </select>
+    </div>
+    <div class="flex items-center gap-2 text-sm">
+        <input asp-for="HorariosEspecificos" type="checkbox" class="rounded border-slate-300" />
+        <label asp-for="HorariosEspecificos">Usar horarios especificos para esta filial</label>
     </div>
     <div class="space-y-2 border rounded p-3">
         <div class="flex items-center justify-between">
@@ -77,25 +81,21 @@
         <div class="grid gap-3">
         @foreach (var h in (IEnumerable<VIP_GATERING.Domain.Entities.Horario>)ViewBag.Horarios)
         {
-            var times = horarioTimes.TryGetValue(h.Id, out var value) ? value : (Inicio: null, Fin: null);
+            var slots = horarioSlots.TryGetValue(h.Id, out var value) ? value : string.Empty;
             var isDefault = string.Equals(h.Nombre, "Almuerzo", StringComparison.OrdinalIgnoreCase);
             <div class="flex flex-wrap items-center gap-3">
                 <label class="flex items-center gap-2 min-w-[140px]">
                     <input type="checkbox" name="horarios" value="@h.Id" @(isDefault ? "checked" : "") />
                     <span>@h.Nombre</span>
                 </label>
-                <div class="flex items-center gap-2 text-sm">
-                    <span>Inicio</span>
-                    <input type="time" name="horario_inicio_@h.Id" value="@times.Inicio" class="border rounded p-2" />
-                </div>
-                <div class="flex items-center gap-2 text-sm">
-                    <span>Fin</span>
-                    <input type="time" name="horario_fin_@h.Id" value="@times.Fin" class="border rounded p-2" />
+                <div class="flex-1 min-w-[220px]">
+                    <label class="block text-xs text-slate-500">Horas permitidas (ej: 12:00, 12:30, 13:00)</label>
+                    <input type="text" name="horario_slots_@h.Id" value="@slots" class="w-full border rounded p-2" />
                 </div>
             </div>
         }
         </div>
-        <div class="text-xs text-slate-500 mt-1">Estos horarios aplican solo a esta filial.</div>
+        <div class="text-xs text-slate-500 mt-1">Si activas horarios especificos, estos valores no se reemplazan cuando cambias la empresa.</div>
     </div>
     <div class="flex gap-2">
         <button class="btn-primary">Guardar</button>

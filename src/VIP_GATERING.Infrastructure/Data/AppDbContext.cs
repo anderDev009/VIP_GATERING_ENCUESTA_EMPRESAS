@@ -21,6 +21,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
     public DbSet<OpcionMenu> OpcionesMenu => Set<OpcionMenu>();
     public DbSet<Horario> Horarios => Set<Horario>();
     public DbSet<SucursalHorario> SucursalesHorarios => Set<SucursalHorario>();
+    public DbSet<SucursalHorarioSlot> SucursalesHorariosSlots => Set<SucursalHorarioSlot>();
     public DbSet<RespuestaFormulario> RespuestasFormulario => Set<RespuestaFormulario>();
     public DbSet<MenuConfiguracion> ConfiguracionesMenu => Set<MenuConfiguracion>();
     public DbSet<EmpleadoSucursal> EmpleadosSucursales => Set<EmpleadoSucursal>();
@@ -212,6 +213,20 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .HasForeignKey(sh => sh.SucursalId)
             .OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<SucursalHorario>()
+            .HasOne(sh => sh.Horario)
+            .WithMany()
+            .HasForeignKey(sh => sh.HorarioId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SucursalHorarioSlot>()
+            .HasIndex(sh => new { sh.SucursalId, sh.HorarioId, sh.Hora })
+            .IsUnique();
+        modelBuilder.Entity<SucursalHorarioSlot>()
+            .HasOne(sh => sh.Sucursal)
+            .WithMany()
+            .HasForeignKey(sh => sh.SucursalId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<SucursalHorarioSlot>()
             .HasOne(sh => sh.Horario)
             .WithMany()
             .HasForeignKey(sh => sh.HorarioId)

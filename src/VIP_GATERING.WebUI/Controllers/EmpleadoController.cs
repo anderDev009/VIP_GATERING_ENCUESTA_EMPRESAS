@@ -168,20 +168,8 @@ public class EmpleadoController : Controller
         if (!sucursalesPermitidas.Contains(sucursalEntregaId))
             return Forbid();
         var sucursalEntregaNombre = localizacionEntrega?.SucursalNombre ?? sucursalDependencia.Nombre;
-        var horarioAlmuerzoId = await _db.Horarios
-            .AsNoTracking()
-            .Where(h => h.Activo && h.Nombre.ToLower().Contains("almuerzo"))
-            .Select(h => (int?)h.Id)
-            .FirstOrDefaultAsync();
-        var rangoAlmuerzo = horarioAlmuerzoId != null
-            ? await _db.SucursalesHorarios
-                .AsNoTracking()
-                .Where(sh => sh.SucursalId == sucursalEntregaId && sh.HorarioId == horarioAlmuerzoId.Value)
-                .Select(sh => new { sh.HoraInicio, sh.HoraFin })
-                .FirstOrDefaultAsync()
-            : null;
-        var horaInicioAlmuerzo = rangoAlmuerzo?.HoraInicio;
-        var horaFinAlmuerzo = rangoAlmuerzo?.HoraFin;
+        TimeOnly? horaInicioAlmuerzo = null;
+        TimeOnly? horaFinAlmuerzo = null;
 
         var hoy = _fechas.Hoy();
         var (inicioActual, finActual) = _fechas.RangoSemanaActual();
@@ -312,19 +300,23 @@ public class EmpleadoController : Controller
         var horaSeleccionada = respuestas.Select(r => r.HoraAlmuerzo).FirstOrDefault(h => h != null);
         var horaElegida = horaSeleccionada;
         var horarioIds = opciones.Where(o => o.HorarioId != null).Select(o => o.HorarioId!.Value).Distinct().ToList();
-        var rangosHorario = await _db.SucursalesHorarios
+        var horariosSlots = await _db.SucursalesHorariosSlots
             .AsNoTracking()
             .Where(sh => sh.SucursalId == sucursalEntregaId && horarioIds.Contains(sh.HorarioId))
-            .Select(sh => new { sh.HorarioId, sh.HoraInicio, sh.HoraFin })
+            .Select(sh => new { sh.HorarioId, sh.Hora })
             .ToListAsync();
-        var rangosMap = rangosHorario.ToDictionary(r => r.HorarioId, r => r);
+        var slotsMap = horariosSlots
+            .GroupBy(h => h.HorarioId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => x.Hora).Distinct().OrderBy(x => x).ToList());
         var horariosHoras = opciones
             .Where(o => o.HorarioId != null)
             .GroupBy(o => o.HorarioId!.Value)
             .Select(g =>
             {
                 var horarioNombre = g.First().Horario?.Nombre ?? "Horario";
-                rangosMap.TryGetValue(g.Key, out var rango);
+                slotsMap.TryGetValue(g.Key, out var slots);
                 var horaSel = respuestas
                     .Where(r => g.Select(x => x.Id).Contains(r.OpcionMenuId))
                     .Select(r => r.HoraAlmuerzo)
@@ -333,9 +325,8 @@ public class EmpleadoController : Controller
                 {
                     HorarioId = g.Key,
                     HorarioNombre = horarioNombre,
-                    HoraInicio = rango?.HoraInicio?.ToString("HH:mm"),
-                    HoraFin = rango?.HoraFin?.ToString("HH:mm"),
-                    HoraSeleccionada = horaSel?.ToString("HH:mm")
+                    HoraSeleccionada = horaSel?.ToString("HH:mm"),
+                    HorasDisponibles = slots?.Select(s => s.ToString("HH:mm")).ToList() ?? new List<string>()
                 };
             })
             .OrderBy(h => h.HorarioNombre)
@@ -444,12 +435,14 @@ public class EmpleadoController : Controller
                 var diaFuturo = fechaDia > hoy;
                 var puedeEditarPorOpcion = edicion.EdicionPorOpcion.TryGetValue(o.Id, out var ed) ? ed && !noHabilitado : !bloqueadoPorTiempo;
                 var editableFinal = diaFuturo && puedeEditarPorOpcion;
+                if (o.DiaCerrado) editableFinal = false;
                 return new DiaEmpleadoVM
                 {
                     OpcionMenuId = o.Id,
                     DiaSemana = o.DiaSemana,
                     HorarioId = o.HorarioId,
                     HorarioNombre = o.Horario?.Nombre,
+                    DiaCerrado = o.DiaCerrado,
                     A = o.OpcionA?.Nombre,
                     B = o.OpcionB?.Nombre,
                     C = o.OpcionC?.Nombre,
@@ -682,12 +675,16 @@ public class EmpleadoController : Controller
         }
 
         var horariosIds = opciones.Where(o => o.HorarioId != null).Select(o => o.HorarioId!.Value).Distinct().ToList();
-        var rangosHorario = await _db.SucursalesHorarios
+        var horariosSlots = await _db.SucursalesHorariosSlots
             .AsNoTracking()
             .Where(sh => sh.SucursalId == sucursalEntregaId && horariosIds.Contains(sh.HorarioId))
-            .Select(sh => new { sh.HorarioId, sh.HoraInicio, sh.HoraFin })
+            .Select(sh => new { sh.HorarioId, sh.Hora })
             .ToListAsync();
-        var rangosMap = rangosHorario.ToDictionary(r => r.HorarioId, r => r);
+        var slotsMap = horariosSlots
+            .GroupBy(h => h.HorarioId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => x.Hora).Distinct().ToHashSet());
 
         var horariosConSeleccion = new HashSet<int>();
         foreach (var d in model.Dias)
@@ -705,25 +702,39 @@ public class EmpleadoController : Controller
 
         foreach (var horarioId in horariosConSeleccion)
         {
+            if (!horasPorHorario.TryGetValue(horarioId, out var horaTmp) || horaTmp == null)
+            {
+                TempData["Error"] = "Selecciona la hora antes de guardar tu menu.";
+                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = localizacionEntregaId });
+            }
+        }
+
+        foreach (var horarioId in horariosConSeleccion)
+        {
             horasPorHorario.TryGetValue(horarioId, out var horaSeleccionada);
-            rangosMap.TryGetValue(horarioId, out var rango);
-            if (rango?.HoraInicio != null && rango.HoraFin != null)
+            slotsMap.TryGetValue(horarioId, out var slots);
+            if (slots != null && slots.Count > 0)
             {
                 if (horaSeleccionada == null)
                 {
-                    TempData["Error"] = "Selecciona una hora dentro del rango permitido para el horario.";
+                    TempData["Error"] = "Selecciona una hora permitida para el horario.";
                     return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = localizacionEntregaId });
                 }
-                if (horaSeleccionada < rango.HoraInicio || horaSeleccionada > rango.HoraFin)
+                if (!slots.Contains(horaSeleccionada.Value))
                 {
-                    TempData["Error"] = $"La hora de almuerzo debe estar entre {rango.HoraInicio:HH\\:mm} y {rango.HoraFin:HH\\:mm}.";
+                    TempData["Error"] = "La hora seleccionada no esta dentro de las opciones permitidas.";
                     return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = localizacionEntregaId });
                 }
             }
-
-            if (esDiaSemana && horaSeleccionada != null && horaSeleccionada < horaActual)
+            else
             {
-                TempData["Error"] = "La hora de almuerzo debe ser mayor o igual a la hora actual.";
+                TempData["Error"] = "No hay horarios configurados para este horario.";
+                return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = localizacionEntregaId });
+            }
+
+            if (esDiaSemana && horaSeleccionada != null && horaSeleccionada <= horaActual)
+            {
+                TempData["Error"] = "La hora seleccionada debe ser mayor a la hora actual.";
                 return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave, localizacionId = localizacionEntregaId });
             }
 

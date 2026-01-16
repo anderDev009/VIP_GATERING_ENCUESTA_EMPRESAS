@@ -2,7 +2,7 @@ Integración de ASP.NET Identity – Plan Técnico
 
 Contexto actual
 - Autenticación temporal basada en cookie `uid` manejada por `ICurrentUserService`, con selección manual de usuario.
-- Modelos propios: `Usuario`, `Rol`, `RolUsuario` para roles/permisos iniciales.
+- Modelos propios: `Usuario` , `Rol`, `RolUsuario` para roles/permisos iniciales.
 - Menús y reglas de negocio ya implementadas (alcance por cliente/sucursal, bloqueo por encuestas, clonación de menús, etc.).
 
 Objetivo de la migración

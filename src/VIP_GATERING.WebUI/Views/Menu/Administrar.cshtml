@@ -226,6 +226,7 @@
                                     var d = item.Dia;
                                     var i = item.Index;
                                     var horarioId = d.HorarioId;
+                                    var diaCerrado = d.DiaCerrado;
                                     var opcionesHorario = Model.Opciones
                                         .OrderBy(o => o.Nombre)
                                         .ToList();
@@ -240,18 +241,22 @@
                                             </div>
                                             <div class="menu-day-actions">
                                                 <label class="text-xs text-slate-500">Platos habilitados</label>
-                                                <select name="Dias[@i].OpcionesMaximas" class="border rounded p-2 max-w-[5.5rem]" data-max-select @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                                <select name="Dias[@i].OpcionesMaximas" class="border rounded p-2 max-w-[5.5rem]" data-max-select @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                     @for (var m = 1; m <= 5; m++)
                                                     {
                                                         if (d.OpcionesMaximas == m) { <option selected value="@m">@m</option>; }
                                                         else { <option value="@m">@m</option>; }
                                                     }
                                                 </select>
+                                                <label class="inline-flex items-center gap-2 text-xs text-slate-600 mt-2">
+                                                    <input type="checkbox" name="Dias[@i].DiaCerrado" value="true" @(diaCerrado ? "checked" : "") @(Model.EncuestaCerrada ? "disabled" : "") />
+                                                    <span>Cerrar dia</span>
+                                                </label>
                                             </div>
                                             <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
                                         </td>
                                         <td class="menu-option-cell" data-slot="1">
-                                            <select name="Dias[@i].A" class="w-full border rounded p-2" aria-label="Plato A" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                            <select name="Dias[@i].A" class="w-full border rounded p-2" aria-label="Plato A" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
@@ -267,7 +272,7 @@
                                             </select>
                                         </td>
                                         <td class="menu-option-cell" data-slot="2">
-                                            <select name="Dias[@i].B" class="w-full border rounded p-2" aria-label="Plato B" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                            <select name="Dias[@i].B" class="w-full border rounded p-2" aria-label="Plato B" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
@@ -283,7 +288,7 @@
                                             </select>
                                         </td>
                                         <td class="menu-option-cell" data-slot="3">
-                                            <select name="Dias[@i].C" class="w-full border rounded p-2" aria-label="Plato C" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                            <select name="Dias[@i].C" class="w-full border rounded p-2" aria-label="Plato C" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
@@ -299,7 +304,7 @@
                                             </select>
                                         </td>
                                         <td class="menu-option-cell" data-slot="4">
-                                            <select name="Dias[@i].D" class="w-full border rounded p-2" aria-label="Plato D" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                            <select name="Dias[@i].D" class="w-full border rounded p-2" aria-label="Plato D" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
@@ -315,7 +320,7 @@
                                             </select>
                                         </td>
                                         <td class="menu-option-cell" data-slot="5">
-                                            <select name="Dias[@i].E" class="w-full border rounded p-2" aria-label="Plato E" @(Model.EncuestaCerrada ? "disabled data-locked=\"1\"" : "")>
+                                            <select name="Dias[@i].E" class="w-full border rounded p-2" aria-label="Plato E" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
