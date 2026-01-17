@@ -21,6 +21,7 @@
     <a class="btn-outline" asp-action="ExportExcel" asp-route-q="@ViewBag.Q">Exportar Excel</a>
     <a class="btn-outline" asp-action="ExportCsv" asp-route-q="@ViewBag.Q">Exportar CSV</a>
     <a class="btn-outline" asp-action="ExportPdf" asp-route-q="@ViewBag.Q">Exportar PDF</a>
+    <a class="btn-outline" asp-action="ImportarProductos">Importar Excel</a>
 </div>
 
 <div class="overflow-x-auto">
@@ -38,7 +39,7 @@
         @foreach (var o in Model.Items)
         {
             <tr class="border-t">
-                <td class="p-2">@o.Codigo</td>
+                <td class="p-2">@(!string.IsNullOrWhiteSpace(o.Codigo) ? o.Codigo : $"ID-{o.Id}")</td>
                 <td class="p-2">@o.Nombre</td>
                 <td class="p-2">@o.Descripcion</td>
                 <td class="p-2">@o.Costo.ToString("0.00")</td>

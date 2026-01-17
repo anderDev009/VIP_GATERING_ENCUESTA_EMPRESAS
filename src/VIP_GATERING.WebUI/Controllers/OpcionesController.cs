@@ -2,10 +2,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ClosedXML.Excel;
 using VIP_GATERING.Domain.Entities;
 using VIP_GATERING.Infrastructure.Data;
 using VIP_GATERING.WebUI.Models;
 using VIP_GATERING.WebUI.Services;
+using System.Globalization;
+using System.Text;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
@@ -14,6 +17,8 @@ public class OpcionesController : Controller
 {
     private readonly AppDbContext _db;
     private readonly IOptionImageService _imageService;
+    private const int ImportErrorLimit = 50;
+    private const int ImportWarningLimit = 50;
     public OpcionesController(AppDbContext db, IOptionImageService imageService)
     {
         _db = db;
@@ -90,6 +95,163 @@ public class OpcionesController : Controller
         }).ToList();
         var pdf = ExportHelper.BuildPdf("Platos", headers, rows);
         return File(pdf, "application/pdf", "platos.pdf");
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public IActionResult ImportarProductos()
+    {
+        return View(new ProductosImportVM());
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportarProductos(ProductosImportVM model)
+    {
+        if (model.Archivo == null || model.Archivo.Length == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Debes seleccionar un archivo Excel.");
+            return View(model);
+        }
+
+        var errores = new List<string>();
+        var advertencias = new List<string>();
+        int totalFilas = 0;
+        int filasProcesadas = 0;
+        int productosCreados = 0;
+        int productosActualizados = 0;
+        int productosSaltados = 0;
+
+        using var stream = model.Archivo.OpenReadStream();
+        using var workbook = new XLWorkbook(stream);
+        var worksheet = workbook.Worksheets.FirstOrDefault();
+        if (worksheet == null)
+        {
+            ModelState.AddModelError(string.Empty, "El archivo Excel no contiene hojas.");
+            return View(model);
+        }
+
+        var headerRow = worksheet.FirstRowUsed();
+        if (headerRow == null)
+        {
+            ModelState.AddModelError(string.Empty, "No se encontro la fila de encabezados.");
+            return View(model);
+        }
+
+        var headerMap = BuildHeaderMap(headerRow);
+        if (!TryGetColumn(headerMap, out var colCodigo, "codigo")
+            || !TryGetColumn(headerMap, out var colNombre, "nombre")
+            || !TryGetColumn(headerMap, out var colDescripcion, "descripcion")
+            || !TryGetColumn(headerMap, out var colCosto, "costo")
+            || !TryGetColumn(headerMap, out var colPrecio, "precio"))
+        {
+            ModelState.AddModelError(string.Empty, "Faltan columnas requeridas: Codigo, Nombre, Descripcion, Costo, Precio.");
+            return View(model);
+        }
+
+        var opciones = await _db.Opciones.ToListAsync();
+        var opcionesPorCodigo = opciones
+            .Where(o => !string.IsNullOrWhiteSpace(o.Codigo))
+            .ToDictionary(o => NormalizeKey(o.Codigo!), o => o);
+        var opcionesPorNombre = opciones
+            .Where(o => !string.IsNullOrWhiteSpace(o.Nombre))
+            .ToDictionary(o => NormalizeKey(o.Nombre!), o => o);
+
+        var firstDataRow = headerRow.RowBelow();
+        var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? firstDataRow.RowNumber();
+
+        for (var rowNumber = firstDataRow.RowNumber(); rowNumber <= lastRow; rowNumber++)
+        {
+            var row = worksheet.Row(rowNumber);
+            if (row.IsEmpty()) continue;
+            totalFilas++;
+
+            var codigo = row.Cell(colCodigo).GetString().Trim();
+            var nombre = row.Cell(colNombre).GetString().Trim();
+            var descripcion = row.Cell(colDescripcion).GetString().Trim();
+            var costoRaw = row.Cell(colCosto).GetString().Trim();
+            var precioRaw = row.Cell(colPrecio).GetString().Trim();
+
+            if (string.IsNullOrWhiteSpace(codigo) && string.IsNullOrWhiteSpace(nombre))
+            {
+                productosSaltados++;
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(nombre))
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: falta el nombre.");
+                productosSaltados++;
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(descripcion))
+                descripcion = nombre;
+
+            if (!TryParseDecimal(costoRaw, out var costo)) costo = 0m;
+            if (!TryParseDecimal(precioRaw, out var precio)) precio = 0m;
+            if (costo <= 0m && precio <= 0m)
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: costo y precio invalidos.");
+                productosSaltados++;
+                continue;
+            }
+
+            if (costo <= 0 && precio > 0) costo = precio;
+            if (precio <= 0 && costo > 0) precio = costo;
+
+            var opcion = FindProducto(opcionesPorCodigo, opcionesPorNombre, codigo, nombre);
+            if (opcion == null)
+            {
+                opcion = new Opcion
+                {
+                    Codigo = string.IsNullOrWhiteSpace(codigo) ? null : codigo,
+                    Nombre = nombre,
+                    Descripcion = descripcion,
+                    Costo = costo,
+                    Precio = precio,
+                    EsSubsidiado = true,
+                    LlevaItbis = true
+                };
+                await _db.Opciones.AddAsync(opcion);
+                productosCreados++;
+                if (!string.IsNullOrWhiteSpace(opcion.Codigo))
+                    opcionesPorCodigo[NormalizeKey(opcion.Codigo!)] = opcion;
+                opcionesPorNombre[NormalizeKey(opcion.Nombre!)] = opcion;
+            }
+            else
+            {
+                opcion.Codigo = string.IsNullOrWhiteSpace(codigo) ? opcion.Codigo : codigo;
+                opcion.Nombre = nombre;
+                opcion.Descripcion = descripcion;
+                opcion.Costo = costo;
+                opcion.Precio = precio;
+                opcion.EsSubsidiado = true;
+                opcion.LlevaItbis = true;
+                opcion.Borrado = false;
+                productosActualizados++;
+            }
+
+            filasProcesadas++;
+        }
+
+        await _db.SaveChangesAsync();
+
+        model.TotalFilas = totalFilas;
+        model.FilasProcesadas = filasProcesadas;
+        model.ProductosCreados = productosCreados;
+        model.ProductosActualizados = productosActualizados;
+        model.ProductosSaltados = productosSaltados;
+        model.Errores = errores;
+        model.Advertencias = advertencias;
+
+        if (errores.Count == 0)
+            TempData["Success"] = $"Importacion completada: {productosCreados} creados, {productosActualizados} actualizados.";
+        else
+            TempData["Error"] = $"Importacion completada con {errores.Count} errores.";
+
+        return View(model);
     }
 
     public async Task<IActionResult> Create()
@@ -263,5 +425,118 @@ public class OpcionesController : Controller
         var width = Math.Max(4, maxDigits);
         var next = max + 1;
         return $"P{next.ToString().PadLeft(width, '0')}";
+    }
+
+    private static Dictionary<string, int> BuildHeaderMap(IXLRow headerRow)
+    {
+        var map = new Dictionary<string, int>();
+        var lastCell = headerRow.LastCellUsed()?.Address.ColumnNumber ?? 0;
+        for (var col = 1; col <= lastCell; col++)
+        {
+            var raw = headerRow.Cell(col).GetString().Trim();
+            if (string.IsNullOrWhiteSpace(raw)) continue;
+            var key = NormalizeKey(raw);
+            map[key] = col;
+        }
+        return map;
+    }
+
+    private static bool TryGetColumn(Dictionary<string, int> headerMap, out int col, params string[] tokens)
+    {
+        if (tokens.Length == 0)
+        {
+            col = 0;
+            return false;
+        }
+        foreach (var entry in headerMap)
+        {
+            var match = true;
+            foreach (var token in tokens)
+            {
+                if (string.IsNullOrWhiteSpace(token)) continue;
+                if (!entry.Key.Contains(token))
+                {
+                    match = false;
+                    break;
+                }
+            }
+            if (match)
+            {
+                col = entry.Value;
+                return true;
+            }
+        }
+        col = 0;
+        return false;
+    }
+
+    private static string NormalizeKey(string value)
+    {
+        var cleaned = RemoveDiacritics(value ?? string.Empty).ToLowerInvariant();
+        var sb = new StringBuilder(cleaned.Length);
+        foreach (var ch in cleaned)
+        {
+            if (char.IsLetterOrDigit(ch))
+                sb.Append(ch);
+        }
+        return sb.ToString();
+    }
+
+    private static string RemoveDiacritics(string value)
+    {
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder();
+        foreach (var ch in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+                sb.Append(ch);
+        }
+        return sb.ToString().Normalize(NormalizationForm.FormC);
+    }
+
+    private static bool TryParseDecimal(string? value, out decimal result)
+    {
+        result = 0m;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var inv))
+        {
+            result = inv;
+            return true;
+        }
+        if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out var local))
+        {
+            result = local;
+            return true;
+        }
+        return false;
+    }
+
+    private static Opcion? FindProducto(Dictionary<string, Opcion> porCodigo, Dictionary<string, Opcion> porNombre, string codigo, string nombre)
+    {
+        if (!string.IsNullOrWhiteSpace(codigo))
+        {
+            var key = NormalizeKey(codigo);
+            if (porCodigo.TryGetValue(key, out var encontrado))
+                return encontrado;
+        }
+        if (!string.IsNullOrWhiteSpace(nombre))
+        {
+            var key = NormalizeKey(nombre);
+            if (porNombre.TryGetValue(key, out var encontrado))
+                return encontrado;
+        }
+        return null;
+    }
+
+    private static void AddLimitedError(List<string> errores, string mensaje)
+    {
+        if (errores.Count < ImportErrorLimit)
+            errores.Add(mensaje);
+    }
+
+    private static void AddLimitedWarning(List<string> advertencias, string mensaje)
+    {
+        if (advertencias.Count < ImportWarningLimit)
+            advertencias.Add(mensaje);
     }
 }
