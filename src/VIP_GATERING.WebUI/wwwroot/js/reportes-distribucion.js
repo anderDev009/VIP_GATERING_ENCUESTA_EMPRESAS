@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const filterInputs = filterForm
     ? filterForm.querySelectorAll('select[name], input[type="date"][name]')
     : [];
+  const vistaInput = filterForm ? filterForm.querySelector('input[name="vista"]') : null;
   const totales = document.getElementById('reportes-totales');
   const exportPdf = document.querySelector('[data-export-pdf]');
   const exportCsv = document.querySelector('[data-export-csv]');
@@ -58,6 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (target) {
         const panel = document.getElementById(target);
         if (panel) panel.classList.add('is-active');
+        if (vistaInput) {
+          vistaInput.value = tabExportMap[target] || 'resumen';
+        }
         syncTotales(target);
         syncExports(target);
       }
@@ -66,6 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const active = document.querySelector('.tab-pill.is-active');
   const activeTarget = active ? active.getAttribute('data-tab-target') : '';
+  if (vistaInput && activeTarget) {
+    vistaInput.value = tabExportMap[activeTarget] || 'resumen';
+  }
   syncTotales(activeTarget);
   syncExports(activeTarget);
 });

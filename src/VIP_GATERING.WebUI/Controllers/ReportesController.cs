@@ -1178,9 +1178,10 @@ public class ReportesController : Controller
         }
 
         var resumen = items
-            .GroupBy(i => new { i.FilialId, i.Filial })
+            .GroupBy(i => new { i.Fecha, i.FilialId, i.Filial })
             .Select(g => new DistribucionVM.ResumenFilialRow
             {
+                Fecha = g.Key.Fecha,
                 FilialId = g.Key.FilialId,
                 Filial = g.Key.Filial,
                 Base = g.Sum(x => x.Base),
@@ -1193,7 +1194,8 @@ public class ReportesController : Controller
                 EmpresaPaga = g.Sum(x => x.EmpresaPaga),
                 EmpleadoPaga = g.Sum(x => x.EmpleadoPaga)
             })
-            .OrderBy(r => r.Filial)
+            .OrderBy(r => r.Fecha)
+            .ThenBy(r => r.Filial)
             .ToList();
 
         var detalle = items
@@ -3303,21 +3305,66 @@ private static (string Title, string Suffix, IReadOnlyList<string> Headers, List
             {
                 var headers = new[]
                 {
-                    "Filial","Base","ITBIS","Total","ITBIS empresa","ITBIS empleado","Monto adicional","ITBIS adicional","Empresa paga","Empleado paga"
+                    "Fecha","Filial","Base","ITBIS","Total","ITBIS empresa","ITBIS empleado","Monto adicional","ITBIS adicional","Empresa paga","Empleado paga"
                 };
-                var rows = vm.ResumenFiliales.Select(r => (IReadOnlyList<string>)new[]
+                var rows = new List<IReadOnlyList<string>>();
+                var grupos = vm.ResumenFiliales
+                    .GroupBy(r => r.Fecha)
+                    .OrderBy(g => g.Key);
+                foreach (var g in grupos)
                 {
-                    r.Filial,
-                    r.Base.ToString("C"),
-                    r.Itbis.ToString("C"),
-                    r.Total.ToString("C"),
-                    r.ItbisEmpresa.ToString("C"),
-                    r.ItbisEmpleado.ToString("C"),
-                    r.MontoAdicional.ToString("C"),
-                    r.ItbisAdicional.ToString("C"),
-                    r.EmpresaPaga.ToString("C"),
-                    r.EmpleadoPaga.ToString("C")
-                }).ToList();
+                    foreach (var r in g.OrderBy(x => x.Filial))
+                    {
+                        rows.Add(new[]
+                        {
+                            r.Fecha.ToString("yyyy-MM-dd"),
+                            r.Filial,
+                            r.Base.ToString("C"),
+                            r.Itbis.ToString("C"),
+                            r.Total.ToString("C"),
+                            r.ItbisEmpresa.ToString("C"),
+                            r.ItbisEmpleado.ToString("C"),
+                            r.MontoAdicional.ToString("C"),
+                            r.ItbisAdicional.ToString("C"),
+                            r.EmpresaPaga.ToString("C"),
+                            r.EmpleadoPaga.ToString("C")
+                        });
+                    }
+
+                    var totalDia = new[]
+                    {
+                        g.Key.ToString("yyyy-MM-dd"),
+                        "Total dia",
+                        g.Sum(x => x.Base).ToString("C"),
+                        g.Sum(x => x.Itbis).ToString("C"),
+                        g.Sum(x => x.Total).ToString("C"),
+                        g.Sum(x => x.ItbisEmpresa).ToString("C"),
+                        g.Sum(x => x.ItbisEmpleado).ToString("C"),
+                        g.Sum(x => x.MontoAdicional).ToString("C"),
+                        g.Sum(x => x.ItbisAdicional).ToString("C"),
+                        g.Sum(x => x.EmpresaPaga).ToString("C"),
+                        g.Sum(x => x.EmpleadoPaga).ToString("C")
+                    };
+                    rows.Add(totalDia);
+                }
+
+                if (vm.ResumenFiliales.Count > 0)
+                {
+                    rows.Add(new[]
+                    {
+                        string.Empty,
+                        "Total general",
+                        vm.TotalBase.ToString("C"),
+                        vm.TotalItbis.ToString("C"),
+                        vm.TotalGeneral.ToString("C"),
+                        vm.ResumenFiliales.Sum(x => x.ItbisEmpresa).ToString("C"),
+                        vm.ResumenFiliales.Sum(x => x.ItbisEmpleado).ToString("C"),
+                        vm.ResumenFiliales.Sum(x => x.MontoAdicional).ToString("C"),
+                        vm.ResumenFiliales.Sum(x => x.ItbisAdicional).ToString("C"),
+                        vm.TotalEmpresa.ToString("C"),
+                        vm.TotalEmpleado.ToString("C")
+                    });
+                }
                 return ("Distribucion resumen por filial", "resumen", headers, AddFilterRows(headers, rows));
             }
     }

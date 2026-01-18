@@ -10,6 +10,11 @@
         ?? "Todos";
     var localizacionNombre = Model.Localizaciones.FirstOrDefault(l => l.Id == Model.LocalizacionId)?.Nombre ?? "Todas";
     var tandaNombre = Model.Horarios.FirstOrDefault(h => h.Id == Model.HorarioId)?.Nombre ?? "Todas";
+    var vistaKey = (ViewContext.HttpContext.Request.Query["vista"].ToString() ?? "resumen").Trim().ToLowerInvariant();
+    if (string.IsNullOrWhiteSpace(vistaKey))
+    {
+        vistaKey = "resumen";
+    }
 }
 
 <h1 class="text-xl font-semibold mb-4">Distribucion desde @Model.Inicio.ToString("dd/MM/yyyy") hasta @Model.Fin.ToString("dd/MM/yyyy")</h1>
@@ -115,6 +120,7 @@
             <div class="text-sm text-slate-600">Empleado paga: <span class="font-semibold">@Model.TotalEmpleado.ToString("C")</span></div>
         </div>
     }
+    <input type="hidden" name="vista" value="@vistaKey" />
     <input type="hidden" name="_" value="@DateTime.UtcNow.Ticks" />
 </form>
 
@@ -123,19 +129,20 @@
     <div class="tab-switch tab-switch--panel mb-4">
         <div class="tab-switch__label">Vista</div>
         <div class="tab-switch__group">
-            <button type="button" class="tab-pill is-active" data-tab-target="tab-resumen">Resumen por filial</button>
-            <button type="button" class="tab-pill" data-tab-target="tab-detalle-pedidos">Detalle por empleado</button>
-            <button type="button" class="tab-pill" data-tab-target="tab-localizacion">Distribucion por localizacion</button>
-            <button type="button" class="tab-pill" data-tab-target="tab-distribucion-detalle">Detalle distribucion</button>
-            <button type="button" class="tab-pill" data-tab-target="tab-cocina">Cocina</button>
+            <button type="button" class="tab-pill @(vistaKey == "resumen" ? "is-active" : "")" data-tab-target="tab-resumen">Resumen por filial</button>
+            <button type="button" class="tab-pill @(vistaKey == "detalle" ? "is-active" : "")" data-tab-target="tab-detalle-pedidos">Detalle por empleado</button>
+            <button type="button" class="tab-pill @(vistaKey == "localizacion" ? "is-active" : "")" data-tab-target="tab-localizacion">Distribucion por localizacion</button>
+            <button type="button" class="tab-pill @(vistaKey == "distribucion-detalle" ? "is-active" : "")" data-tab-target="tab-distribucion-detalle">Detalle distribucion</button>
+            <button type="button" class="tab-pill @(vistaKey == "cocina" ? "is-active" : "")" data-tab-target="tab-cocina">Cocina</button>
         </div>
     </div>
 
-    <div id="tab-resumen" class="tab-panel is-active space-y-3" data-tab-panel>
+    <div id="tab-resumen" class="tab-panel @(vistaKey == "resumen" ? "is-active" : "") space-y-3" data-tab-panel>
         <div class="report-scroll">
         <table>
             <thead>
             <tr>
+                <th>Fecha</th>
                 <th>Filial</th>
                 <th class="text-right">Base</th>
                 <th class="text-right">ITBIS</th>
@@ -149,19 +156,58 @@
             </tr>
             </thead>
             <tbody>
-            @foreach (var r in Model.ResumenFiliales)
+            @{
+                var resumenPorDia = Model.ResumenFiliales
+                    .GroupBy(r => r.Fecha)
+                    .OrderBy(g => g.Key);
+            }
+            @foreach (var g in resumenPorDia)
             {
-                <tr>
-                    <td>@r.Filial</td>
-                    <td class="text-right">@r.Base.ToString("C")</td>
-                    <td class="text-right">@r.Itbis.ToString("C")</td>
-                    <td class="text-right">@r.Total.ToString("C")</td>
-                    <td class="text-right">@r.ItbisEmpresa.ToString("C")</td>
-                    <td class="text-right">@r.ItbisEmpleado.ToString("C")</td>
-                    <td class="text-right">@r.MontoAdicional.ToString("C")</td>
-                    <td class="text-right">@r.ItbisAdicional.ToString("C")</td>
-                    <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
-                    <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+                foreach (var r in g.OrderBy(x => x.Filial))
+                {
+                    <tr>
+                        <td>@r.Fecha.ToString("yyyy-MM-dd")</td>
+                        <td>@r.Filial</td>
+                        <td class="text-right">@r.Base.ToString("C")</td>
+                        <td class="text-right">@r.Itbis.ToString("C")</td>
+                        <td class="text-right">@r.Total.ToString("C")</td>
+                        <td class="text-right">@r.ItbisEmpresa.ToString("C")</td>
+                        <td class="text-right">@r.ItbisEmpleado.ToString("C")</td>
+                        <td class="text-right">@r.MontoAdicional.ToString("C")</td>
+                        <td class="text-right">@r.ItbisAdicional.ToString("C")</td>
+                        <td class="text-right">@r.EmpresaPaga.ToString("C")</td>
+                        <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
+                    </tr>
+                }
+
+                <tr class="bg-slate-50 font-semibold">
+                    <td>@g.Key.ToString("yyyy-MM-dd")</td>
+                    <td>Total dia</td>
+                    <td class="text-right">@g.Sum(x => x.Base).ToString("C")</td>
+                    <td class="text-right">@g.Sum(x => x.Itbis).ToString("C")</td>
+                    <td class="text-right">@g.Sum(x => x.Total).ToString("C")</td>
+                    <td class="text-right">@g.Sum(x => x.ItbisEmpresa).ToString("C")</td>
+                    <td class="text-right">@g.Sum(x => x.ItbisEmpleado).ToString("C")</td>
+                    <td class="text-right">@g.Sum(x => x.MontoAdicional).ToString("C")</td>
+                    <td class="text-right">@g.Sum(x => x.ItbisAdicional).ToString("C")</td>
+                    <td class="text-right">@g.Sum(x => x.EmpresaPaga).ToString("C")</td>
+                    <td class="text-right">@g.Sum(x => x.EmpleadoPaga).ToString("C")</td>
+                </tr>
+            }
+            @if (Model.ResumenFiliales.Count > 0)
+            {
+                <tr class="bg-slate-100 font-semibold">
+                    <td></td>
+                    <td>Total general</td>
+                    <td class="text-right">@Model.TotalBase.ToString("C")</td>
+                    <td class="text-right">@Model.TotalItbis.ToString("C")</td>
+                    <td class="text-right">@Model.TotalGeneral.ToString("C")</td>
+                    <td class="text-right">@Model.ResumenFiliales.Sum(x => x.ItbisEmpresa).ToString("C")</td>
+                    <td class="text-right">@Model.ResumenFiliales.Sum(x => x.ItbisEmpleado).ToString("C")</td>
+                    <td class="text-right">@Model.ResumenFiliales.Sum(x => x.MontoAdicional).ToString("C")</td>
+                    <td class="text-right">@Model.ResumenFiliales.Sum(x => x.ItbisAdicional).ToString("C")</td>
+                    <td class="text-right">@Model.TotalEmpresa.ToString("C")</td>
+                    <td class="text-right">@Model.TotalEmpleado.ToString("C")</td>
                 </tr>
             }
             </tbody>
@@ -169,7 +215,7 @@
         </div>
     </div>
 
-    <div id="tab-detalle-pedidos" class="tab-panel space-y-3" data-tab-panel>
+    <div id="tab-detalle-pedidos" class="tab-panel @(vistaKey == "detalle" ? "is-active" : "") space-y-3" data-tab-panel>
         <div class="report-scroll">
         <table>
             <thead>
@@ -216,7 +262,7 @@
         </div>
     </div>
 
-    <div id="tab-localizacion" class="tab-panel space-y-3" data-tab-panel>
+    <div id="tab-localizacion" class="tab-panel @(vistaKey == "localizacion" ? "is-active" : "") space-y-3" data-tab-panel>
         <div class="report-scroll">
         <table>
             <thead>
@@ -252,7 +298,7 @@
         </div>
     </div>
 
-    <div id="tab-distribucion-detalle" class="tab-panel space-y-3" data-tab-panel>
+    <div id="tab-distribucion-detalle" class="tab-panel @(vistaKey == "distribucion-detalle" ? "is-active" : "") space-y-3" data-tab-panel>
         <div class="report-scroll">
         <table>
             <thead>
@@ -338,7 +384,7 @@
         </div>
     </div>
 
-    <div id="tab-cocina" class="tab-panel space-y-3" data-tab-panel>
+    <div id="tab-cocina" class="tab-panel @(vistaKey == "cocina" ? "is-active" : "") space-y-3" data-tab-panel>
         <div class="report-scroll">
         <table>
             <thead>

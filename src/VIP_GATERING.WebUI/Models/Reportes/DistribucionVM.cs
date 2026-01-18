@@ -34,6 +34,7 @@ public class DistribucionVM
 
     public class ResumenFilialRow
     {
+        public DateOnly Fecha { get; set; }
         public int FilialId { get; set; }
         public string Filial { get; set; } = string.Empty;
         public decimal Base { get; set; }

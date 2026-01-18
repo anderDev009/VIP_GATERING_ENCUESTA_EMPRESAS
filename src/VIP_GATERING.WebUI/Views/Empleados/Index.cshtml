@@ -73,6 +73,7 @@
                 <th class="text-left px-6">Empresa</th>
                 <th class="text-left px-6">Localizacion</th>
                 <th class="text-left px-6">Subsidiado</th>
+                <th class="text-left px-6">Subsidio</th>
                 <th class="px-6 text-right">Acciones</th>
             </tr>
         </thead>
@@ -108,6 +109,20 @@
                     {
                         <span class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600">No</span>
                     }
+                </td>
+                <td class="p-2 text-slate-600">
+                    @{
+                        var tipoSubsidio = e.SubsidioTipo
+                            ?? e.Sucursal?.SubsidioTipo
+                            ?? e.Sucursal?.Empresa?.SubsidioTipo
+                            ?? VIP_GATERING.Domain.Entities.SubsidioTipo.Porcentaje;
+                        var valorSubsidio = e.SubsidioValor
+                            ?? e.Sucursal?.SubsidioValor
+                            ?? e.Sucursal?.Empresa?.SubsidioValor
+                            ?? 0m;
+                        var tipoLabel = tipoSubsidio == VIP_GATERING.Domain.Entities.SubsidioTipo.MontoFijo ? "RD$" : "%";
+                    }
+                    @(e.EsSubsidiado ? $"{valorSubsidio:0.##} {tipoLabel}" : "N/A")
                 </td>
                 <td class="p-2 text-right">
                     <div class="flex flex-wrap justify-end gap-2">
