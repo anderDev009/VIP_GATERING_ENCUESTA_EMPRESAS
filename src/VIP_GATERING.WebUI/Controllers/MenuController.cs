@@ -462,6 +462,8 @@ public class MenuController : Controller
             .Include(s => s.Empresa)
             .Where(s => empresaFiltro == null || s.EmpresaId == empresaFiltro)
             .ToListAsync();
+        var empresasIds = await _db.Empresas.Select(e => e.Id).ToListAsync();
+        var empresasSet = empresasIds.ToHashSet();
         var sucursalesPorNombre = sucursales
             .GroupBy(s => NormalizeKey(s.Nombre))
             .ToDictionary(g => g.Key, g => g.ToList());
@@ -549,6 +551,12 @@ public class MenuController : Controller
             }
             if (localizacion == null && sucursal != null)
             {
+                if (!empresasSet.Contains(sucursal.EmpresaId))
+                {
+                    AddLimitedError(errores, $"Fila {rowNumber}: la filial '{sucursal.Nombre}' no tiene empresa valida.");
+                    seleccionesSaltadas++;
+                    continue;
+                }
                 localizacion = new Localizacion
                 {
                     Nombre = localidad,
@@ -647,10 +655,7 @@ public class MenuController : Controller
 
             if (!opcionesCache.TryGetValue(menu.Id, out var opcionesDia))
             {
-                var opcionesMenu = await _db.OpcionesMenu
-                    .Include(o => o.Horario)
-                    .Where(o => o.MenuId == menu.Id)
-                    .ToListAsync();
+                var opcionesMenu = await EnsureOpcionesAlmuerzoAsync(menu.Id, horarioAlmuerzo.Id);
                 opcionesDia = BuildOpcionesPorDia(opcionesMenu, horarioAlmuerzo.Id);
                 opcionesCache[menu.Id] = opcionesDia;
             }
@@ -680,6 +685,18 @@ public class MenuController : Controller
                     AddLimitedError(errores, $"Fila {rowNumber}: no existe menu para {dia}.");
                     seleccionesSaltadas++;
                     continue;
+                }
+
+                if (!SeleccionDisponible(opcionMenu, seleccion.Value))
+                {
+                    var fallback = GetFallbackSeleccion(opcionMenu);
+                    if (fallback == null)
+                    {
+                        AddLimitedError(errores, $"Fila {rowNumber}: no hay opciones disponibles para {dia}.");
+                        seleccionesSaltadas++;
+                        continue;
+                    }
+                    seleccion = fallback;
                 }
 
                 try
@@ -1126,6 +1143,140 @@ public class MenuController : Controller
             "e" => 'E',
             _ => null
         };
+    }
+
+    private static readonly DayOfWeek[] WorkingDays = new[]
+    {
+        DayOfWeek.Monday,
+        DayOfWeek.Tuesday,
+        DayOfWeek.Wednesday,
+        DayOfWeek.Thursday,
+        DayOfWeek.Friday
+    };
+
+    private async Task<List<OpcionMenu>> EnsureOpcionesAlmuerzoAsync(int menuId, int horarioId)
+    {
+        var opcionesMenu = await _db.OpcionesMenu
+            .Where(o => o.MenuId == menuId && o.HorarioId == horarioId)
+            .ToListAsync();
+
+        if (opcionesMenu.Count == 0)
+        {
+            foreach (var dia in WorkingDays)
+            {
+                _db.OpcionesMenu.Add(new OpcionMenu
+                {
+                    MenuId = menuId,
+                    DiaSemana = dia,
+                    HorarioId = horarioId,
+                    OpcionesMaximas = 3
+                });
+            }
+            await _db.SaveChangesAsync();
+
+            opcionesMenu = await _db.OpcionesMenu
+                .Where(o => o.MenuId == menuId && o.HorarioId == horarioId)
+                .ToListAsync();
+        }
+
+        var yaConfigurado = opcionesMenu.Any(o =>
+            o.OpcionIdA != null || o.OpcionIdB != null || o.OpcionIdC != null || o.OpcionIdD != null || o.OpcionIdE != null);
+        if (yaConfigurado)
+            return opcionesMenu;
+
+        var opciones = await GetOrCreateOpcionesParaHorarioAsync(horarioId);
+        if (opciones.Count == 0)
+            return opcionesMenu;
+
+        foreach (var opcionMenu in opcionesMenu)
+        {
+            opcionMenu.OpcionIdA = opciones.ElementAtOrDefault(0)?.Id;
+            opcionMenu.OpcionIdB = opciones.ElementAtOrDefault(1)?.Id;
+            opcionMenu.OpcionIdC = opciones.ElementAtOrDefault(2)?.Id;
+            opcionMenu.OpcionIdD = opciones.ElementAtOrDefault(3)?.Id;
+            opcionMenu.OpcionIdE = opciones.ElementAtOrDefault(4)?.Id;
+            opcionMenu.OpcionesMaximas = opciones.Count;
+        }
+
+        await _db.SaveChangesAsync();
+        return opcionesMenu;
+    }
+
+    private async Task<List<Opcion>> GetOrCreateOpcionesParaHorarioAsync(int horarioId)
+    {
+        var opcionIds = await _db.OpcionesHorarios
+            .Where(oh => oh.HorarioId == horarioId)
+            .Select(oh => oh.OpcionId)
+            .Distinct()
+            .ToListAsync();
+
+        var query = _db.Opciones.Where(o => !o.Borrado);
+        if (opcionIds.Count > 0)
+            query = query.Where(o => opcionIds.Contains(o.Id));
+
+        var opciones = await query.OrderBy(o => o.Nombre).Take(5).ToListAsync();
+        if (opciones.Count > 0)
+            return opciones;
+
+        var placeholders = new List<Opcion>();
+        for (var i = 1; i <= 5; i++)
+        {
+            var nombre = $"Opcion {i}";
+            var existente = await _db.Opciones.FirstOrDefaultAsync(o => o.Nombre == nombre);
+            if (existente == null)
+            {
+                existente = new Opcion
+                {
+                    Nombre = nombre,
+                    Descripcion = nombre,
+                    EsSubsidiado = true,
+                    LlevaItbis = true,
+                    Costo = 0m,
+                    Precio = 0m
+                };
+                _db.Opciones.Add(existente);
+                await _db.SaveChangesAsync();
+            }
+
+            var horarioExiste = await _db.OpcionesHorarios
+                .AnyAsync(oh => oh.OpcionId == existente.Id && oh.HorarioId == horarioId);
+            if (!horarioExiste)
+            {
+                _db.OpcionesHorarios.Add(new OpcionHorario
+                {
+                    OpcionId = existente.Id,
+                    HorarioId = horarioId
+                });
+                await _db.SaveChangesAsync();
+            }
+
+            placeholders.Add(existente);
+        }
+
+        return placeholders;
+    }
+
+    private static bool SeleccionDisponible(OpcionMenu opcionMenu, char seleccion)
+    {
+        return seleccion switch
+        {
+            'A' => opcionMenu.OpcionIdA != null || opcionMenu.OpcionA != null,
+            'B' => opcionMenu.OpcionIdB != null || opcionMenu.OpcionB != null,
+            'C' => opcionMenu.OpcionIdC != null || opcionMenu.OpcionC != null,
+            'D' => opcionMenu.OpcionIdD != null || opcionMenu.OpcionD != null,
+            'E' => opcionMenu.OpcionIdE != null || opcionMenu.OpcionE != null,
+            _ => false
+        };
+    }
+
+    private static char? GetFallbackSeleccion(OpcionMenu opcionMenu)
+    {
+        if (opcionMenu.OpcionIdA != null || opcionMenu.OpcionA != null) return 'A';
+        if (opcionMenu.OpcionIdB != null || opcionMenu.OpcionB != null) return 'B';
+        if (opcionMenu.OpcionIdC != null || opcionMenu.OpcionC != null) return 'C';
+        if (opcionMenu.OpcionIdD != null || opcionMenu.OpcionD != null) return 'D';
+        if (opcionMenu.OpcionIdE != null || opcionMenu.OpcionE != null) return 'E';
+        return null;
     }
 
     private async Task<(bool Created, string? Error)> EnsureIdentityUserAsync(Empleado empleado, string codigo, string codigoUni, string contrasena)

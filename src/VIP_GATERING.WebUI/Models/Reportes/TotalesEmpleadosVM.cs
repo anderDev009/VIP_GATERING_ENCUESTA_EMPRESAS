@@ -21,7 +21,8 @@ public class TotalesEmpleadosVM
     public decimal TotalCosto => Filas.Sum(f => f.TotalCosto);
     public decimal TotalPrecio => Filas.Sum(f => f.TotalPrecio);
     public decimal TotalBeneficio => Filas.Sum(f => f.TotalBeneficio);
-    public decimal TotalGeneral => TotalCosto; // Legacy alias
+    public decimal TotalItbis => Filas.Sum(f => f.TotalItbis);
+    public decimal TotalGeneral => TotalCosto + TotalItbis;
 
     public class Row
     {
@@ -29,6 +30,7 @@ public class TotalesEmpleadosVM
         public string Empleado { get; set; } = string.Empty;
         public int Cantidad { get; set; }
         public decimal TotalCosto { get; set; }
+        public decimal TotalItbis { get; set; }
         public decimal TotalPrecio { get; set; }
         public decimal TotalBeneficio => TotalCosto - TotalPrecio;
     }

@@ -52,6 +52,8 @@
         <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3">
             <div class="text-sm text-slate-600">Total costo</div>
             <div class="text-lg font-semibold">@Model.TotalCosto.ToString("C")</div>
+            <div class="text-sm text-slate-600">ITBIS</div>
+            <div class="text-lg font-semibold">@Model.TotalItbis.ToString("C")</div>
             <div class="text-xs text-slate-500">@Model.TotalSelecciones selecciones</div>
             @if (isAdmin)
             {
@@ -74,6 +76,7 @@
         <th>Empleado</th>
         <th class="text-right">Selecciones</th>
         <th class="text-right">Costo empresa</th>
+        <th class="text-right">ITBIS</th>
         @if (isAdmin)
         {
             <th class="text-right">Consumo</th>
@@ -88,6 +91,7 @@
             <td>@r.Empleado</td>
             <td class="text-right">@r.Cantidad</td>
             <td class="text-right">@r.TotalCosto.ToString("C")</td>
+            <td class="text-right">@r.TotalItbis.ToString("C")</td>
             @if (isAdmin)
             {
                 <td class="text-right">@r.TotalPrecio.ToString("C")</td>
@@ -101,6 +105,7 @@
         <th>Total</th>
         <th class="text-right">@Model.TotalSelecciones</th>
         <th class="text-right">@Model.TotalCosto.ToString("C")</th>
+        <th class="text-right">@Model.TotalItbis.ToString("C")</th>
         @if (isAdmin)
         {
             <th class="text-right">@Model.TotalPrecio.ToString("C")</th>

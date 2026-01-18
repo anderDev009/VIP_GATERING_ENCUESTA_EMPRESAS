@@ -98,19 +98,7 @@
                     </div>
                 }
 
-                @if (User.IsInRole("Admin"))
-                {
-                    <div class="nav-dropdown">
-                        <button type="button" class="btn-primary nav-dropdown__trigger">
-                            Facturacion
-                            <span class="nav-dropdown__chevron" aria-hidden="true">&#9662;</span>
-                        </button>
-                        <div class="nav-dropdown__menu">
-                            <a asp-controller="Reportes" asp-action="FacturacionMantenimiento" class="nav-dropdown__item">Mantenimiento</a>
-                            <a asp-controller="Reportes" asp-action="FacturasHistorico" class="nav-dropdown__item">Historico</a>
-                        </div>
-                    </div>
-                }
+                @* Facturacion oculto temporalmente por issues en el modulo *@
 
                 @if (User.Identity?.IsAuthenticated == true)
                 {

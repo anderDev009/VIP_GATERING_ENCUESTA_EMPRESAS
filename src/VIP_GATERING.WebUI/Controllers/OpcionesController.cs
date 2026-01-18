@@ -329,7 +329,7 @@ public class OpcionesController : Controller
             ent.ImagenUrl = await _imageService.SaveAsync(imagen, ent.ImagenUrl);
         }
         ent.Codigo = model.Codigo; ent.Nombre = model.Nombre; ent.Descripcion = model.Descripcion; ent.Costo = model.Costo;
-        ent.Precio = model.Precio; ent.EsSubsidiado = true; ent.LlevaItbis = true;
+        ent.Precio = model.Precio; ent.EsSubsidiado = true; ent.LlevaItbis = true; ent.EsAdicional = model.EsAdicional;
 
         var actuales = await _db.OpcionesHorarios.Where(oh => oh.OpcionId == ent.Id).ToListAsync();
         var actualesSet = actuales.Select(oh => oh.HorarioId).ToHashSet();
@@ -513,16 +513,22 @@ public class OpcionesController : Controller
 
     private static Opcion? FindProducto(Dictionary<string, Opcion> porCodigo, Dictionary<string, Opcion> porNombre, string codigo, string nombre)
     {
+        var nombreKey = !string.IsNullOrWhiteSpace(nombre) ? NormalizeKey(nombre) : null;
         if (!string.IsNullOrWhiteSpace(codigo))
         {
             var key = NormalizeKey(codigo);
             if (porCodigo.TryGetValue(key, out var encontrado))
-                return encontrado;
+            {
+                if (nombreKey == null)
+                    return encontrado;
+                var encontradoNombre = !string.IsNullOrWhiteSpace(encontrado.Nombre) ? NormalizeKey(encontrado.Nombre) : null;
+                if (encontradoNombre == nombreKey)
+                    return encontrado;
+            }
         }
-        if (!string.IsNullOrWhiteSpace(nombre))
+        if (nombreKey != null)
         {
-            var key = NormalizeKey(nombre);
-            if (porNombre.TryGetValue(key, out var encontrado))
+            if (porNombre.TryGetValue(nombreKey, out var encontrado))
                 return encontrado;
         }
         return null;

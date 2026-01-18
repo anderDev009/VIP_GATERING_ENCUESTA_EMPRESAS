@@ -3,7 +3,7 @@
     ViewData["Title"] = "Editar plato";
     var horarios = ViewBag.Horarios as List<VIP_GATERING.Domain.Entities.Horario> ?? new();
     var seleccionados = ViewBag.HorarioIds as List<int> ?? new();
-    var esAdicional = (bool?)(ViewBag.EsAdicional) ?? false;
+    var esAdicional = Model.EsAdicional;
     var tipoEtiqueta = esAdicional ? "Adicional (100% empleado)" : "Plato principal";
 }
 <h1 class="text-2xl font-semibold mb-4 max-w-lg mx-auto">Editar plato</h1>
@@ -63,6 +63,10 @@
     <label class="flex items-center gap-2 text-sm text-slate-700">
         <input asp-for="LlevaItbis" type="checkbox" class="border rounded" />
         ITBIS incluido
+    </label>
+    <label class="flex items-center gap-2 text-sm text-slate-700">
+        <input asp-for="EsAdicional" type="checkbox" class="border rounded" />
+        Es adicional
     </label>
     <div>
         <label class="block text-sm">Imagen</label>

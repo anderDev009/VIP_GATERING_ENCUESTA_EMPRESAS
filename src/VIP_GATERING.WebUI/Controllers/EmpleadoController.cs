@@ -12,23 +12,6 @@ namespace VIP_GATERING.WebUI.Controllers;
 [Authorize(Roles = "Empleado")]
 public class EmpleadoController : Controller
 {
-    private static readonly HashSet<string> LocalizacionesGrupoUniversalPermitidas = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "UNIT SA",
-        "AUTONOVO SERVICIOS AUTONOVO, SERVICIOS AUTORIZADOS",
-        "UNIVERSAL ASISTENCIA",
-        "ARS UNIVERSAL (EZALIA)",
-        "SUPLIDORA PROPARTES (30 DE MAYO)",
-        "UNIVERSAL TORRE HABITAT (HABITAT CENTER)",
-        "SEGURIDAD PROPARTE",
-        "SEGURIDAD AUTONOVO",
-        "SEGURIDAD DE TORRE",
-        "SEGURIDAD LOPE",
-        "SEGURIDAD KM",
-        "SEGURIDAD ZONA",
-        "KM",
-        "UNIVERSAL LINCONL (Lincoln 57 Mil)"
-    };
     private readonly IMenuService _menuService;
     private readonly AppDbContext _db;
     private readonly ICurrentUserService _current;
@@ -139,13 +122,10 @@ public class EmpleadoController : Controller
                 };
             })
             .ToList();
-
-        if (string.Equals(sucursalDependencia.EmpresaNombre, "GRUPO UNIVERSAL", StringComparison.OrdinalIgnoreCase))
-        {
-            localizacionesEntregaInfo = localizacionesEntregaInfo
-                .Where(l => LocalizacionesGrupoUniversalPermitidas.Contains(l.Nombre.Trim()))
-                .ToList();
-        }
+        localizacionesEntregaInfo = localizacionesEntregaInfo
+            .GroupBy(l => l.Id)
+            .Select(g => g.First())
+            .ToList();
 
         var localizacionesEntregaDisponibles = localizacionesEntregaInfo
             .OrderBy(l => l.Etiqueta)
@@ -335,6 +315,8 @@ public class EmpleadoController : Controller
             .OrderBy(h => h.HorarioNombre)
             .ToList();
 
+        const decimal itbisRate = 0.18m;
+
         // Adicionales fijos del menu (se cobran 100%)
         var adicionales = await _db.MenusAdicionales
             .AsNoTracking()
@@ -344,7 +326,9 @@ public class EmpleadoController : Controller
             {
                 Id = a.OpcionId,
                 Nombre = a.Opcion != null ? a.Opcion.Nombre : "Sin definir",
-                Precio = a.Opcion != null ? (a.Opcion.Precio ?? a.Opcion.Costo) : 0m
+                Precio = a.Opcion != null
+                    ? Math.Round((a.Opcion.Precio ?? a.Opcion.Costo) + ((a.Opcion.LlevaItbis ? (a.Opcion.Precio ?? a.Opcion.Costo) * itbisRate : 0m)), 2)
+                    : 0m
             })
             .OrderBy(a => a.Nombre)
             .ToListAsync();
@@ -387,12 +371,24 @@ public class EmpleadoController : Controller
             return _subsidios.CalcularPrecioEmpleado(basePrecio, ctx).PrecioEmpleado;
         }
 
+        decimal? CalcularPrecioEmpleadoConItbis(Opcion? opcion)
+        {
+            if (opcion == null) return null;
+            var basePrecio = opcion.Precio ?? opcion.Costo;
+            if (basePrecio <= 0) return 0m;
+            var precioEmpleado = CalcularPrecioEmpleado(opcion) ?? basePrecio;
+            var itbis = opcion.LlevaItbis ? Math.Round(basePrecio * itbisRate, 2) : 0m;
+            var total = basePrecio + itbis;
+            var ratio = basePrecio > 0 ? Math.Clamp(precioEmpleado / basePrecio, 0m, 1m) : 1m;
+            return Math.Round(total * ratio, 2);
+        }
+
         var totalEmpleado = 0m;
         foreach (var resp in respuestas)
         {
             var om = opciones.FirstOrDefault(x => x.Id == resp.OpcionMenuId);
             var opcion = GetOpcionSeleccionada(om, resp.Seleccion);
-            var precio = CalcularPrecioEmpleado(opcion);
+            var precio = CalcularPrecioEmpleadoConItbis(opcion);
             if (precio != null)
                 totalEmpleado += precio.Value;
 
@@ -456,11 +452,11 @@ public class EmpleadoController : Controller
                     ImagenC = o.OpcionC?.ImagenUrl,
                     ImagenD = o.OpcionD?.ImagenUrl,
                     ImagenE = o.OpcionE?.ImagenUrl,
-                    PrecioEmpleadoA = CalcularPrecioEmpleado(o.OpcionA),
-                    PrecioEmpleadoB = CalcularPrecioEmpleado(o.OpcionB),
-                    PrecioEmpleadoC = CalcularPrecioEmpleado(o.OpcionC),
-                    PrecioEmpleadoD = CalcularPrecioEmpleado(o.OpcionD),
-                    PrecioEmpleadoE = CalcularPrecioEmpleado(o.OpcionE),
+                    PrecioEmpleadoA = CalcularPrecioEmpleadoConItbis(o.OpcionA),
+                    PrecioEmpleadoB = CalcularPrecioEmpleadoConItbis(o.OpcionB),
+                    PrecioEmpleadoC = CalcularPrecioEmpleadoConItbis(o.OpcionC),
+                    PrecioEmpleadoD = CalcularPrecioEmpleadoConItbis(o.OpcionD),
+                    PrecioEmpleadoE = CalcularPrecioEmpleadoConItbis(o.OpcionE),
                     OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas,
                     Seleccion = respuestasPorOpcion.TryGetValue(o.Id, out var resp) ? resp.Seleccion : null,
                     AdicionalOpcionId = respuestasPorOpcion.TryGetValue(o.Id, out var resp2) ? resp2.AdicionalOpcionId : null,

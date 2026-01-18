@@ -6,6 +6,7 @@ using System.Globalization;
 using VIP_GATERING.Application.Services;
 using VIP_GATERING.Domain.Entities;
 using VIP_GATERING.Infrastructure.Data;
+using VIP_GATERING.Infrastructure.Identity;
 using VIP_GATERING.WebUI.Models;
 using VIP_GATERING.WebUI.Models.Reportes;
 using VIP_GATERING.WebUI.Services;
@@ -348,7 +349,8 @@ public class ReportesController : Controller
                 && ObtenerFechaDiaSemana(r.OpcionMenu.Menu.FechaInicio, r.OpcionMenu.DiaSemana) <= hoy)
             .ToList();
 
-        var rowsRaw = new List<(int EmpleadoId, string EmpleadoNombre, decimal Costo, decimal Precio)>();
+        const decimal itbisRate = 0.18m;
+        var rowsRaw = new List<(int EmpleadoId, string EmpleadoNombre, decimal Costo, decimal Itbis, decimal Precio)>();
         foreach (var r in respuestas)
         {
             if (r.OpcionMenu == null || r.Empleado == null) continue;
@@ -362,14 +364,16 @@ public class ReportesController : Controller
             {
                 var ctx = BuildSubsidioContext(opcion.EsSubsidiado, r.Empleado, sucEmpleado, empresaEmpleado);
                 var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
-                rowsRaw.Add((r.Empleado.Id, empleadoNombre, opcion.Costo, precio));
+                var itbis = opcion.LlevaItbis ? Math.Round(opcion.Costo * itbisRate, 2) : 0m;
+                rowsRaw.Add((r.Empleado.Id, empleadoNombre, opcion.Costo, itbis, precio));
             }
 
             if (r.AdicionalOpcionId != null && r.AdicionalOpcion != null)
             {
                 var adicional = r.AdicionalOpcion;
                 var precio = adicional.Precio ?? adicional.Costo;
-                rowsRaw.Add((r.Empleado.Id, empleadoNombre, adicional.Costo, precio));
+                var itbis = adicional.LlevaItbis ? Math.Round(adicional.Costo * itbisRate, 2) : 0m;
+                rowsRaw.Add((r.Empleado.Id, empleadoNombre, adicional.Costo, itbis, precio));
             }
         }
 
@@ -381,6 +385,7 @@ public class ReportesController : Controller
                 Empleado = g.Key.EmpleadoNombre,
                 Cantidad = g.Count(),
                 TotalCosto = g.Sum(i => i.Costo),
+                TotalItbis = g.Sum(i => i.Itbis),
                 TotalPrecio = g.Sum(i => i.Precio)
             })
             .OrderBy(r => r.Empleado)
@@ -410,14 +415,50 @@ public class ReportesController : Controller
         data.Vm.AccionGenerar = nameof(CierreNominaGenerar);
         data.Vm.AccionLabel = "Cerrar nomina";
         data.Vm.TipoExport = "cierre-nomina";
-        if (empresaId != null && sucursalId != null)
-        {
-            var (inicio, fin) = ResolveRango(desde, hasta);
-            var respuestas = await BuildCierreBaseAsync(inicio, fin, empresaId.Value, sucursalId.Value);
-            data.Vm.EstaCerrado = respuestas.Any(r => r.CierreNomina);
-        }
-        data.Vm.EstadoProceso = data.Vm.EstaCerrado ? "Cerrado" : "Abierto";
+        data.Vm.EstaCerrado = false;
+        data.Vm.EstadoProceso = data.Items.Count == 0 ? "Sin pendientes" : "Abierto";
         return View(data.Vm);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CierreNominaGuardar(int? empresaId = null, int? sucursalId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    {
+        if (empresaId == null || sucursalId == null)
+        {
+            TempData["ExportMessage"] = "Debe seleccionar empresa y filial para guardar la nomina.";
+            return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        var (inicio, fin) = ResolveRango(desde, hasta);
+        var respuestas = await BuildCierreBaseAsync(inicio, fin, empresaId.Value, sucursalId.Value);
+        if (respuestas.Count == 0)
+        {
+            TempData["Success"] = null;
+            TempData["ExportMessage"] = "No hay registros para guardar la nomina.";
+            return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
+        }
+
+        var usuarioProceso = User.Identity?.Name ?? "Sistema";
+        var abiertas = respuestas.Where(r => !r.CierreNomina).ToList();
+        if (abiertas.Count == 0)
+        {
+            TempData["Success"] = null;
+            TempData["ExportMessage"] = "Nomina sin pendientes.";
+            return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
+        }
+        foreach (var r in abiertas)
+        {
+            if (string.IsNullOrWhiteSpace(r.UsuarioCierreNomina))
+                r.UsuarioCierreNomina = usuarioProceso;
+            if (r.CierreNomina)
+                r.FechaCierreNomina = r.FechaCierreNomina ?? DateTime.UtcNow;
+        }
+        await _db.SaveChangesAsync();
+
+        TempData["Success"] = "Nomina guardada correctamente.";
+        return RedirectToAction(nameof(NominasMantenimiento));
     }
 
     [Authorize(Roles = "Admin")]
@@ -441,7 +482,7 @@ public class ReportesController : Controller
         var usuarioProceso = User.Identity?.Name ?? "Sistema";
         var timestamp = DateTime.UtcNow;
         EnsureSnapshots(data.Respuestas);
-        foreach (var r in data.Respuestas)
+        foreach (var r in data.Respuestas.Where(r => !r.CierreNomina))
         {
             r.CierreNomina = true;
             r.FechaCierreNomina = timestamp;
@@ -449,7 +490,7 @@ public class ReportesController : Controller
         }
         await _db.SaveChangesAsync();
         TempData["Success"] = "Nomina creada correctamente.";
-        return RedirectToAction(nameof(CierreNomina), new { empresaId, sucursalId, desde, hasta });
+        return RedirectToAction(nameof(Nominas), new { empresaId, sucursalId, desde, hasta });
     }
 
     [Authorize(Roles = "Admin")]
@@ -483,7 +524,7 @@ public class ReportesController : Controller
         }
 
         var (inicio, fin) = ResolveRango(desde, hasta);
-        var count = await ClearCierreAsync(false, empresaId.Value, sucursalId.Value, inicio, fin);
+        var count = await ClearCierreAsync(false, empresaId.Value, sucursalId.Value, inicio, fin, clearUsuarioNomina: false);
         if (count == 0)
         {
             TempData["ExportMessage"] = "No hay nominas cerradas para reabrir.";
@@ -546,7 +587,7 @@ public class ReportesController : Controller
         }
         await _db.SaveChangesAsync();
         TempData["Success"] = "Facturacion creada correctamente.";
-        return RedirectToAction(nameof(Facturacion), new { empresaId, sucursalId, desde, hasta });
+        return RedirectToAction(nameof(Facturas), new { empresaId, sucursalId, desde, hasta });
     }
 
     [Authorize(Roles = "Admin")]
@@ -567,7 +608,7 @@ public class ReportesController : Controller
     [HttpGet]
     public async Task<IActionResult> FacturacionMantenimiento(int page = 1, int pageSize = 20)
     {
-        var vm = await BuildCierreListadoAsync(true, false, page, pageSize);
+        var vm = await BuildCierreListadoAsync(true, true, page, pageSize);
         vm.Titulo = "Facturacion";
         vm.MostrarCrear = true;
         vm.AccionCrear = nameof(Facturacion);
@@ -604,8 +645,15 @@ public class ReportesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EliminarNomina(int empresaId, int sucursalId, DateOnly desde, DateOnly hasta, int page = 1, int pageSize = 20)
     {
-        var count = await ClearCierreAsync(false, empresaId, sucursalId, desde, hasta);
-        TempData["Success"] = count > 0 ? "Nomina eliminada correctamente." : "No hay nominas cerradas para eliminar.";
+        var count = await ClearCierreAsync(false, empresaId, sucursalId, desde, hasta, clearUsuarioNomina: true);
+        if (count > 0)
+        {
+            TempData["Success"] = "Nomina eliminada correctamente.";
+            return RedirectToAction(nameof(NominasMantenimiento), new { page, pageSize });
+        }
+
+        var abiertas = await ClearNominaCreadaAsync(empresaId, sucursalId, desde, hasta);
+        TempData["Success"] = abiertas > 0 ? "Nomina eliminada correctamente." : "No hay nominas para eliminar.";
         return RedirectToAction(nameof(NominasMantenimiento), new { page, pageSize });
     }
 
@@ -1011,7 +1059,7 @@ public class ReportesController : Controller
         if (sucursalId == null)
         {
             localizaciones = localizacionesRaw
-                .GroupBy(l => l.Nombre, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(l => NormalizeLocalizacionKey(l.Nombre))
                 .Select(g => g.OrderBy(x => x.Id).First())
                 .OrderBy(l => l.Nombre)
                 .ToList();
@@ -1019,7 +1067,7 @@ public class ReportesController : Controller
         else
         {
             localizaciones = localizacionesRaw
-                .GroupBy(l => (l.EmpresaId, l.SucursalId, l.Nombre))
+                .GroupBy(l => (l.EmpresaId, l.SucursalId, Key: NormalizeLocalizacionKey(l.Nombre)))
                 .Select(g => g.OrderBy(x => x.Id).First())
                 .OrderBy(l => l.Nombre)
                 .ToList();
@@ -1286,7 +1334,7 @@ public class ReportesController : Controller
         var vm = (TotalesEmpleadosVM)result!.Model!;
         var isAdmin = User.IsInRole("Admin");
 
-        var headers = new List<string> { "Empleado", "Selecciones", "Costo" };
+        var headers = new List<string> { "Empleado", "Selecciones", "Costo", "ITBIS" };
         if (isAdmin)
         {
             headers.Add("Consumo");
@@ -1299,7 +1347,8 @@ public class ReportesController : Controller
             {
                 r.Empleado,
                 r.Cantidad.ToString(),
-                r.TotalCosto.ToString("C")
+                r.TotalCosto.ToString("C"),
+                r.TotalItbis.ToString("C")
             };
             if (isAdmin)
             {
@@ -1321,7 +1370,7 @@ public class ReportesController : Controller
         var vm = (TotalesEmpleadosVM)result!.Model!;
         var isAdmin = User.IsInRole("Admin");
 
-        var headers = new List<string> { "Empleado", "Selecciones", "Costo" };
+        var headers = new List<string> { "Empleado", "Selecciones", "Costo", "ITBIS" };
         if (isAdmin)
         {
             headers.Add("Consumo");
@@ -1334,7 +1383,8 @@ public class ReportesController : Controller
             {
                 r.Empleado,
                 r.Cantidad.ToString(),
-                r.TotalCosto.ToString("C")
+                r.TotalCosto.ToString("C"),
+                r.TotalItbis.ToString("C")
             };
             if (isAdmin)
             {
@@ -1370,6 +1420,7 @@ public class ReportesController : Controller
                         c.RelativeColumn(6);
                         c.RelativeColumn(2);
                         c.RelativeColumn(2);
+                        c.RelativeColumn(2);
                         if (isAdmin)
                         {
                             c.RelativeColumn(2);
@@ -1381,6 +1432,7 @@ public class ReportesController : Controller
                         h.Cell().Text("Empleado").SemiBold();
                         h.Cell().AlignRight().Text("Selecciones").SemiBold();
                         h.Cell().AlignRight().Text("Costo").SemiBold();
+                        h.Cell().AlignRight().Text("ITBIS").SemiBold();
                         if (isAdmin)
                         {
                             h.Cell().AlignRight().Text("Consumo").SemiBold();
@@ -1392,6 +1444,7 @@ public class ReportesController : Controller
                         t.Cell().Text(r.Empleado);
                         t.Cell().AlignRight().Text(r.Cantidad.ToString());
                         t.Cell().AlignRight().Text(r.TotalCosto.ToString("C"));
+                        t.Cell().AlignRight().Text(r.TotalItbis.ToString("C"));
                         if (isAdmin)
                         {
                             t.Cell().AlignRight().Text(r.TotalPrecio.ToString("C"));
@@ -1401,6 +1454,7 @@ public class ReportesController : Controller
                     t.Cell().Text("Total").SemiBold();
                     t.Cell().AlignRight().Text(vm.Filas.Sum(x => x.Cantidad).ToString()).SemiBold();
                     t.Cell().AlignRight().Text(vm.TotalCosto.ToString("C")).SemiBold();
+                    t.Cell().AlignRight().Text(vm.TotalItbis.ToString("C")).SemiBold();
                     if (isAdmin)
                     {
                         t.Cell().AlignRight().Text(vm.TotalPrecio.ToString("C")).SemiBold();
@@ -2199,6 +2253,14 @@ private IQueryable<RespuestaFormulario> AplicarFiltrosEmpresaSucursales(IQueryab
                 .ToListAsync();
             if (ids.Count == 0)
             {
+                ids = await _db.SucursalesHorariosSlots
+                    .Where(sh => sh.SucursalId == sucursalId)
+                    .Select(sh => sh.HorarioId)
+                    .Distinct()
+                    .ToListAsync();
+            }
+            if (ids.Count == 0)
+            {
                 return await _db.Horarios
                     .Where(h => h.Activo)
                     .OrderBy(h => h.Orden)
@@ -2220,6 +2282,15 @@ private IQueryable<RespuestaFormulario> AplicarFiltrosEmpresaSucursales(IQueryab
                 .Select(sh => sh.HorarioId)
                 .Distinct()
                 .ToListAsync();
+            if (ids.Count == 0)
+            {
+                ids = await _db.SucursalesHorariosSlots
+                    .Include(sh => sh.Sucursal)
+                    .Where(sh => sh.Sucursal != null && sh.Sucursal.EmpresaId == empresaId)
+                    .Select(sh => sh.HorarioId)
+                    .Distinct()
+                    .ToListAsync();
+            }
             if (ids.Count == 0)
             {
                 return await _db.Horarios
@@ -2435,7 +2506,7 @@ private async Task<List<RespuestaFormulario>> BuildCierreBaseAsync(DateOnly inic
         .ToList();
 }
 
-private async Task<int> ClearCierreAsync(bool esFacturacion, int empresaId, int sucursalId, DateOnly inicio, DateOnly fin)
+private async Task<int> ClearCierreAsync(bool esFacturacion, int empresaId, int sucursalId, DateOnly inicio, DateOnly fin, bool clearUsuarioNomina = true)
 {
     var respuestas = await BuildCierreBaseAsync(inicio, fin, empresaId, sucursalId);
     if (esFacturacion)
@@ -2457,7 +2528,8 @@ private async Task<int> ClearCierreAsync(bool esFacturacion, int empresaId, int 
         {
             r.CierreNomina = false;
             r.FechaCierreNomina = null;
-            r.UsuarioCierreNomina = null;
+            if (clearUsuarioNomina)
+                r.UsuarioCierreNomina = null;
             r.Facturado = false;
             r.FechaFacturado = null;
             r.UsuarioFacturacion = null;
@@ -2465,6 +2537,21 @@ private async Task<int> ClearCierreAsync(bool esFacturacion, int empresaId, int 
     }
     await _db.SaveChangesAsync();
     return respuestas.Count;
+}
+
+private async Task<int> ClearNominaCreadaAsync(int empresaId, int sucursalId, DateOnly inicio, DateOnly fin)
+{
+    var respuestas = await BuildCierreBaseAsync(inicio, fin, empresaId, sucursalId);
+    var abiertas = respuestas.Where(r => !r.CierreNomina && !string.IsNullOrWhiteSpace(r.UsuarioCierreNomina)).ToList();
+    if (abiertas.Count == 0) return 0;
+
+    foreach (var r in abiertas)
+    {
+        r.UsuarioCierreNomina = null;
+        r.FechaCierreNomina = null;
+    }
+    await _db.SaveChangesAsync();
+    return abiertas.Count;
 }
 
 private async Task<CierreFacturacionData> BuildCierreFacturacionAsync(int? empresaId, int? sucursalId, DateOnly? desde, DateOnly? hasta, bool esFacturacion)
@@ -2557,10 +2644,10 @@ private async Task<CierreFacturacionData> BuildCierreFacturacionAsync(int? empre
         baseQuery = baseQuery.Where(r =>
             (r.SucursalEntrega != null && r.SucursalEntrega.Id == sucursalId) ||
             (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.SucursalId == sucursalId));
-    if (!esFacturacion)
-        baseQuery = baseQuery.Where(r => !r.CierreNomina);
-    else
+    if (esFacturacion)
         baseQuery = baseQuery.Where(r => r.CierreNomina && !r.Facturado);
+    else
+        baseQuery = baseQuery.Where(r => !r.CierreNomina);
 
     var respuestas = await baseQuery.ToListAsync();
     respuestas = respuestas
@@ -2716,7 +2803,7 @@ private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows)
         "Opcion",
         "Seleccion",
         "Precio base",
-        "ITBIS total",
+        "ITBIS",
         "Total",
         "Empresa paga",
         "ITBIS empresa",
@@ -2911,6 +2998,34 @@ private async Task<CierreFacturacionDetalleVM> BuildCierreFacturacionDetalleAsyn
         .ThenBy(r => r.Fecha)
         .ToList();
 
+    DateTime? cierreUtc = null;
+    if (respuestas.Count > 0)
+    {
+        cierreUtc = facturado
+            ? respuestas.Select(r => r.FechaFacturado).Where(d => d.HasValue).Max()
+            : respuestas.Select(r => r.FechaCierreNomina).Where(d => d.HasValue).Max();
+    }
+    var puedeReabrir = cierreUtc != null && DateTime.UtcNow - cierreUtc.Value <= TimeSpan.FromMinutes(30);
+    if (!facturado && empresaId != null && sucursalId != null)
+    {
+        var tieneCierrePosterior = await _db.RespuestasFormulario
+            .Include(r => r.OpcionMenu).ThenInclude(om => om!.Menu)
+            .Where(r => r.CierreNomina
+                && r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio > fin)
+            .Where(r =>
+                (r.SucursalEntrega != null && r.SucursalEntrega.EmpresaId == empresaId) ||
+                (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.Sucursal != null && r.Empleado.Sucursal.EmpresaId == empresaId))
+            .Where(r =>
+                (r.SucursalEntrega != null && r.SucursalEntrega.Id == sucursalId) ||
+                (r.SucursalEntrega == null && r.Empleado != null && r.Empleado.SucursalId == sucursalId))
+            .AnyAsync();
+
+        if (tieneCierrePosterior)
+            puedeReabrir = false;
+    }
+
     return new CierreFacturacionDetalleVM
     {
         Inicio = inicio,
@@ -2919,7 +3034,9 @@ private async Task<CierreFacturacionDetalleVM> BuildCierreFacturacionDetalleAsyn
         SucursalId = sucursalId,
         Empresas = empresas,
         Sucursales = sucursales,
-        Filas = rows
+        Filas = rows,
+        FechaCierreUtc = cierreUtc,
+        PuedeReabrir = puedeReabrir
     };
 }
 
@@ -2936,6 +3053,10 @@ private async Task<CierreListadoVM> BuildCierreListadoAsync(bool esFacturacion, 
 
     if (esFacturacion)
         baseQuery = baseQuery.Where(r => r.CierreNomina);
+    else
+        baseQuery = baseQuery.Where(r => r.CierreNomina || r.UsuarioCierreNomina != null);
+    if (soloCerrados)
+        baseQuery = baseQuery.Where(r => esFacturacion ? r.Facturado : r.CierreNomina);
 
     var respuestas = await baseQuery.ToListAsync();
     var rows = respuestas
@@ -3209,7 +3330,20 @@ private async Task<List<Localizacion>> BuildLocalizacionesFiltroAsync(int? empre
         query = query.Where(l => l.EmpresaId == empresaId);
     if (sucursalId != null)
         query = query.Where(l => l.SucursalId == sucursalId);
-    return await query.OrderBy(l => l.Nombre).ToListAsync();
+    var items = await query.OrderBy(l => l.Nombre).ToListAsync();
+    if (sucursalId == null)
+    {
+        return items
+            .GroupBy(l => NormalizeLocalizacionKey(l.Nombre))
+            .Select(g => g.OrderBy(x => x.Id).First())
+            .OrderBy(l => l.Nombre)
+            .ToList();
+    }
+    return items
+        .GroupBy(l => (l.EmpresaId, l.SucursalId, Key: NormalizeLocalizacionKey(l.Nombre)))
+        .Select(g => g.OrderBy(x => x.Id).First())
+        .OrderBy(l => l.Nombre)
+        .ToList();
 }
 
 private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, int? localizacionId, int? empleadoId, string? tipo, string? estado, IReadOnlyList<Localizacion> localizaciones)
@@ -3270,16 +3404,14 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
         .Select(r => r.SucursalEntregaId)
         .Distinct()
         .ToList();
-    var horarioIds = respuestas
-        .Where(r => r.OpcionMenu?.HorarioId != null)
-        .Select(r => r.OpcionMenu!.HorarioId!.Value)
+    var empleadoIds = respuestas
+        .Select(r => r.EmpleadoId)
         .Distinct()
         .ToList();
-    var horarioTimes = await _db.SucursalesHorarios
-        .Where(sh => sucursalIds.Contains(sh.SucursalId) && horarioIds.Contains(sh.HorarioId))
-        .ToDictionaryAsync(
-            sh => (sh.SucursalId, sh.HorarioId),
-            sh => (Inicio: sh.HoraInicio?.ToString("HH:mm"), Fin: sh.HoraFin?.ToString("HH:mm")));
+    var usuariosEmpleado = await _db.Set<ApplicationUser>()
+        .Where(u => u.EmpleadoId != null && empleadoIds.Contains(u.EmpleadoId.Value))
+        .Select(u => new { u.EmpleadoId, u.UserName })
+        .ToDictionaryAsync(u => u.EmpleadoId!.Value, u => u.UserName ?? string.Empty);
 
     var culture = CultureInfo.CurrentCulture;
     var rows = new List<ReporteMaestroVM.Row>();
@@ -3295,17 +3427,9 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
         var localizacion = r.LocalizacionEntrega?.Nombre ?? "Sin asignar";
         var empleadoNombre = GetEmpleadoDisplayName(r.Empleado);
         var empleadoCodigo = r.Empleado.Codigo ?? string.Empty;
+        var usuarioEmpleado = usuariosEmpleado.TryGetValue(r.Empleado.Id, out var username) ? username : string.Empty;
         var horarioNombre = r.OpcionMenu.Horario?.Nombre ?? "Sin horario";
-        var horarioKey = r.OpcionMenu.HorarioId.HasValue ? (sucEntrega.Id, r.OpcionMenu.HorarioId.Value) : (0, 0);
-        var horarioInicio = string.Empty;
-        var horarioFin = string.Empty;
-        if (horarioKey != (0, 0) && horarioTimes.TryGetValue(horarioKey, out var rango))
-        {
-            horarioInicio = rango.Inicio ?? string.Empty;
-            horarioFin = rango.Fin ?? string.Empty;
-        }
-
-        var periodo = $"Semana {r.OpcionMenu.Menu!.FechaInicio:yyyy-MM-dd} a {r.OpcionMenu.Menu!.FechaTermino:yyyy-MM-dd}";
+        var horaAlmuerzo = r.HoraAlmuerzo?.ToString("HH:mm") ?? string.Empty;
 
         void AddRow(string tipoRegistro, string opcionLabel, string plato, decimal baseValor, decimal itbis, decimal total, decimal empresaPaga, decimal empleadoPaga, decimal itbisEmpresa, decimal itbisEmpleado)
         {
@@ -3316,15 +3440,14 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
                 Fecha = fecha,
                 DiaSemana = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
                 Hora = r.FechaSeleccion.HasValue ? r.FechaSeleccion.Value.ToLocalTime().ToString("HH:mm") : string.Empty,
-                Periodo = periodo,
+                HoraAlmuerzo = horaAlmuerzo,
                 Horario = horarioNombre,
-                HorarioInicio = horarioInicio,
-                HorarioFin = horarioFin,
                 Empresa = empresaEmpleado.Nombre ?? string.Empty,
                 Filial = sucEntrega.Nombre ?? string.Empty,
                 Localizacion = localizacion,
                 EmpleadoCodigo = empleadoCodigo,
                 EmpleadoNombre = empleadoNombre,
+                UsuarioEmpleado = usuarioEmpleado,
                 Tipo = tipoRegistro,
                 Opcion = opcionLabel,
                 Plato = plato,
@@ -3380,11 +3503,18 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
         .ToList();
 }
 
+    private static string NormalizeLocalizacionKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+        return value.Trim().ToUpperInvariant();
+    }
+
 private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows) BuildReporteMaestroExport(IReadOnlyList<ReporteMaestroVM.Row> rows)
 {
     var headers = new[]
     {
-        "Fecha","Dia","Hora","Semana","Horario","Hora inicio","Hora fin","Empresa","Filial","Localizacion","Codigo empleado","Empleado","Tipo","Opcion","Plato","Cantidad","Precio unitario base","ITBIS total","Total","Subsidio aplicado","% subsidio","Monto empresa","ITBIS empresa","Monto empleado","ITBIS empleado","Numero cierre","Estado nomina","Numero factura","Estado facturacion","Usuario proceso"
+        "Fecha","Dia","Hora","Hora almuerzo","Horario","Empresa","Filial","Localizacion","Codigo empleado","Empleado","Usuario","Tipo","Opcion","Plato","Cantidad","Precio unitario base","ITBIS","Total","Subsidio aplicado","% subsidio","Monto empresa","ITBIS empresa","Monto empleado","ITBIS empleado","Numero cierre","Estado nomina","Numero factura","Estado facturacion","Usuario proceso"
       };
 
     var data = rows.Select(r => (IReadOnlyList<string>)new[]
@@ -3392,15 +3522,14 @@ private static (IReadOnlyList<string> Headers, List<IReadOnlyList<string>> Rows)
         r.Fecha.ToString("yyyy-MM-dd"),
         r.DiaSemana,
         r.Hora,
-        r.Periodo,
+        r.HoraAlmuerzo,
         r.Horario,
-        r.HorarioInicio,
-        r.HorarioFin,
         r.Empresa,
         r.Filial,
         r.Localizacion,
         r.EmpleadoCodigo,
         r.EmpleadoNombre,
+        r.UsuarioEmpleado,
         r.Tipo,
         r.Opcion,
         r.Plato,

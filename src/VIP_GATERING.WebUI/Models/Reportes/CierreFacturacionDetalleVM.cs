@@ -9,6 +9,8 @@ public class CierreFacturacionDetalleVM
     public string ExportExcelAction { get; set; } = string.Empty;
     public string ExportPdfAction { get; set; } = string.Empty;
     public string EstadoProceso { get; set; } = "Cerrado";
+    public DateTime? FechaCierreUtc { get; set; }
+    public bool PuedeReabrir { get; set; }
 
     public DateOnly Inicio { get; set; }
     public DateOnly Fin { get; set; }

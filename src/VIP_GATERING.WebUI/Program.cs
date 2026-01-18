@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using VIP_GATERING.Infrastructure;
 using VIP_GATERING.Infrastructure.Data;
@@ -40,6 +41,12 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.Cookie.SameSite = isDev ? SameSiteMode.Lax : SameSiteMode.Strict;
     options.Cookie.Name = "VIPGATERING.AUTH";
 });
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddApplication();
 builder.Services.AddRazorPages().AddRazorRuntimeCompilation();
 builder.Services.AddHttpContextAccessor();
@@ -59,6 +66,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.Use(async (context, next) =>
 {
@@ -226,6 +234,9 @@ using (var scope = app.Services.CreateScope())
     await db.Database.ExecuteSqlRawAsync(
         "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_SucursalesHorariosSlots_SucursalId_HorarioId_Hora\" " +
         "ON \"SucursalesHorariosSlots\" (\"SucursalId\", \"HorarioId\", \"Hora\");");
+    await db.Database.ExecuteSqlRawAsync(
+        "ALTER TABLE IF EXISTS \"Opciones\" " +
+        "ADD COLUMN IF NOT EXISTS \"EsAdicional\" boolean NOT NULL DEFAULT FALSE;");
     await SeedData.EnsureSeedAsync(db, app.Environment.ContentRootPath);
     // Ensure Identity roles and demo users
     var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();

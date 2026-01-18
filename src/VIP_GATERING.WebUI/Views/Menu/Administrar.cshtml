@@ -150,16 +150,28 @@
                 <div class="addon-field__hint">Tip: escribe para filtrar y usa Enter para elegir multiples.</div>
             </div>
             <div class="addon-field__control">
+                @{
+                    var adicionalesDisponibles = Model.Opciones
+                        .Where(o => o.EsAdicional || (Model.AdicionalesIds?.Contains(o.Id) ?? false))
+                        .ToList();
+                }
                 <select id="adicionales-select" name="AdicionalesIds" multiple class="w-full" @(Model.EncuestaCerrada ? "disabled" : "")>
-                    @foreach (var o in Model.Opciones)
+                    @if (!adicionalesDisponibles.Any())
                     {
-                        if (Model.AdicionalesIds != null && Model.AdicionalesIds.Contains(o.Id))
+                        <option value="" disabled>No hay adicionales disponibles. Marca "Es adicional" en platos.</option>
+                    }
+                    else
+                    {
+                        foreach (var o in adicionalesDisponibles)
                         {
-                            <option value="@o.Id" selected>@o.Nombre</option>
-                        }
-                        else
-                        {
-                            <option value="@o.Id">@o.Nombre</option>
+                            if (Model.AdicionalesIds != null && Model.AdicionalesIds.Contains(o.Id))
+                            {
+                                <option value="@o.Id" selected>@o.Nombre</option>
+                            }
+                            else
+                            {
+                                <option value="@o.Id">@o.Nombre</option>
+                            }
                         }
                     }
                 </select>

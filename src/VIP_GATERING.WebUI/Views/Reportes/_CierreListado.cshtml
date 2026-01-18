@@ -34,7 +34,7 @@
                 <td class="p-2 text-right">@r.TotalSelecciones</td>
                 <td class="p-2 text-right">
                     <div class="flex justify-end gap-2">
-                        @if (!string.IsNullOrWhiteSpace(Model.AccionEditar))
+                        @if (!r.Cerrado && !string.IsNullOrWhiteSpace(Model.AccionEditar))
                         {
                             <a class="btn-outline" asp-action="@Model.AccionEditar" asp-route-empresaId="@r.EmpresaId" asp-route-sucursalId="@r.SucursalId" asp-route-desde="@r.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@r.Fin.ToString("yyyy-MM-dd")">@label</a>
                         }
@@ -42,7 +42,7 @@
                         {
                             <a class="btn-outline" asp-action="@Model.AccionDetalle" asp-route-empresaId="@r.EmpresaId" asp-route-sucursalId="@r.SucursalId" asp-route-desde="@r.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@r.Fin.ToString("yyyy-MM-dd")">Detalle</a>
                         }
-                        @if (r.Cerrado && !string.IsNullOrWhiteSpace(Model.AccionEliminar))
+                        @if (!r.Cerrado && !string.IsNullOrWhiteSpace(Model.AccionEliminar))
                         {
                             <form asp-action="@Model.AccionEliminar" method="post">
                                 @Html.AntiForgeryToken()

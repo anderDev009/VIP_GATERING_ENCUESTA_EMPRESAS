@@ -10,6 +10,7 @@ public class Opcion
     public decimal? Precio { get; set; }
     public bool EsSubsidiado { get; set; }
     public bool LlevaItbis { get; set; } = true;
+    public bool EsAdicional { get; set; } = false;
     public string? ImagenUrl { get; set; }
     public bool Borrado { get; set; } = false;
     public ICollection<OpcionHorario> Horarios { get; set; } = new List<OpcionHorario>();

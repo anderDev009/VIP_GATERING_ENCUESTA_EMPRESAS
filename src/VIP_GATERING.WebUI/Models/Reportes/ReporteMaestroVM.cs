@@ -27,16 +27,15 @@ public class ReporteMaestroVM
         public DateOnly Fecha { get; set; }
         public string DiaSemana { get; set; } = string.Empty;
         public string Hora { get; set; } = string.Empty;
-        public string Periodo { get; set; } = string.Empty;
+        public string HoraAlmuerzo { get; set; } = string.Empty;
         public string Horario { get; set; } = string.Empty;
-        public string HorarioInicio { get; set; } = string.Empty;
-        public string HorarioFin { get; set; } = string.Empty;
 
         public string Empresa { get; set; } = string.Empty;
         public string Filial { get; set; } = string.Empty;
         public string Localizacion { get; set; } = string.Empty;
         public string EmpleadoCodigo { get; set; } = string.Empty;
         public string EmpleadoNombre { get; set; } = string.Empty;
+        public string UsuarioEmpleado { get; set; } = string.Empty;
 
         public string Tipo { get; set; } = string.Empty;
         public string Opcion { get; set; } = string.Empty;
