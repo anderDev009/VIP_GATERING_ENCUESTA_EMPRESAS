@@ -5,7 +5,10 @@
 @section Breadcrumb{<div class="text-sm text-slate-500 mb-4">Inicio / Administracion / Empresas</div>}
 <div class="flex justify-between items-center mb-4">
     <h1 class="text-2xl font-semibold">Empresas</h1>
-    <a asp-action="Create" class="btn-primary">Nueva Empresa</a>
+    @if (User.IsInRole("Admin"))
+    {
+        <a asp-action="Create" class="btn-primary">Nueva Empresa</a>
+    }
 </div>
 
 <form method="get" class="card mb-4 flex items-end gap-2 max-w-xl">
@@ -42,10 +45,13 @@
                 <td class="p-2">@e.Direccion</td>
                 <td class="p-2 text-right space-x-2">
                     <a asp-action="Edit" asp-route-id="@e.Id" class="btn-outline">Editar</a>
-                    <form asp-action="Delete" method="post" class="inline">
-                        <input type="hidden" name="id" value="@e.Id" />
-                        <button class="btn-outline text-rose-500 border-rose-100 hover:border-rose-300">Eliminar</button>
-                    </form>
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <form asp-action="Delete" method="post" class="inline">
+                            <input type="hidden" name="id" value="@e.Id" />
+                            <button class="btn-outline text-rose-500 border-rose-100 hover:border-rose-300">Eliminar</button>
+                        </form>
+                    }
                 </td>
             </tr>
         }

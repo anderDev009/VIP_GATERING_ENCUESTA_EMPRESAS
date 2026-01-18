@@ -89,8 +89,10 @@ public class EmpresasController : Controller
         return query;
     }
 
+    [Authorize(Roles = "Admin")]
     public IActionResult Create() => View(new Empresa());
 
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(Empresa model)
@@ -102,6 +104,7 @@ public class EmpresasController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Roles = "Admin,RRHH")]
     public async Task<IActionResult> Edit(int id)
     {
         var ent = await _db.Empresas.FindAsync(id);
@@ -131,6 +134,7 @@ public class EmpresasController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Admin,RRHH")]
     public async Task<IActionResult> Edit(int id, Empresa model)
     {
         if (!ModelState.IsValid)
@@ -158,6 +162,7 @@ public class EmpresasController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
     {
         var ent = await _db.Empresas.FindAsync(id);
