@@ -27,3 +27,4 @@ Rol: Empleado
 Filial: SUPLIDORA PROPARTES
 
 Notas: Hay un seed de Admin con usuario ADMINa1_ (usuario y contrasena iguales).
+RRHHa1_0

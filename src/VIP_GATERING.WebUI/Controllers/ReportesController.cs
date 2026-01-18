@@ -993,7 +993,7 @@ public class ReportesController : Controller
         return View("Seleccionados", vm);
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,RRHH")]
     [HttpGet]
     public async Task<IActionResult> Distribucion(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null)
     {
@@ -1936,7 +1936,7 @@ public class ReportesController : Controller
         return File(pdf, "application/pdf", $"seleccionados-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.pdf");
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,RRHH")]
     [HttpGet]
     public async Task<IActionResult> DistribucionCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? vista = null)
     {
@@ -1947,7 +1947,7 @@ public class ReportesController : Controller
         return File(bytes, "text/csv", $"distribucion-{export.Suffix}-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.csv");
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,RRHH")]
     [HttpGet]
     public async Task<IActionResult> DistribucionExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? vista = null)
     {
@@ -1958,7 +1958,7 @@ public class ReportesController : Controller
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"distribucion-{export.Suffix}-{vm.Inicio:yyyyMMdd}-{vm.Fin:yyyyMMdd}.xlsx");
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,RRHH")]
     [HttpGet]
     public async Task<IActionResult> DistribucionPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? vista = null)
     {

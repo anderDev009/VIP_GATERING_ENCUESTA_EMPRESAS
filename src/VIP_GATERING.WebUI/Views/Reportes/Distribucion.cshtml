@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Distribucion";
     var showData = string.IsNullOrWhiteSpace(Model.MensajeValidacion);
+    var isRRHH = User.IsInRole("RRHH");
 
     var empresaNombre = Model.Empresas.FirstOrDefault(e => e.Id == Model.EmpresaId)?.Nombre ?? "Todas";
     var sucursalNombre = Model.Sucursales.FirstOrDefault(s => s.Id == Model.SucursalId)?.Nombre ?? "Todas";
@@ -12,6 +13,10 @@
     var tandaNombre = Model.Horarios.FirstOrDefault(h => h.Id == Model.HorarioId)?.Nombre ?? "Todas";
     var vistaKey = (ViewContext.HttpContext.Request.Query["vista"].ToString() ?? "resumen").Trim().ToLowerInvariant();
     if (string.IsNullOrWhiteSpace(vistaKey))
+    {
+        vistaKey = "resumen";
+    }
+    if (isRRHH && vistaKey != "resumen" && vistaKey != "detalle")
     {
         vistaKey = "resumen";
     }
@@ -112,13 +117,16 @@
             Localizacion: @localizacionNombre,
             Tanda: @tandaNombre.
         </div>
-        <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3" id="reportes-totales">
-            <div class="text-sm text-slate-600">Total base: <span class="font-semibold">@Model.TotalBase.ToString("C")</span></div>
-            <div class="text-sm text-slate-600">ITBIS: <span class="font-semibold">@Model.TotalItbis.ToString("C")</span></div>
-            <div class="text-sm text-slate-600">Total general: <span class="font-semibold">@Model.TotalGeneral.ToString("C")</span></div>
-            <div class="text-sm text-slate-600">Empresa paga: <span class="font-semibold">@Model.TotalEmpresa.ToString("C")</span></div>
-            <div class="text-sm text-slate-600">Empleado paga: <span class="font-semibold">@Model.TotalEmpleado.ToString("C")</span></div>
-        </div>
+        @if (!isRRHH)
+        {
+            <div class="md:col-span-4 text-right space-y-1 border-t border-slate-200 pt-3" id="reportes-totales">
+                <div class="text-sm text-slate-600">Total base: <span class="font-semibold">@Model.TotalBase.ToString("C")</span></div>
+                <div class="text-sm text-slate-600">ITBIS: <span class="font-semibold">@Model.TotalItbis.ToString("C")</span></div>
+                <div class="text-sm text-slate-600">Total general: <span class="font-semibold">@Model.TotalGeneral.ToString("C")</span></div>
+                <div class="text-sm text-slate-600">Empresa paga: <span class="font-semibold">@Model.TotalEmpresa.ToString("C")</span></div>
+                <div class="text-sm text-slate-600">Empleado paga: <span class="font-semibold">@Model.TotalEmpleado.ToString("C")</span></div>
+            </div>
+        }
     }
     <input type="hidden" name="vista" value="@vistaKey" />
     <input type="hidden" name="_" value="@DateTime.UtcNow.Ticks" />
@@ -131,9 +139,12 @@
         <div class="tab-switch__group">
             <button type="button" class="tab-pill @(vistaKey == "resumen" ? "is-active" : "")" data-tab-target="tab-resumen">Resumen por filial</button>
             <button type="button" class="tab-pill @(vistaKey == "detalle" ? "is-active" : "")" data-tab-target="tab-detalle-pedidos">Detalle por empleado</button>
-            <button type="button" class="tab-pill @(vistaKey == "localizacion" ? "is-active" : "")" data-tab-target="tab-localizacion">Distribucion por localizacion</button>
-            <button type="button" class="tab-pill @(vistaKey == "distribucion-detalle" ? "is-active" : "")" data-tab-target="tab-distribucion-detalle">Detalle distribucion</button>
-            <button type="button" class="tab-pill @(vistaKey == "cocina" ? "is-active" : "")" data-tab-target="tab-cocina">Cocina</button>
+            @if (!isRRHH)
+            {
+                <button type="button" class="tab-pill @(vistaKey == "localizacion" ? "is-active" : "")" data-tab-target="tab-localizacion">Distribucion por localizacion</button>
+                <button type="button" class="tab-pill @(vistaKey == "distribucion-detalle" ? "is-active" : "")" data-tab-target="tab-distribucion-detalle">Detalle distribucion</button>
+                <button type="button" class="tab-pill @(vistaKey == "cocina" ? "is-active" : "")" data-tab-target="tab-cocina">Cocina</button>
+            }
         </div>
     </div>
 
@@ -298,6 +309,8 @@
         </div>
     </div>
 
+    @if (!isRRHH)
+    {
     <div id="tab-distribucion-detalle" class="tab-panel @(vistaKey == "distribucion-detalle" ? "is-active" : "") space-y-3" data-tab-panel>
         <div class="report-scroll">
         <table>
@@ -383,7 +396,10 @@
             </div>
         </div>
     </div>
+    }
 
+    @if (!isRRHH)
+    {
     <div id="tab-cocina" class="tab-panel @(vistaKey == "cocina" ? "is-active" : "") space-y-3" data-tab-panel>
         <div class="report-scroll">
         <table>
@@ -423,6 +439,7 @@
         </table>
         </div>
     </div>
+    }
 }
 
 @section Scripts {

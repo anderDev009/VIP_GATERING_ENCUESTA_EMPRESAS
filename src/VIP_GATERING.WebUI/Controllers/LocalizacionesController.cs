@@ -8,7 +8,7 @@ using VIP_GATERING.WebUI.Services;
 
 namespace VIP_GATERING.WebUI.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,RRHH")]
 public class LocalizacionesController : Controller
 {
     private readonly AppDbContext _db;
