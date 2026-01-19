@@ -815,6 +815,7 @@ public class ReportesController : Controller
             .ToList();
 
         var culture = CultureInfo.CurrentCulture;
+        const decimal itbisRate = 0.18m;
         var movimientos = new List<EstadoCuentaEmpleadoVM.MovimientoRow>();
         foreach (var r in respuestas)
         {
@@ -825,7 +826,13 @@ public class ReportesController : Controller
             var suc = empleadoDatos.Sucursal!;
             var emp = suc.Empresa!;
             var ctx = BuildSubsidioContext(opcion.EsSubsidiado, empleadoDatos, suc, emp);
-            var precio = _subsidios.CalcularPrecioEmpleado(opcion.Precio ?? opcion.Costo, ctx).PrecioEmpleado;
+            var basePrecio = opcion.Precio ?? opcion.Costo;
+            var baseEmpleado = _subsidios.CalcularPrecioEmpleado(basePrecio, ctx).PrecioEmpleado;
+            var itbis = opcion.LlevaItbis ? Math.Round(basePrecio * itbisRate, 2) : 0m;
+            var total = basePrecio + itbis;
+            var ratio = basePrecio > 0 ? Math.Clamp(baseEmpleado / basePrecio, 0m, 1m) : 1m;
+            var totalEmpleado = Math.Round(total * ratio, 2);
+            var itbisEmpleado = Math.Round(totalEmpleado - baseEmpleado, 2);
             movimientos.Add(new EstadoCuentaEmpleadoVM.MovimientoRow
             {
                 Fecha = fecha,
@@ -833,12 +840,17 @@ public class ReportesController : Controller
                 Horario = r.OpcionMenu.Horario != null ? r.OpcionMenu.Horario.Nombre : null,
                 Seleccion = r.Seleccion.ToString(),
                 OpcionNombre = opcion.Nombre ?? "Sin definir",
-                PrecioEmpleado = precio
+                BaseEmpleado = Math.Round(baseEmpleado, 2),
+                ItbisEmpleado = itbisEmpleado,
+                TotalEmpleado = totalEmpleado
             });
 
             if (r.AdicionalOpcion != null)
             {
                 var adicional = r.AdicionalOpcion;
+                var baseAdicional = adicional.Precio ?? adicional.Costo;
+                var itbisAdicional = adicional.LlevaItbis ? Math.Round(baseAdicional * itbisRate, 2) : 0m;
+                var totalAdicional = baseAdicional + itbisAdicional;
                 movimientos.Add(new EstadoCuentaEmpleadoVM.MovimientoRow
                 {
                     Fecha = fecha,
@@ -846,7 +858,9 @@ public class ReportesController : Controller
                     Horario = r.OpcionMenu.Horario != null ? r.OpcionMenu.Horario.Nombre : null,
                     Seleccion = r.Seleccion.ToString(),
                     OpcionNombre = $"Adicional: {adicional.Nombre ?? "Sin definir"}",
-                    PrecioEmpleado = adicional.Precio ?? adicional.Costo
+                    BaseEmpleado = Math.Round(baseAdicional, 2),
+                    ItbisEmpleado = itbisAdicional,
+                    TotalEmpleado = Math.Round(totalAdicional, 2)
                 });
             }
         }
@@ -2117,7 +2131,7 @@ public class ReportesController : Controller
         var result = await EstadoCuenta(desde, hasta) as ViewResult;
         var vm = (EstadoCuentaEmpleadoVM)result!.Model!;
 
-        var headers = new[] { "Fecha", "Dia", "Horario", "Seleccion", "Opcion", "Precio empleado" };
+        var headers = new[] { "Fecha", "Dia", "Horario", "Seleccion", "Opcion", "Base", "ITBIS", "Total" };
         var rows = vm.Movimientos.Select(r => (IReadOnlyList<string>)new[]
         {
             r.Fecha.ToString("yyyy-MM-dd"),
@@ -2125,7 +2139,9 @@ public class ReportesController : Controller
             r.Horario ?? string.Empty,
             r.Seleccion,
             r.OpcionNombre ?? string.Empty,
-            r.PrecioEmpleado.ToString("C")
+            r.BaseEmpleado.ToString("C"),
+            r.ItbisEmpleado.ToString("C"),
+            r.TotalEmpleado.ToString("C")
         }).ToList();
 
         var bytes = ExportHelper.BuildCsv(headers, rows);
@@ -2140,7 +2156,7 @@ public class ReportesController : Controller
         var result = await EstadoCuenta(desde, hasta) as ViewResult;
         var vm = (EstadoCuentaEmpleadoVM)result!.Model!;
 
-        var headers = new[] { "Fecha", "Dia", "Horario", "Seleccion", "Opcion", "Precio empleado" };
+        var headers = new[] { "Fecha", "Dia", "Horario", "Seleccion", "Opcion", "Base", "ITBIS", "Total" };
         var rows = vm.Movimientos.Select(r => (IReadOnlyList<string>)new[]
         {
             r.Fecha.ToString("yyyy-MM-dd"),
@@ -2148,7 +2164,9 @@ public class ReportesController : Controller
             r.Horario ?? string.Empty,
             r.Seleccion,
             r.OpcionNombre ?? string.Empty,
-            r.PrecioEmpleado.ToString("C")
+            r.BaseEmpleado.ToString("C"),
+            r.ItbisEmpleado.ToString("C"),
+            r.TotalEmpleado.ToString("C")
         }).ToList();
 
         var bytes = ExportHelper.BuildExcel("Estado cuenta", headers, rows);
@@ -2163,7 +2181,7 @@ public class ReportesController : Controller
         var result = await EstadoCuenta(desde, hasta) as ViewResult;
         var vm = (EstadoCuentaEmpleadoVM)result!.Model!;
 
-        var headers = new[] { "Fecha", "Dia", "Horario", "Seleccion", "Opcion", "Precio empleado" };
+        var headers = new[] { "Fecha", "Dia", "Horario", "Seleccion", "Opcion", "Base", "ITBIS", "Total" };
         var rows = vm.Movimientos.Select(r => (IReadOnlyList<string>)new[]
         {
             r.Fecha.ToString("yyyy-MM-dd"),
@@ -2171,7 +2189,9 @@ public class ReportesController : Controller
             r.Horario ?? string.Empty,
             r.Seleccion,
             r.OpcionNombre ?? string.Empty,
-            r.PrecioEmpleado.ToString("C")
+            r.BaseEmpleado.ToString("C"),
+            r.ItbisEmpleado.ToString("C"),
+            r.TotalEmpleado.ToString("C")
         }).ToList();
 
         var pdf = ExportHelper.BuildPdf($"Estado de cuenta {vm.Desde:yyyy-MM-dd} a {vm.Hasta:yyyy-MM-dd}", headers, rows);

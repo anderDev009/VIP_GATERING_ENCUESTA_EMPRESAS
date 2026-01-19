@@ -23,13 +23,15 @@
         <div class="text-right">
             <p class="eyebrow">Total consumo</p>
             <p class="summary-value">@Model.TotalConsumo.ToString("C")</p>
+            <div class="summary-hint">Base: @Model.TotalBase.ToString("C")</div>
+            <div class="summary-hint">ITBIS: @Model.TotalItbis.ToString("C")</div>
             <p class="summary-hint">@Model.TotalSelecciones selecciones</p>
         </div>
     </div>
 </section>
 
 <section class="page-panel space-y-4 mb-5">
-    <form method="get" class="grid md:grid-cols-3 gap-4 items-end">
+    <form method="get" asp-action="EstadoCuenta" class="grid md:grid-cols-3 gap-4 items-end">
         <div class="control-field">
             <label class="flex items-center gap-2" for="desde"><span class="icon-dot icon-dot--teal" aria-hidden="true"></span> Desde</label>
             <input id="desde" name="desde" type="date" class="w-full" value="@Model.Desde.ToString("yyyy-MM-dd")" />
@@ -52,6 +54,8 @@
             <div class="text-right">
                 <p class="panel-subtitle">Consumo acumulado</p>
                 <p class="summary-value">@Model.TotalConsumo.ToString("C")</p>
+                <div class="summary-hint">Base: @Model.TotalBase.ToString("C")</div>
+                <div class="summary-hint">ITBIS: @Model.TotalItbis.ToString("C")</div>
                 <p class="summary-hint">@Model.TotalSelecciones selecciones</p>
             </div>
         </div>
@@ -76,7 +80,9 @@ else
                         <th>D&iacute;a</th>
                         <th>Horario</th>
                         <th>Selecci&oacute;n</th>
-                        <th class="text-right">Consumo</th>
+                        <th class="text-right">Base</th>
+                        <th class="text-right">ITBIS</th>
+                        <th class="text-right">Total</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -90,13 +96,17 @@ else
                             <div class="font-medium">@m.OpcionNombre</div>
                             <div class="text-xs text-slate-500">Plato @m.Seleccion</div>
                         </td>
-                        <td class="text-right">@m.PrecioEmpleado.ToString("C")</td>
+                        <td class="text-right">@m.BaseEmpleado.ToString("C")</td>
+                        <td class="text-right">@m.ItbisEmpleado.ToString("C")</td>
+                        <td class="text-right">@m.TotalEmpleado.ToString("C")</td>
                     </tr>
                 }
                 </tbody>
                 <tfoot>
                     <tr>
                         <th colspan="4" class="text-right">Total</th>
+                        <th class="text-right">@Model.TotalBase.ToString("C")</th>
+                        <th class="text-right">@Model.TotalItbis.ToString("C")</th>
                         <th class="text-right">@Model.TotalConsumo.ToString("C")</th>
                     </tr>
                 </tfoot>

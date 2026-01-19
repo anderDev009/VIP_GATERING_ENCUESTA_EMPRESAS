@@ -10,7 +10,9 @@ public class EstadoCuentaEmpleadoVM
 
     public List<MovimientoRow> Movimientos { get; set; } = new();
 
-    public decimal TotalConsumo => Movimientos.Sum(m => m.PrecioEmpleado);
+    public decimal TotalBase => Movimientos.Sum(m => m.BaseEmpleado);
+    public decimal TotalItbis => Movimientos.Sum(m => m.ItbisEmpleado);
+    public decimal TotalConsumo => Movimientos.Sum(m => m.TotalEmpleado);
     public int TotalSelecciones => Movimientos.Count;
 
     public class MovimientoRow
@@ -20,6 +22,8 @@ public class EstadoCuentaEmpleadoVM
         public string? Horario { get; set; }
         public string Seleccion { get; set; } = string.Empty;
         public string? OpcionNombre { get; set; }
-        public decimal PrecioEmpleado { get; set; }
+        public decimal BaseEmpleado { get; set; }
+        public decimal ItbisEmpleado { get; set; }
+        public decimal TotalEmpleado { get; set; }
     }
 }
