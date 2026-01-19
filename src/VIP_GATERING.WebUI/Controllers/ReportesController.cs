@@ -3330,22 +3330,6 @@ private static (string Title, string Suffix, IReadOnlyList<string> Headers, List
                             r.EmpleadoPaga.ToString("C")
                         });
                     }
-
-                    var totalDia = new[]
-                    {
-                        g.Key.ToString("yyyy-MM-dd"),
-                        "Total dia",
-                        g.Sum(x => x.Base).ToString("C"),
-                        g.Sum(x => x.Itbis).ToString("C"),
-                        g.Sum(x => x.Total).ToString("C"),
-                        g.Sum(x => x.ItbisEmpresa).ToString("C"),
-                        g.Sum(x => x.ItbisEmpleado).ToString("C"),
-                        g.Sum(x => x.MontoAdicional).ToString("C"),
-                        g.Sum(x => x.ItbisAdicional).ToString("C"),
-                        g.Sum(x => x.EmpresaPaga).ToString("C"),
-                        g.Sum(x => x.EmpleadoPaga).ToString("C")
-                    };
-                    rows.Add(totalDia);
                 }
 
                 if (vm.ResumenFiliales.Count > 0)

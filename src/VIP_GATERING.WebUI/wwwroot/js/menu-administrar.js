@@ -16,6 +16,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isDisabled) ts.disable();
   }
 
+  const searchableSelects = document.querySelectorAll('select.ts-search');
+  searchableSelects.forEach((select) => {
+    if (typeof TomSelect === 'undefined') return;
+    if (select.tomselect) return;
+    const ts = new TomSelect(select, {
+      create: false,
+      allowEmptyOption: true,
+      placeholder: select.getAttribute('placeholder') || 'Selecciona...',
+      render: {
+        option: (data, escape) => `<div class="ts-option-inner">${escape(data.text)}</div>`,
+        item: (data, escape) => `<div class="ts-item-inner">${escape(data.text)}</div>`
+      }
+    });
+    if (select.hasAttribute('disabled')) ts.disable();
+  });
+
   const empresaSelect = document.querySelector('select[name="empresaId"]');
   const sucursalSelect = document.getElementById('sucursal-select');
   if (empresaSelect && sucursalSelect) {

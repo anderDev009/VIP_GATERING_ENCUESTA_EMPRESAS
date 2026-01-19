@@ -190,20 +190,6 @@
                         <td class="text-right">@r.EmpleadoPaga.ToString("C")</td>
                     </tr>
                 }
-
-                <tr class="bg-slate-50 font-semibold">
-                    <td>@g.Key.ToString("yyyy-MM-dd")</td>
-                    <td>Total dia</td>
-                    <td class="text-right">@g.Sum(x => x.Base).ToString("C")</td>
-                    <td class="text-right">@g.Sum(x => x.Itbis).ToString("C")</td>
-                    <td class="text-right">@g.Sum(x => x.Total).ToString("C")</td>
-                    <td class="text-right">@g.Sum(x => x.ItbisEmpresa).ToString("C")</td>
-                    <td class="text-right">@g.Sum(x => x.ItbisEmpleado).ToString("C")</td>
-                    <td class="text-right">@g.Sum(x => x.MontoAdicional).ToString("C")</td>
-                    <td class="text-right">@g.Sum(x => x.ItbisAdicional).ToString("C")</td>
-                    <td class="text-right">@g.Sum(x => x.EmpresaPaga).ToString("C")</td>
-                    <td class="text-right">@g.Sum(x => x.EmpleadoPaga).ToString("C")</td>
-                </tr>
             }
             @if (Model.ResumenFiliales.Count > 0)
             {

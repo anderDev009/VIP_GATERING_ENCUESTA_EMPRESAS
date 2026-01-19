@@ -33,7 +33,7 @@
     <input type='hidden' name='fecha' value='@Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd")' />
     <div>
         <label class="block text-sm text-slate-600">Empresa</label>
-        <select name="empresaId" class="border rounded p-2 w-full">
+        <select name="empresaId" class="border rounded p-2 w-full ts-search">
             @foreach (var e in Model.Empresas)
             {
                 if (Model.EmpresaId == e.id) {<option selected value="@e.id">@e.nombre</option>} else {<option value="@e.id">@e.nombre</option>}
@@ -42,7 +42,7 @@
     </div>
     <div>
         <label class="block text-sm text-slate-600">Filial (opcional)</label>
-        <select id="sucursal-select" name="sucursalId" class="border rounded p-2 w-full">
+        <select id="sucursal-select" name="sucursalId" class="border rounded p-2 w-full ts-search">
             <option value="" data-empresa="">-- Global por Empresa --</option>
             @foreach (var s in Model.Sucursales)
             {
@@ -268,7 +268,7 @@
                                             <input type="hidden" name="Dias[@i].OpcionMenuId" value="@d.OpcionMenuId" />
                                         </td>
                                         <td class="menu-option-cell" data-slot="1">
-                                            <select name="Dias[@i].A" class="w-full border rounded p-2" aria-label="Plato A" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
+                                                <select name="Dias[@i].A" class="w-full border rounded p-2 ts-search" aria-label="Plato A" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
@@ -284,7 +284,7 @@
                                             </select>
                                         </td>
                                         <td class="menu-option-cell" data-slot="2">
-                                            <select name="Dias[@i].B" class="w-full border rounded p-2" aria-label="Plato B" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
+                                                <select name="Dias[@i].B" class="w-full border rounded p-2 ts-search" aria-label="Plato B" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
@@ -300,7 +300,7 @@
                                             </select>
                                         </td>
                                         <td class="menu-option-cell" data-slot="3">
-                                            <select name="Dias[@i].C" class="w-full border rounded p-2" aria-label="Plato C" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
+                                                <select name="Dias[@i].C" class="w-full border rounded p-2 ts-search" aria-label="Plato C" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
@@ -316,7 +316,7 @@
                                             </select>
                                         </td>
                                         <td class="menu-option-cell" data-slot="4">
-                                            <select name="Dias[@i].D" class="w-full border rounded p-2" aria-label="Plato D" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
+                                                <select name="Dias[@i].D" class="w-full border rounded p-2 ts-search" aria-label="Plato D" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
@@ -332,7 +332,7 @@
                                             </select>
                                         </td>
                                         <td class="menu-option-cell" data-slot="5">
-                                            <select name="Dias[@i].E" class="w-full border rounded p-2" aria-label="Plato E" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
+                                                <select name="Dias[@i].E" class="w-full border rounded p-2 ts-search" aria-label="Plato E" @((Model.EncuestaCerrada || diaCerrado) ? "disabled data-locked=\"1\"" : "")>
                                                 <option value="">-- Sin plato --</option>
                                                 @foreach (var o in opcionesHorario)
                                                 {
