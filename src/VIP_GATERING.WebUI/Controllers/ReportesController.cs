@@ -782,6 +782,18 @@ public class ReportesController : Controller
         var empleadoCodigo = empleadoDatos.Codigo;
 
         var hoy = _fechas.Hoy();
+        var rawDesde = Request.Query["desde"].FirstOrDefault();
+        var rawHasta = Request.Query["hasta"].FirstOrDefault();
+        if (desde == null && !string.IsNullOrWhiteSpace(rawDesde))
+        {
+            if (TryParseDateOnly(rawDesde, out var parsed))
+                desde = parsed;
+        }
+        if (hasta == null && !string.IsNullOrWhiteSpace(rawHasta))
+        {
+            if (TryParseDateOnly(rawHasta, out var parsed))
+                hasta = parsed;
+        }
         hasta ??= hoy;
         desde ??= hasta.Value.AddDays(-30);
         if (hasta < desde)
@@ -1340,6 +1352,15 @@ public class ReportesController : Controller
             PorLocalizacionCocinaDetalle = porLocalizacionCocinaDetalle
         };
         return View(vm);
+    }
+
+    private static bool TryParseDateOnly(string input, out DateOnly date)
+    {
+        var formats = new[] { "yyyy-MM-dd", "MM/dd/yyyy", "dd/MM/yyyy" };
+        return DateOnly.TryParseExact(input, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out date)
+            || DateOnly.TryParseExact(input, formats, new CultureInfo("es-DO"), DateTimeStyles.None, out date)
+            || DateOnly.TryParse(input, CultureInfo.InvariantCulture, DateTimeStyles.None, out date)
+            || DateOnly.TryParse(input, new CultureInfo("es-DO"), DateTimeStyles.None, out date);
     }
 
     [Authorize(Roles = "Admin")]
