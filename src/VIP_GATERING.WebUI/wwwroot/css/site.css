@@ -58,3 +58,10 @@
 .app-logo__badge{width:64px;height:64px;border-radius:50%;background:#fff;border:1px solid var(--border);box-shadow:0 12px 24px rgba(12,17,35,.12);display:flex;align-items:center;justify-content:center}
 .app-logo__img{width:46px;height:46px;object-fit:contain}
 
+/* Tom Select dropdowns inside menu config */
+.menu-table{overflow:visible}
+.menu-option-cell{overflow:visible}
+.menu-option-cell .ts-wrapper{position:relative;z-index:5}
+.menu-config .ts-dropdown{z-index:60;top:100%!important;bottom:auto!important}
+.menu-config .ts-dropdown,.menu-config .ts-dropdown [data-selectable]{max-height:260px}
+

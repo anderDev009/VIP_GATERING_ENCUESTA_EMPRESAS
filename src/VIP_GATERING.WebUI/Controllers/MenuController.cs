@@ -1117,7 +1117,10 @@ public class MenuController : Controller
         if (string.IsNullOrWhiteSpace(value))
             return null;
         var normalized = NormalizeKey(value);
-        if (normalized.Contains("ninguno") || normalized.Contains("no"))
+        if (normalized.Contains("ninguno")
+            || normalized == "no"
+            || normalized.StartsWith("no ")
+            || normalized.Contains("feriado"))
             return null;
         if (normalized.Contains("opcion"))
             normalized = normalized.Replace("opcion", string.Empty);
