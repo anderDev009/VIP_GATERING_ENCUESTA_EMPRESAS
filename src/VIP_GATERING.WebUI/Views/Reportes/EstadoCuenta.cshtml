@@ -68,50 +68,47 @@
         No se encontraron selecciones en el rango indicado.
     </div>
 }
-else
-{
-    <section class="page-panel">
-        <div class="overflow-x-auto">
-            <div class="report-scroll">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>D&iacute;a</th>
-                        <th>Horario</th>
-                        <th>Selecci&oacute;n</th>
-                        <th class="text-right">Base</th>
-                        <th class="text-right">ITBIS</th>
-                        <th class="text-right">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var m in Model.Movimientos)
-                {
-                    <tr>
-                        <td>@m.Fecha.ToString("yyyy-MM-dd")</td>
-                        <td>@m.DiaNombre</td>
-                        <td>@m.Horario</td>
-                        <td>
-                            <div class="font-medium">@m.OpcionNombre</div>
-                            <div class="text-xs text-slate-500">Plato @m.Seleccion</div>
-                        </td>
-                        <td class="text-right">@m.BaseEmpleado.ToString("C")</td>
-                        <td class="text-right">@m.ItbisEmpleado.ToString("C")</td>
-                        <td class="text-right">@m.TotalEmpleado.ToString("C")</td>
-                    </tr>
-                }
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <th colspan="4" class="text-right">Total</th>
-                        <th class="text-right">@Model.TotalBase.ToString("C")</th>
-                        <th class="text-right">@Model.TotalItbis.ToString("C")</th>
-                        <th class="text-right">@Model.TotalConsumo.ToString("C")</th>
-                    </tr>
-                </tfoot>
-            </table>
-            </div>
+<section class="page-panel">
+    <div class="overflow-x-auto">
+        <div class="report-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>D&iacute;a</th>
+                    <th>Horario</th>
+                    <th>Selecci&oacute;n</th>
+                    <th class="text-right">Base</th>
+                    <th class="text-right">ITBIS</th>
+                    <th class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var m in Model.Movimientos)
+            {
+                <tr>
+                    <td>@m.Fecha.ToString("yyyy-MM-dd")</td>
+                    <td>@m.DiaNombre</td>
+                    <td>@m.Horario</td>
+                    <td>
+                        <div class="font-medium">@m.OpcionNombre</div>
+                        <div class="text-xs text-slate-500">Plato @m.Seleccion</div>
+                    </td>
+                    <td class="text-right">@m.BaseEmpleado.ToString("C")</td>
+                    <td class="text-right">@m.ItbisEmpleado.ToString("C")</td>
+                    <td class="text-right">@m.TotalEmpleado.ToString("C")</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="4" class="text-right">Total</th>
+                    <th class="text-right">@Model.TotalBase.ToString("C")</th>
+                    <th class="text-right">@Model.TotalItbis.ToString("C")</th>
+                    <th class="text-right">@Model.TotalConsumo.ToString("C")</th>
+                </tr>
+            </tfoot>
+        </table>
         </div>
-    </section>
-}
+    </div>
+</section>

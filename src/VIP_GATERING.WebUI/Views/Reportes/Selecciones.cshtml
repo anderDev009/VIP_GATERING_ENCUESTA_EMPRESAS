@@ -122,6 +122,10 @@
 @if (isEmpleado)
 {
     <h2 class="font-semibold mb-2">Tus selecciones</h2>
+    @if (!Model.SeleccionesEmpleado.Any())
+    {
+        <div class="page-panel alert">No se encontraron selecciones en el rango indicado.</div>
+    }
     <div class="report-scroll">
     <table>
         <thead>
@@ -158,6 +162,10 @@
 else
 {
     <h2 class="font-semibold mb-2">Detalle por empleado</h2>
+    @if (!Model.PorEmpleado.Any())
+    {
+        <div class="page-panel alert">No se encontraron selecciones en el rango indicado.</div>
+    }
     <div class="report-scroll">
     <table>
         <thead>
