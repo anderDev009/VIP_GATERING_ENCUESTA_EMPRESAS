@@ -64,4 +64,5 @@
 .menu-option-cell .ts-wrapper{position:relative;z-index:5}
 .menu-config .ts-dropdown{z-index:60;top:100%!important;bottom:auto!important}
 .menu-config .ts-dropdown,.menu-config .ts-dropdown [data-selectable]{max-height:260px}
+.ts-dropdown{z-index:2000}
 

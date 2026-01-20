@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
       maxItems: null,
       persist: false,
       create: false,
+      dropdownParent: 'body',
       placeholder: 'Selecciona adicionales...',
       render: {
         option: (data, escape) => `<div class="ts-option-inner">${escape(data.text)}</div>`,
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ts = new TomSelect(select, {
       create: false,
       allowEmptyOption: true,
+      dropdownParent: 'body',
       placeholder: select.getAttribute('placeholder') || 'Selecciona...',
       render: {
         option: (data, escape) => `<div class="ts-option-inner">${escape(data.text)}</div>`,
