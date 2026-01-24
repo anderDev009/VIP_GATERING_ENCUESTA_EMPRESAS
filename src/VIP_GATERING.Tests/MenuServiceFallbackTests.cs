@@ -41,7 +41,7 @@ public class MenuServiceFallbackTests
         IRepository<EmpleadoLocalizacion> repoEmpLoc = new EfRepository<EmpleadoLocalizacion>(ctx);
         IUnitOfWork uow = new UnitOfWork(ctx);
         var fechas = new FechaServicio();
-        var svc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, repoLoc, repoEmpLoc, uow, fechas);
+        var svc = new MenuService(repoMenu, repoOpc, repoOpcMenu, new EfRepository<Horario>(ctx), repoResp, new EfRepository<SucursalHorario>(ctx), new EfRepository<SucursalHorarioSlot>(ctx), repoEmp, repoEmpSuc, repoMenuAdi, repoLoc, repoEmpLoc, uow, fechas);
 
         var (inicio, fin) = fechas.RangoSemanaSiguiente();
         // solo crear menú de empresa

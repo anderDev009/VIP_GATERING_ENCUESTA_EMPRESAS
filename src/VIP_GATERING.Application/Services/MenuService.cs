@@ -26,6 +26,7 @@ public class MenuService : IMenuService
     private readonly IRepository<Horario> _horarios;
     private readonly IRepository<RespuestaFormulario> _respuestas;
     private readonly IRepository<SucursalHorario> _sucursalHorarios;
+    private readonly IRepository<SucursalHorarioSlot> _sucursalHorarioSlots;
     private readonly IRepository<Empleado> _empleados;
     private readonly IRepository<EmpleadoSucursal> _empleadosSucursales;
     private readonly IRepository<Localizacion> _localizaciones;
@@ -40,6 +41,7 @@ public class MenuService : IMenuService
         IRepository<Horario> horarios,
         IRepository<RespuestaFormulario> respuestas,
         IRepository<SucursalHorario> sucursalHorarios,
+        IRepository<SucursalHorarioSlot> sucursalHorarioSlots,
         IRepository<Empleado> empleados,
         IRepository<EmpleadoSucursal> empleadosSucursales,
         IRepository<MenuAdicional> menusAdicionales,
@@ -54,6 +56,7 @@ public class MenuService : IMenuService
         _horarios = horarios;
         _respuestas = respuestas;
         _sucursalHorarios = sucursalHorarios;
+        _sucursalHorarioSlots = sucursalHorarioSlots;
         _empleados = empleados;
         _empleadosSucursales = empleadosSucursales;
         _menusAdicionales = menusAdicionales;
@@ -295,6 +298,21 @@ public class MenuService : IMenuService
         };
         if (!slotTieneOpcion)
             throw new ArgumentException("Seleccion no disponible para este dia/horario", nameof(seleccion));
+
+        if (horaAlmuerzo == null && opcionMenu.HorarioId != null)
+        {
+            var slots = await _sucursalHorarioSlots.ListAsync(
+                s => s.SucursalId == sucursalEntregaId && s.HorarioId == opcionMenu.HorarioId.Value,
+                ct);
+            if (slots.Count > 0)
+            {
+                horaAlmuerzo = slots
+                    .Select(s => s.Hora)
+                    .Distinct()
+                    .OrderBy(h => h)
+                    .First();
+            }
+        }
 
         var existentes = await _respuestas.ListAsync(r => r.EmpleadoId == empleadoId && r.OpcionMenuId == opcionMenuId, ct);
         var actual = existentes.FirstOrDefault();

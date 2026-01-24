@@ -71,12 +71,44 @@
             <option value="cerrado" selected="@(Model.Estado == "cerrado" ? "selected" : null)">Cerrado</option>
         </select>
     </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Tanda</label>
+        <select name="horarioId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" @((Model.EmpresaId == null && Model.SucursalId == null) ? "disabled" : "")>
+            <option value="" selected="@(Model.HorarioId == null ? "selected" : null)">Todas</option>
+            @foreach (var h in Model.Horarios)
+            {
+                <option value="@h.Id" selected="@(Model.HorarioId == h.Id ? "selected" : null)">@h.Nombre</option>
+            }
+        </select>
+        @if (Model.EmpresaId == null && Model.SucursalId == null)
+        {
+            <div class="mt-1 text-xs text-slate-400">Selecciona empresa o filial para cargar tandas.</div>
+        }
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Hora almuerzo</label>
+        <select name="horaAlmuerzo" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" @(Model.HorarioId == null ? "disabled" : "")>
+            <option value="" selected="@(string.IsNullOrWhiteSpace(Model.HoraAlmuerzo) ? "selected" : null)">Todas</option>
+            @foreach (var h in Model.HorasAlmuerzo)
+            {
+                <option value="@h" selected="@(Model.HoraAlmuerzo == h ? "selected" : null)">@h</option>
+            }
+        </select>
+        @if (Model.HorarioId == null)
+        {
+            <div class="mt-1 text-xs text-slate-400">Selecciona una tanda para cargar horas.</div>
+        }
+        else if (!Model.HorasAlmuerzo.Any())
+        {
+            <div class="mt-1 text-xs text-slate-400">No hay horas registradas en el rango.</div>
+        }
+    </div>
     <div class="flex gap-3 md:col-span-4 flex-wrap">
         <button type="submit" class="btn-primary">Filtrar</button>
         <a class="btn-outline" asp-action="ReporteMaestro">Limpiar</a>
-        <a class="btn-outline" asp-action="ReporteMaestroExcel" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-tipo="@Model.Tipo" asp-route-estado="@Model.Estado">Exportar Excel</a>
-        <a class="btn-outline" asp-action="ReporteMaestroCsv" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-tipo="@Model.Tipo" asp-route-estado="@Model.Estado">Exportar CSV</a>
-        <a class="btn-outline" asp-action="ReporteMaestroPdf" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-tipo="@Model.Tipo" asp-route-estado="@Model.Estado">Exportar PDF</a>
+        <a class="btn-outline" asp-action="ReporteMaestroExcel" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-horarioId="@Model.HorarioId" asp-route-horaAlmuerzo="@Model.HoraAlmuerzo" asp-route-tipo="@Model.Tipo" asp-route-estado="@Model.Estado">Exportar Excel</a>
+        <a class="btn-outline" asp-action="ReporteMaestroCsv" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-horarioId="@Model.HorarioId" asp-route-horaAlmuerzo="@Model.HoraAlmuerzo" asp-route-tipo="@Model.Tipo" asp-route-estado="@Model.Estado">Exportar CSV</a>
+        <a class="btn-outline" asp-action="ReporteMaestroPdf" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-localizacionId="@Model.LocalizacionId" asp-route-empleadoId="@Model.EmpleadoId" asp-route-horarioId="@Model.HorarioId" asp-route-horaAlmuerzo="@Model.HoraAlmuerzo" asp-route-tipo="@Model.Tipo" asp-route-estado="@Model.Estado">Exportar PDF</a>
     </div>
     <input type="hidden" name="page" value="@Model.Paginado.Page" />
     <input type="hidden" name="pageSize" value="@Model.Paginado.PageSize" />

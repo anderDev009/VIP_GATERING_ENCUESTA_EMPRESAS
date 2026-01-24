@@ -73,17 +73,6 @@
         </select>
     </div>
     <div class="md:col-span-2">
-        <label class="text-xs uppercase tracking-widest text-slate-400">Localizacion</label>
-        <select name="localizacionId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
-            <option value="" selected="@(Model.LocalizacionId == null ? "selected" : null)">Todas</option>
-            @foreach (var l in Model.Localizaciones)
-            {
-                <option value="@l.Id" selected="@(Model.LocalizacionId == l.Id ? "selected" : null)">@l.Nombre</option>
-            }
-        </select>
-        <div class="mt-1 text-xs text-slate-400">Si filtras por empleado, la localizacion es opcional.</div>
-    </div>
-    <div class="md:col-span-2">
         <label class="text-xs uppercase tracking-widest text-slate-400">Tanda</label>
         <select name="horarioId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100" @((Model.EmpresaId == null && Model.SucursalId == null) ? "disabled" : "")>
             <option value="" selected="@(Model.HorarioId == null ? "selected" : null)">Todas</option>
@@ -114,6 +103,17 @@
         {
             <div class="mt-1 text-xs text-slate-400">No hay horas registradas en el rango.</div>
         }
+    </div>
+    <div class="md:col-span-2">
+        <label class="text-xs uppercase tracking-widest text-slate-400">Localizacion</label>
+        <select name="localizacionId" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
+            <option value="" selected="@(Model.LocalizacionId == null ? "selected" : null)">Todas</option>
+            @foreach (var l in Model.Localizaciones)
+            {
+                <option value="@l.Id" selected="@(Model.LocalizacionId == l.Id ? "selected" : null)">@l.Nombre</option>
+            }
+        </select>
+        <div class="mt-1 text-xs text-slate-400">Si filtras por empleado, la localizacion es opcional.</div>
     </div>
     <div class="flex gap-3 md:col-span-4">
         <button type="submit" class="btn-primary">Filtrar</button>

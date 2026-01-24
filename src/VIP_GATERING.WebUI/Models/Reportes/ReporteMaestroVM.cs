@@ -12,6 +12,8 @@ public class ReporteMaestroVM
     public int? SucursalId { get; set; }
     public int? LocalizacionId { get; set; }
     public int? EmpleadoId { get; set; }
+    public int? HorarioId { get; set; }
+    public string? HoraAlmuerzo { get; set; }
     public string? Tipo { get; set; }
     public string? Estado { get; set; }
 
@@ -19,6 +21,8 @@ public class ReporteMaestroVM
     public IReadOnlyList<Sucursal> Sucursales { get; set; } = Array.Empty<Sucursal>();
     public IReadOnlyList<Localizacion> Localizaciones { get; set; } = Array.Empty<Localizacion>();
     public IReadOnlyList<Empleado> Empleados { get; set; } = Array.Empty<Empleado>();
+    public IReadOnlyList<Horario> Horarios { get; set; } = Array.Empty<Horario>();
+    public IReadOnlyList<string> HorasAlmuerzo { get; set; } = Array.Empty<string>();
 
     public PagedResult<Row> Paginado { get; set; } = new();
 

@@ -2056,14 +2056,21 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> ReporteMaestro(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, string? tipo = null, string? estado = null, int page = 1, int pageSize = 50)
+    public async Task<IActionResult> ReporteMaestro(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, int? horarioId = null, string? horaAlmuerzo = null, string? tipo = null, string? estado = null, int page = 1, int pageSize = 50)
     {
         if (empresaId <= 0) empresaId = null;
         if (sucursalId <= 0) sucursalId = null;
         if (localizacionId <= 0) localizacionId = null;
         if (empleadoId <= 0) empleadoId = null;
+        if (horarioId <= 0) horarioId = null;
         tipo = string.IsNullOrWhiteSpace(tipo) ? null : tipo.Trim().ToLowerInvariant();
         estado = string.IsNullOrWhiteSpace(estado) ? null : estado.Trim().ToLowerInvariant();
+        TimeOnly? horaAlmuerzoValue = null;
+        if (!string.IsNullOrWhiteSpace(horaAlmuerzo)
+            && TimeOnly.TryParseExact(horaAlmuerzo, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var horaParsed))
+        {
+            horaAlmuerzoValue = horaParsed;
+        }
 
         DateOnly inicio;
         DateOnly fin;
@@ -2107,6 +2114,7 @@ public class ReportesController : Controller
                 .ToListAsync();
         }
         var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
+        var horarios = await ObtenerHorariosFiltroAsync(empresaId, sucursalId, inicio, fin);
 
         var localizacionesRaw = await BuildLocalizacionesFiltroAsync(empresaId, sucursalId);
         List<Localizacion> localizaciones;
@@ -2127,7 +2135,77 @@ public class ReportesController : Controller
                 .ToList();
         }
 
-        var rows = await BuildReporteMaestroRowsAsync(inicio, fin, empresaId, sucursalId, localizacionId, empleadoId, tipo, estado, localizaciones);
+        var localizacionNombreFiltro = localizacionId != null
+            ? localizaciones.FirstOrDefault(l => l.Id == localizacionId)?.Nombre
+            : null;
+
+        var horasAlmuerzoSet = new HashSet<TimeOnly>();
+        if (horarioId != null && (empresaId != null || sucursalId != null))
+        {
+            var slotsQuery = _db.SucursalesHorariosSlots.AsNoTracking().AsQueryable();
+            if (sucursalId != null)
+            {
+                slotsQuery = slotsQuery.Where(sh => sh.SucursalId == sucursalId && sh.HorarioId == horarioId);
+            }
+            else if (empresaId != null)
+            {
+                slotsQuery = slotsQuery
+                    .Include(sh => sh.Sucursal)
+                    .Where(sh => sh.Sucursal != null && sh.Sucursal.EmpresaId == empresaId && sh.HorarioId == horarioId);
+            }
+
+            var slots = await slotsQuery
+                .Select(sh => sh.Hora)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var hora in slots)
+                horasAlmuerzoSet.Add(hora);
+        }
+
+        var horasHistoricasQuery = _db.RespuestasFormulario
+            .AsNoTracking()
+            .Where(r => r.OpcionMenu != null
+                && r.OpcionMenu.Menu != null
+                && r.OpcionMenu.Menu.FechaInicio <= fin
+                && r.OpcionMenu.Menu.FechaTermino >= inicio);
+        horasHistoricasQuery = AplicarFiltrosEmpresaSucursal(horasHistoricasQuery, empresaId, sucursalId);
+        if (empleadoId != null)
+            horasHistoricasQuery = horasHistoricasQuery.Where(r => r.EmpleadoId == empleadoId);
+        if (localizacionId != null)
+        {
+            if (sucursalId == null && !string.IsNullOrWhiteSpace(localizacionNombreFiltro))
+                horasHistoricasQuery = horasHistoricasQuery.Where(r => r.LocalizacionEntrega != null && r.LocalizacionEntrega.Nombre == localizacionNombreFiltro);
+            else
+                horasHistoricasQuery = horasHistoricasQuery.Where(r => r.LocalizacionEntregaId == localizacionId);
+        }
+        if (!string.IsNullOrWhiteSpace(estado))
+        {
+            horasHistoricasQuery = estado switch
+            {
+                "abierto" => horasHistoricasQuery.Where(r => !r.CierreNomina),
+                "cerrado" => horasHistoricasQuery.Where(r => r.CierreNomina),
+                _ => horasHistoricasQuery
+            };
+        }
+        if (horarioId != null)
+            horasHistoricasQuery = horasHistoricasQuery.Where(r => r.OpcionMenu != null && r.OpcionMenu.HorarioId == horarioId);
+
+        var horasHistoricas = await horasHistoricasQuery
+            .Where(r => r.HoraAlmuerzo != null)
+            .Select(r => r.HoraAlmuerzo!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        foreach (var hora in horasHistoricas)
+            horasAlmuerzoSet.Add(hora);
+
+        var horasAlmuerzo = horasAlmuerzoSet
+            .OrderBy(h => h)
+            .Select(h => h.ToString("HH:mm"))
+            .ToList();
+
+        var rows = await BuildReporteMaestroRowsAsync(inicio, fin, empresaId, sucursalId, localizacionId, empleadoId, horarioId, horaAlmuerzoValue, tipo, estado, localizaciones);
         if (page < 1) page = 1;
         if (pageSize <= 0) pageSize = 50;
         var total = rows.Count;
@@ -2141,12 +2219,16 @@ public class ReportesController : Controller
             SucursalId = sucursalId,
             LocalizacionId = localizacionId,
             EmpleadoId = empleadoId,
+            HorarioId = horarioId,
+            HoraAlmuerzo = horaAlmuerzoValue?.ToString("HH:mm"),
             Tipo = tipo,
             Estado = estado,
             Empresas = empresas,
             Sucursales = sucursales,
             Localizaciones = localizaciones,
             Empleados = empleados,
+            Horarios = horarios,
+            HorasAlmuerzo = horasAlmuerzo,
             Paginado = new PagedResult<ReporteMaestroVM.Row>
             {
                 Items = items,
@@ -2161,9 +2243,9 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> ReporteMaestroCsv(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, string? tipo = null, string? estado = null)
+    public async Task<IActionResult> ReporteMaestroCsv(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, int? horarioId = null, string? horaAlmuerzo = null, string? tipo = null, string? estado = null)
     {
-        var vm = await ReporteMaestro(desde, hasta, empresaId, sucursalId, localizacionId, empleadoId, tipo, estado, 1, int.MaxValue) as ViewResult;
+        var vm = await ReporteMaestro(desde, hasta, empresaId, sucursalId, localizacionId, empleadoId, horarioId, horaAlmuerzo, tipo, estado, 1, int.MaxValue) as ViewResult;
         var model = (ReporteMaestroVM)vm!.Model!;
         var export = BuildReporteMaestroExport(model.Paginado.Items);
         var bytes = ExportHelper.BuildCsv(export.Headers, export.Rows);
@@ -2172,9 +2254,9 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> ReporteMaestroExcel(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, string? tipo = null, string? estado = null)
+    public async Task<IActionResult> ReporteMaestroExcel(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, int? horarioId = null, string? horaAlmuerzo = null, string? tipo = null, string? estado = null)
     {
-        var vm = await ReporteMaestro(desde, hasta, empresaId, sucursalId, localizacionId, empleadoId, tipo, estado, 1, int.MaxValue) as ViewResult;
+        var vm = await ReporteMaestro(desde, hasta, empresaId, sucursalId, localizacionId, empleadoId, horarioId, horaAlmuerzo, tipo, estado, 1, int.MaxValue) as ViewResult;
         var model = (ReporteMaestroVM)vm!.Model!;
         var export = BuildReporteMaestroExport(model.Paginado.Items);
         var bytes = ExportHelper.BuildExcel("Reporte Maestro", export.Headers, export.Rows);
@@ -2183,9 +2265,9 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
-    public async Task<IActionResult> ReporteMaestroPdf(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, string? tipo = null, string? estado = null)
+    public async Task<IActionResult> ReporteMaestroPdf(DateOnly? desde = null, DateOnly? hasta = null, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, int? empleadoId = null, int? horarioId = null, string? horaAlmuerzo = null, string? tipo = null, string? estado = null)
     {
-        var vm = await ReporteMaestro(desde, hasta, empresaId, sucursalId, localizacionId, empleadoId, tipo, estado, 1, int.MaxValue) as ViewResult;
+        var vm = await ReporteMaestro(desde, hasta, empresaId, sucursalId, localizacionId, empleadoId, horarioId, horaAlmuerzo, tipo, estado, 1, int.MaxValue) as ViewResult;
         var model = (ReporteMaestroVM)vm!.Model!;
         var export = BuildReporteMaestroExport(model.Paginado.Items);
         var pdf = ExportHelper.BuildPdf($"Reporte Maestro {model.Inicio:yyyy-MM-dd} a {model.Fin:yyyy-MM-dd}", export.Headers, export.Rows);
@@ -3479,7 +3561,7 @@ private async Task<List<Localizacion>> BuildLocalizacionesFiltroAsync(int? empre
         .ToList();
 }
 
-private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, int? localizacionId, int? empleadoId, string? tipo, string? estado, IReadOnlyList<Localizacion> localizaciones)
+private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, int? localizacionId, int? empleadoId, int? horarioId, TimeOnly? horaAlmuerzo, string? tipo, string? estado, IReadOnlyList<Localizacion> localizaciones)
 {
     var localizacionNombreFiltro = localizacionId != null
         ? localizaciones.FirstOrDefault(l => l.Id == localizacionId)?.Nombre
@@ -3512,6 +3594,8 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
         else
             baseQuery = baseQuery.Where(r => r.LocalizacionEntregaId == localizacionId);
     }
+    if (horarioId != null)
+        baseQuery = baseQuery.Where(r => r.OpcionMenu != null && r.OpcionMenu.HorarioId == horarioId);
     if (!string.IsNullOrWhiteSpace(estado))
     {
         baseQuery = estado switch
@@ -3521,6 +3605,8 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
             _ => baseQuery
         };
     }
+    if (horaAlmuerzo != null)
+        baseQuery = baseQuery.Where(r => r.HoraAlmuerzo == horaAlmuerzo);
 
     var respuestas = await baseQuery.ToListAsync();
     respuestas = respuestas
@@ -3561,7 +3647,7 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
         var empleadoCodigo = r.Empleado.Codigo ?? string.Empty;
         var usuarioEmpleado = usuariosEmpleado.TryGetValue(r.Empleado.Id, out var username) ? username : string.Empty;
         var horarioNombre = r.OpcionMenu.Horario?.Nombre ?? "Sin horario";
-        var horaAlmuerzo = r.HoraAlmuerzo?.ToString("HH:mm") ?? string.Empty;
+        var horaAlmuerzoTexto = r.HoraAlmuerzo?.ToString("HH:mm") ?? string.Empty;
 
         void AddRow(string tipoRegistro, string opcionLabel, string plato, decimal baseValor, decimal itbis, decimal total, decimal empresaPaga, decimal empleadoPaga, decimal itbisEmpresa, decimal itbisEmpleado)
         {
@@ -3572,7 +3658,7 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
                 Fecha = fecha,
                 DiaSemana = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
                 Hora = r.FechaSeleccion.HasValue ? r.FechaSeleccion.Value.ToLocalTime().ToString("HH:mm") : string.Empty,
-                HoraAlmuerzo = horaAlmuerzo,
+                HoraAlmuerzo = horaAlmuerzoTexto,
                 Horario = horarioNombre,
                 Empresa = empresaEmpleado.Nombre ?? string.Empty,
                 Filial = sucEntrega.Nombre ?? string.Empty,
