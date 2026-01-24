@@ -68,6 +68,10 @@
                href="@Url.Action("VistaPrevia", new { inicio = Model.FechaInicio.ToString("yyyy-MM-dd"), fin = Model.FechaTermino.ToString("yyyy-MM-dd"), empresaId = Model.EmpresaId, sucursalId = Model.SucursalId })">
                 Vista previa
             </a>
+            <a class="btn-outline"
+               href="@Url.Action("ImportarMenu", new { fecha = Model.FechaInicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId = Model.EmpresaId, sucursalId = Model.SucursalId })">
+                Importar menu
+            </a>
         </div>
     </div>
     <div class="text-sm text-slate-600">

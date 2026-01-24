@@ -17,7 +17,18 @@ public static class ExportHelper
         var sb = new StringBuilder();
         sb.AppendLine(string.Join(",", headers.Select(EscapeCsv)));
         foreach (var row in rows)
-            sb.AppendLine(string.Join(",", row.Select(EscapeCsv)));
+        {
+            var output = new string[headers.Count];
+            for (var i = 0; i < headers.Count; i++)
+            {
+                var value = i < row.Count ? row[i] : string.Empty;
+                if (IsNumericHeader(headers[i]) && TryParseNumber(value, out var number))
+                    output[i] = number.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+                else
+                    output[i] = value ?? string.Empty;
+            }
+            sb.AppendLine(string.Join(",", output.Select(EscapeCsv)));
+        }
         return Encoding.UTF8.GetBytes(sb.ToString());
     }
 
@@ -34,7 +45,13 @@ public static class ExportHelper
         {
             var row = rows[r];
             for (var c = 0; c < headers.Count; c++)
-                ws.Cell(r + 2, c + 1).Value = c < row.Count ? row[c] : string.Empty;
+            {
+                var value = c < row.Count ? row[c] : string.Empty;
+                if (IsNumericHeader(headers[c]) && TryParseNumber(value, out var number))
+                    ws.Cell(r + 2, c + 1).Value = number;
+                else
+                    ws.Cell(r + 2, c + 1).Value = value ?? string.Empty;
+            }
         }
         ws.Columns().AdjustToContents();
         using var ms = new MemoryStream();
@@ -96,5 +113,46 @@ public static class ExportHelper
         if (v.Contains('"'))
             v = v.Replace("\"", "\"\"");
         return needsQuotes ? $"\"{v}\"" : v;
+    }
+
+    private static bool IsNumericHeader(string header)
+    {
+        if (string.IsNullOrWhiteSpace(header)) return false;
+        var key = RemoveDiacritics(header).ToLowerInvariant();
+        return key.Contains("costo")
+            || key.Contains("precio")
+            || key.Contains("base")
+            || key.Contains("itbis")
+            || key.Contains("total")
+            || key.Contains("monto")
+            || key.Contains("cantidad")
+            || key.Contains("consumo")
+            || key.Contains("beneficio")
+            || key.Contains("paga")
+            || key.Contains("subsidio");
+    }
+
+    private static bool TryParseNumber(string? value, out decimal number)
+    {
+        number = 0m;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        var cleaned = value.Replace("RD$", string.Empty)
+            .Replace("$", string.Empty)
+            .Trim();
+        return decimal.TryParse(cleaned, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out number)
+            || decimal.TryParse(cleaned, System.Globalization.NumberStyles.Any, new System.Globalization.CultureInfo("es-DO"), out number);
+    }
+
+    private static string RemoveDiacritics(string value)
+    {
+        var normalized = value.Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new StringBuilder();
+        foreach (var ch in normalized)
+        {
+            var cat = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (cat != System.Globalization.UnicodeCategory.NonSpacingMark)
+                sb.Append(ch);
+        }
+        return sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
     }
 }

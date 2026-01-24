@@ -12,6 +12,7 @@ public class DistribucionVM
     public int? EmpleadoId { get; set; }
     public int? LocalizacionId { get; set; }
     public int? HorarioId { get; set; }
+    public string? HoraAlmuerzo { get; set; }
     public string? MensajeValidacion { get; set; }
 
     public IEnumerable<Empresa> Empresas { get; set; } = Enumerable.Empty<Empresa>();
@@ -19,6 +20,7 @@ public class DistribucionVM
     public IEnumerable<Empleado> Empleados { get; set; } = Enumerable.Empty<Empleado>();
     public IEnumerable<Localizacion> Localizaciones { get; set; } = Enumerable.Empty<Localizacion>();
     public IEnumerable<Horario> Horarios { get; set; } = Enumerable.Empty<Horario>();
+    public IEnumerable<string> HorasAlmuerzo { get; set; } = Enumerable.Empty<string>();
 
     public List<ResumenFilialRow> ResumenFiliales { get; set; } = new();
     public List<DetalleEmpleadoRow> DetalleEmpleados { get; set; } = new();

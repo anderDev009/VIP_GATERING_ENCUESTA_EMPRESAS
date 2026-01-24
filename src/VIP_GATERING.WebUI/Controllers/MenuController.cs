@@ -12,6 +12,7 @@ using VIP_GATERING.WebUI.Services;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Identity;
 using System.Globalization;
+using System.IO;
 using System.Text;
 
 namespace VIP_GATERING.WebUI.Controllers;
@@ -410,6 +411,402 @@ public class MenuController : Controller
             Fin = fin,
             EmpresaId = empresaId
         });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> ImportarMenu(DateTime? fecha, int? empresaId, int? sucursalId)
+    {
+        var baseDate = fecha?.Date ?? DateTime.UtcNow.Date;
+        if (fecha == null && baseDate.DayOfWeek == DayOfWeek.Sunday)
+            baseDate = baseDate.AddDays(1);
+        int diff = ((int)baseDate.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var lunes = baseDate.AddDays(-diff);
+        var inicio = DateOnly.FromDateTime(lunes);
+        var fin = inicio.AddDays(4);
+
+        return View(new MenuSemanalImportVM
+        {
+            Inicio = inicio,
+            Fin = fin,
+            EmpresaId = empresaId,
+            SucursalId = sucursalId
+        });
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public IActionResult PlantillaMenuExcel()
+    {
+        using var workbook = new XLWorkbook();
+        var menuSheet = workbook.Worksheets.Add("Menu");
+        menuSheet.Cell(1, 1).Value = "Dia";
+        menuSheet.Cell(1, 2).Value = "Horario";
+        menuSheet.Cell(1, 3).Value = "OpcionesMaximas";
+        menuSheet.Cell(1, 4).Value = "Plato A";
+        menuSheet.Cell(1, 5).Value = "Plato B";
+        menuSheet.Cell(1, 6).Value = "Plato C";
+        menuSheet.Cell(1, 7).Value = "Plato D";
+        menuSheet.Cell(1, 8).Value = "Plato E";
+        menuSheet.Cell(1, 9).Value = "DiaCerrado";
+        menuSheet.Cell(2, 1).Value = "Lunes";
+        menuSheet.Cell(2, 2).Value = "Almuerzo";
+        menuSheet.Cell(2, 3).Value = 3;
+        menuSheet.Cell(2, 4).Value = "P0001";
+        menuSheet.Cell(2, 5).Value = "P0002";
+        menuSheet.Cell(2, 6).Value = "P0003";
+        menuSheet.Cell(2, 9).Value = "No";
+        menuSheet.Columns().AdjustToContents();
+
+        var adicionalesSheet = workbook.Worksheets.Add("Adicionales");
+        adicionalesSheet.Cell(1, 1).Value = "Codigo";
+        adicionalesSheet.Cell(1, 2).Value = "Nombre";
+        adicionalesSheet.Cell(2, 1).Value = "A0001";
+        adicionalesSheet.Cell(2, 2).Value = "Refresco 16 onz";
+        adicionalesSheet.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "plantilla-menu.xlsx");
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportarMenu(MenuSemanalImportVM model)
+    {
+        if (model.Archivo == null || model.Archivo.Length == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Debes seleccionar un archivo Excel.");
+            return View(model);
+        }
+
+        if (model.Inicio > model.Fin)
+        {
+            ModelState.AddModelError(string.Empty, "El rango de fechas es invalido.");
+            return View(model);
+        }
+
+        var errores = new List<string>();
+        var advertencias = new List<string>();
+        var filasProcesadas = 0;
+        var diasActualizados = 0;
+        var adicionalesActualizados = 0;
+
+        var menu = await _menuService.GetOrCreateMenuAsync(model.Inicio, model.Fin, model.EmpresaId, model.SucursalId);
+        if (_cierre.EstaCerrada(menu))
+        {
+            ModelState.AddModelError(string.Empty, "No se puede importar: el menu esta cerrado.");
+            return View(model);
+        }
+
+        var horariosActivos = await _db.Horarios.Where(h => h.Activo).OrderBy(h => h.Orden).ToListAsync();
+        var horarioIdsPermitidos = new HashSet<int>();
+        if (model.SucursalId != null)
+        {
+            var ids = await _db.SucursalesHorarios
+                .Where(sh => sh.SucursalId == model.SucursalId)
+                .Select(sh => sh.HorarioId)
+                .Distinct()
+                .ToListAsync();
+            horarioIdsPermitidos = ids.ToHashSet();
+        }
+        else if (model.EmpresaId != null)
+        {
+            var ids = await _db.SucursalesHorarios
+                .Include(sh => sh.Sucursal)
+                .Where(sh => sh.Sucursal != null && sh.Sucursal.EmpresaId == model.EmpresaId)
+                .Select(sh => sh.HorarioId)
+                .Distinct()
+                .ToListAsync();
+            horarioIdsPermitidos = ids.ToHashSet();
+        }
+        var horariosPermitidos = horariosActivos.Where(h => horarioIdsPermitidos.Contains(h.Id)).ToList();
+        if (horariosPermitidos.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "No hay horarios configurados para esta empresa o filial.");
+            return View(model);
+        }
+
+        var opciones = await _db.Opciones.Where(o => !o.Borrado).ToListAsync();
+        var opcionesPorCodigo = opciones
+            .Where(o => !string.IsNullOrWhiteSpace(o.Codigo))
+            .ToDictionary(o => NormalizeKey(o.Codigo!), o => o);
+        var opcionesPorNombre = opciones
+            .Where(o => !string.IsNullOrWhiteSpace(o.Nombre))
+            .ToDictionary(o => NormalizeKey(o.Nombre), o => o);
+
+        var opcionesMenu = await _db.OpcionesMenu
+            .Where(o => o.MenuId == menu.Id)
+            .ToListAsync();
+
+        var opcionesPorDiaHorario = opcionesMenu
+            .GroupBy(o => new { o.DiaSemana, o.HorarioId })
+            .ToDictionary(g => (g.Key.DiaSemana, g.Key.HorarioId), g => g.First());
+
+        using var stream = model.Archivo.OpenReadStream();
+        using var workbook = new XLWorkbook(stream);
+        var menuSheet = workbook.Worksheets.FirstOrDefault(ws => NormalizeKey(ws.Name) == "menu") ?? workbook.Worksheets.FirstOrDefault();
+        if (menuSheet == null)
+        {
+            ModelState.AddModelError(string.Empty, "El archivo Excel no contiene hojas.");
+            return View(model);
+        }
+
+        var headerRow = menuSheet.FirstRowUsed();
+        if (headerRow == null)
+        {
+            ModelState.AddModelError(string.Empty, "No se encontro la fila de encabezados.");
+            return View(model);
+        }
+
+        var headerMap = BuildHeaderMap(headerRow);
+        if (!TryGetColumn(headerMap, out var colDia, "dia")
+            || !TryGetColumn(headerMap, out var colHorario, "horario"))
+        {
+            ModelState.AddModelError(string.Empty, "Faltan columnas requeridas: Dia, Horario.");
+            return View(model);
+        }
+
+        if (!TryGetColumn(headerMap, out var colMax, "opcionesmaximas")
+            && !TryGetColumn(headerMap, out colMax, "cantidad", "opcion"))
+        {
+            ModelState.AddModelError(string.Empty, "Falta la columna OpcionesMaximas.");
+            return View(model);
+        }
+
+        if (!TryGetOptionColumn(headerMap, out var colA, 1)
+            || !TryGetOptionColumn(headerMap, out var colB, 2)
+            || !TryGetOptionColumn(headerMap, out var colC, 3)
+            || !TryGetOptionColumn(headerMap, out var colD, 4)
+            || !TryGetOptionColumn(headerMap, out var colE, 5))
+        {
+            ModelState.AddModelError(string.Empty, "Faltan columnas de platos: Plato A, Plato B, Plato C, Plato D, Plato E.");
+            return View(model);
+        }
+
+        TryGetColumn(headerMap, out var colCerrado, "diacerrado");
+
+        var firstDataRow = headerRow.RowBelow();
+        var lastRow = menuSheet.LastRowUsed()?.RowNumber() ?? firstDataRow.RowNumber();
+        var filas = new List<MenuImportRow>();
+        var seenKeys = new HashSet<string>();
+
+        for (var rowNumber = firstDataRow.RowNumber(); rowNumber <= lastRow; rowNumber++)
+        {
+            var row = menuSheet.Row(rowNumber);
+            if (row.IsEmpty()) continue;
+            filasProcesadas++;
+            var errorCountBefore = errores.Count;
+
+            var diaRaw = row.Cell(colDia).GetString().Trim();
+            var horarioRaw = row.Cell(colHorario).GetString().Trim();
+            if (string.IsNullOrWhiteSpace(diaRaw) && string.IsNullOrWhiteSpace(horarioRaw))
+                continue;
+
+            if (!TryParseDia(diaRaw, out var dia))
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: dia '{diaRaw}' no reconocido.");
+                continue;
+            }
+
+            var horarioKey = NormalizeKey(horarioRaw);
+            var horario = horariosPermitidos.FirstOrDefault(h => NormalizeKey(h.Nombre) == horarioKey);
+            if (horario == null)
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: horario '{horarioRaw}' no disponible para este alcance.");
+                continue;
+            }
+
+            var rowKey = $"{dia}-{horario.Id}";
+            if (!seenKeys.Add(rowKey))
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: dia/horario duplicado.");
+                continue;
+            }
+
+            var maxRaw = row.Cell(colMax).GetString().Trim();
+            if (!TryParseOpcionesMaximas(maxRaw, out var max))
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: OpcionesMaximas invalido ('{maxRaw}').");
+                continue;
+            }
+
+            var rawA = row.Cell(colA).GetString().Trim();
+            var rawB = row.Cell(colB).GetString().Trim();
+            var rawC = row.Cell(colC).GetString().Trim();
+            var rawD = row.Cell(colD).GetString().Trim();
+            var rawE = row.Cell(colE).GetString().Trim();
+
+            var diaCerrado = colCerrado > 0 && TryParseBool(row.Cell(colCerrado).GetString(), out var closed) && closed;
+            if (!diaCerrado && AnyTokenFeriado(rawA, rawB, rawC, rawD, rawE))
+                diaCerrado = true;
+
+            if (diaCerrado && AnyTokenNoVacio(rawA, rawB, rawC, rawD, rawE))
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: dia cerrado no puede tener platos asignados.");
+                continue;
+            }
+
+            var optionIds = new int?[5];
+            var rawValues = new[] { rawA, rawB, rawC, rawD, rawE };
+            for (var i = 0; i < rawValues.Length; i++)
+            {
+                var raw = rawValues[i];
+                if (IsNullToken(raw))
+                {
+                    optionIds[i] = null;
+                    continue;
+                }
+
+                var opcion = FindOpcionFromCell(opcionesPorCodigo, opcionesPorNombre, raw);
+                if (opcion == null)
+                {
+                    AddLimitedError(errores, $"Fila {rowNumber}: plato '{raw}' no existe.");
+                    break;
+                }
+                if (opcion.EsAdicional)
+                {
+                    AddLimitedError(errores, $"Fila {rowNumber}: '{raw}' es adicional y no puede ir en menu.");
+                    break;
+                }
+                optionIds[i] = opcion.Id;
+            }
+
+            if (errores.Count > errorCountBefore)
+                continue;
+
+            if (!opcionesPorDiaHorario.TryGetValue((dia, horario.Id), out var opcionMenu))
+            {
+                AddLimitedError(errores, $"Fila {rowNumber}: no existe configuracion para {diaRaw} / {horarioRaw}.");
+                continue;
+            }
+
+            filas.Add(new MenuImportRow
+            {
+                RowNumber = rowNumber,
+                DiaSemana = dia,
+                HorarioId = horario.Id,
+                OpcionesMaximas = max,
+                DiaCerrado = diaCerrado,
+                Opciones = optionIds,
+                OpcionMenuId = opcionMenu.Id
+            });
+        }
+
+        var adicionalesSheet = workbook.Worksheets.FirstOrDefault(ws =>
+            NormalizeKey(ws.Name) == "adicionales" || NormalizeKey(ws.Name) == "opcionales");
+        var adicionalesIds = new List<int>();
+        if (adicionalesSheet != null)
+        {
+            var adicionalesHeader = adicionalesSheet.FirstRowUsed();
+            if (adicionalesHeader != null)
+            {
+                var map = BuildHeaderMap(adicionalesHeader);
+                if (TryGetColumn(map, out var colCodigo, "codigo")
+                    || TryGetColumn(map, out colCodigo, "cod"))
+                {
+                    TryGetColumn(map, out var colNombre, "nombre");
+                    var first = adicionalesHeader.RowBelow();
+                    var last = adicionalesSheet.LastRowUsed()?.RowNumber() ?? first.RowNumber();
+                    for (var rowNumber = first.RowNumber(); rowNumber <= last; rowNumber++)
+                    {
+                        var row = adicionalesSheet.Row(rowNumber);
+                        if (row.IsEmpty()) continue;
+                        var codigoRaw = colCodigo > 0 ? row.Cell(colCodigo).GetString().Trim() : string.Empty;
+                        var nombreRaw = colNombre > 0 ? row.Cell(colNombre).GetString().Trim() : string.Empty;
+                        if (string.IsNullOrWhiteSpace(codigoRaw) && string.IsNullOrWhiteSpace(nombreRaw))
+                            continue;
+
+                        var opcion = FindOpcionFromCell(opcionesPorCodigo, opcionesPorNombre, !string.IsNullOrWhiteSpace(codigoRaw) ? codigoRaw : nombreRaw);
+                        if (opcion == null)
+                        {
+                            AddLimitedError(errores, $"Adicional fila {rowNumber}: no existe '{codigoRaw} {nombreRaw}'.");
+                            continue;
+                        }
+                        if (!opcion.EsAdicional)
+                        {
+                            AddLimitedError(errores, $"Adicional fila {rowNumber}: '{opcion.Nombre}' no esta marcado como adicional.");
+                            continue;
+                        }
+                        if (!adicionalesIds.Contains(opcion.Id))
+                            adicionalesIds.Add(opcion.Id);
+                    }
+                }
+            }
+        }
+
+        if (errores.Count > 0)
+        {
+            model.Errores = errores;
+            model.Advertencias = advertencias;
+            return View(model);
+        }
+
+        using var tx = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            var cerrarIds = new List<int>();
+            foreach (var row in filas)
+            {
+                var diaMenu = opcionesMenu.First(x => x.Id == row.OpcionMenuId);
+                diaMenu.OpcionesMaximas = Math.Clamp(row.OpcionesMaximas, 1, 5);
+                diaMenu.DiaCerrado = row.DiaCerrado;
+
+                if (row.DiaCerrado)
+                {
+                    diaMenu.OpcionIdA = null;
+                    diaMenu.OpcionIdB = null;
+                    diaMenu.OpcionIdC = null;
+                    diaMenu.OpcionIdD = null;
+                    diaMenu.OpcionIdE = null;
+                    cerrarIds.Add(diaMenu.Id);
+                }
+                else
+                {
+                    diaMenu.OpcionIdA = row.Opciones.ElementAtOrDefault(0);
+                    diaMenu.OpcionIdB = row.Opciones.ElementAtOrDefault(1);
+                    diaMenu.OpcionIdC = row.Opciones.ElementAtOrDefault(2);
+                    diaMenu.OpcionIdD = row.Opciones.ElementAtOrDefault(3);
+                    diaMenu.OpcionIdE = row.Opciones.ElementAtOrDefault(4);
+                }
+            }
+
+            if (cerrarIds.Count > 0)
+            {
+                var respuestas = await _db.RespuestasFormulario.Where(r => cerrarIds.Contains(r.OpcionMenuId)).ToListAsync();
+                if (respuestas.Count > 0)
+                    _db.RespuestasFormulario.RemoveRange(respuestas);
+            }
+
+            if (adicionalesSheet != null)
+            {
+                var actuales = await _db.MenusAdicionales.Where(a => a.MenuId == menu.Id).ToListAsync();
+                if (actuales.Count > 0)
+                    _db.MenusAdicionales.RemoveRange(actuales);
+                var toAdd = adicionalesIds.Select(id => new MenuAdicional { MenuId = menu.Id, OpcionId = id }).ToList();
+                if (toAdd.Count > 0)
+                    await _db.MenusAdicionales.AddRangeAsync(toAdd);
+                adicionalesActualizados = toAdd.Count;
+            }
+
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            diasActualizados = filas.Count;
+            model.FilasProcesadas = filasProcesadas;
+            model.DiasActualizados = diasActualizados;
+            model.AdicionalesActualizados = adicionalesActualizados;
+            TempData["Success"] = $"Menu importado. Dias actualizados: {diasActualizados}.";
+            return RedirectToAction(nameof(Administrar), new { fecha = model.Inicio.ToDateTime(TimeOnly.MinValue).ToString("yyyy-MM-dd"), empresaId = model.EmpresaId, sucursalId = model.SucursalId });
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync();
+            model.Errores = new List<string> { "No se pudo importar el menu: " + ex.Message };
+            model.Advertencias = advertencias;
+            return View(model);
+        }
     }
 
     [Authorize(Roles = "Admin")]
@@ -1279,6 +1676,136 @@ public class MenuController : Controller
         if (opcionMenu.OpcionIdC != null || opcionMenu.OpcionC != null) return 'C';
         if (opcionMenu.OpcionIdD != null || opcionMenu.OpcionD != null) return 'D';
         if (opcionMenu.OpcionIdE != null || opcionMenu.OpcionE != null) return 'E';
+        return null;
+    }
+
+    private sealed class MenuImportRow
+    {
+        public int RowNumber { get; set; }
+        public DayOfWeek DiaSemana { get; set; }
+        public int HorarioId { get; set; }
+        public int OpcionesMaximas { get; set; }
+        public bool DiaCerrado { get; set; }
+        public int OpcionMenuId { get; set; }
+        public int?[] Opciones { get; set; } = new int?[5];
+    }
+
+    private static bool TryParseDia(string value, out DayOfWeek day)
+    {
+        var key = NormalizeKey(value);
+        switch (key)
+        {
+            case "lunes":
+            case "monday":
+                day = DayOfWeek.Monday; return true;
+            case "martes":
+            case "tuesday":
+                day = DayOfWeek.Tuesday; return true;
+            case "miercoles":
+            case "wednesday":
+                day = DayOfWeek.Wednesday; return true;
+            case "jueves":
+            case "thursday":
+                day = DayOfWeek.Thursday; return true;
+            case "viernes":
+            case "friday":
+                day = DayOfWeek.Friday; return true;
+        }
+        day = default;
+        return false;
+    }
+
+    private static bool TryGetOptionColumn(Dictionary<string, int> headerMap, out int col, int index)
+    {
+        var letter = ((char)('a' + (index - 1))).ToString();
+        var targets = new[]
+        {
+            $"opcion{index}",
+            $"opcion{letter}",
+            $"plato{index}",
+            $"plato{letter}"
+        };
+        foreach (var entry in headerMap)
+        {
+            foreach (var target in targets)
+            {
+                if (entry.Key.Contains(target))
+                {
+                    col = entry.Value;
+                    return true;
+                }
+            }
+        }
+        col = 0;
+        return false;
+    }
+
+    private static bool TryParseOpcionesMaximas(string raw, out int value)
+    {
+        value = 0;
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+        if (!int.TryParse(raw, out var parsed)) return false;
+        if (parsed < 1 || parsed > 5) return false;
+        value = parsed;
+        return true;
+    }
+
+    private static bool TryParseBool(string? raw, out bool value)
+    {
+        value = false;
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+        var key = NormalizeKey(raw);
+        if (key == "1" || key == "si" || key == "true" || key == "cerrado" || key == "feriado")
+        {
+            value = true;
+            return true;
+        }
+        if (key == "0" || key == "no" || key == "false")
+        {
+            value = false;
+            return true;
+        }
+        return false;
+    }
+
+    private static bool IsNullToken(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return true;
+        var key = NormalizeKey(raw);
+        return key == "ninguno" || key == "no" || key == "sinplato" || key == "feriado";
+    }
+
+    private static bool AnyTokenFeriado(params string[] values)
+    {
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value)) continue;
+            if (NormalizeKey(value) == "feriado")
+                return true;
+        }
+        return false;
+    }
+
+    private static bool AnyTokenNoVacio(params string[] values)
+    {
+        foreach (var value in values)
+        {
+            if (!IsNullToken(value))
+                return true;
+        }
+        return false;
+    }
+
+    private static Opcion? FindOpcionFromCell(Dictionary<string, Opcion> porCodigo, Dictionary<string, Opcion> porNombre, string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var key = NormalizeKey(raw);
+        if (porCodigo.TryGetValue(key, out var encontrado))
+            return encontrado;
+        if (porNombre.TryGetValue(key, out encontrado))
+            return encontrado;
+        if (key.All(char.IsDigit) && porCodigo.TryGetValue($"p{key}", out encontrado))
+            return encontrado;
         return null;
     }
 

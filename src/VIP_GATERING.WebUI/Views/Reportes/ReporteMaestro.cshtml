@@ -64,12 +64,11 @@
         </select>
     </div>
     <div class="md:col-span-2">
-        <label class="text-xs uppercase tracking-widest text-slate-400">Estado</label>
+        <label class="text-xs uppercase tracking-widest text-slate-400">Estado nomina</label>
         <select name="estado" class="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100">
             <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Estado) ? "selected" : null)">Todos</option>
             <option value="abierto" selected="@(Model.Estado == "abierto" ? "selected" : null)">Abierto</option>
             <option value="cerrado" selected="@(Model.Estado == "cerrado" ? "selected" : null)">Cerrado</option>
-            <option value="facturado" selected="@(Model.Estado == "facturado" ? "selected" : null)">Facturado</option>
         </select>
     </div>
     <div class="flex gap-3 md:col-span-4 flex-wrap">

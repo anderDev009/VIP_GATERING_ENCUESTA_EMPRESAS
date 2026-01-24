@@ -1021,13 +1021,19 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,RRHH")]
     [HttpGet]
-    public async Task<IActionResult> Distribucion(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null)
+    public async Task<IActionResult> Distribucion(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? horaAlmuerzo = null)
     {
         if (empresaId <= 0) empresaId = null;
         if (sucursalId <= 0) sucursalId = null;
         if (empleadoId <= 0) empleadoId = null;
         if (localizacionId <= 0) localizacionId = null;
         if (horarioId <= 0) horarioId = null;
+        TimeOnly? horaAlmuerzoValue = null;
+        if (!string.IsNullOrWhiteSpace(horaAlmuerzo)
+            && TimeOnly.TryParseExact(horaAlmuerzo, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var horaParsed))
+        {
+            horaAlmuerzoValue = horaParsed;
+        }
 
         DateOnly inicio;
         DateOnly fin;
@@ -1071,7 +1077,7 @@ public class ReportesController : Controller
                 .ToListAsync();
         }
         var empleados = await ObtenerEmpleadosFiltroAsync(empresaId, sucursalId);
-        var horarios = await ObtenerHorariosFiltroAsync(empresaId, sucursalId);
+        var horarios = await ObtenerHorariosFiltroAsync(empresaId, sucursalId, inicio, fin);
         List<Localizacion> localizaciones;
         var localizacionesBase = _db.Localizaciones.AsNoTracking().AsQueryable();
         if (empresaId != null)
@@ -1132,6 +1138,46 @@ public class ReportesController : Controller
         }
         if (horarioId != null)
             baseQuery = baseQuery.Where(r => r.OpcionMenu != null && r.OpcionMenu.HorarioId == horarioId);
+
+        var horasAlmuerzoSet = new HashSet<TimeOnly>();
+        if (horarioId != null && (empresaId != null || sucursalId != null))
+        {
+            var slotsQuery = _db.SucursalesHorariosSlots.AsNoTracking().AsQueryable();
+            if (sucursalId != null)
+            {
+                slotsQuery = slotsQuery.Where(sh => sh.SucursalId == sucursalId && sh.HorarioId == horarioId);
+            }
+            else if (empresaId != null)
+            {
+                slotsQuery = slotsQuery
+                    .Include(sh => sh.Sucursal)
+                    .Where(sh => sh.Sucursal != null && sh.Sucursal.EmpresaId == empresaId && sh.HorarioId == horarioId);
+            }
+
+            var slots = await slotsQuery
+                .Select(sh => sh.Hora)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var hora in slots)
+                horasAlmuerzoSet.Add(hora);
+        }
+
+        var horasHistoricas = await baseQuery
+            .Where(r => r.HoraAlmuerzo != null)
+            .Select(r => r.HoraAlmuerzo!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        foreach (var hora in horasHistoricas)
+            horasAlmuerzoSet.Add(hora);
+
+        var horasAlmuerzo = horasAlmuerzoSet
+            .OrderBy(h => h)
+            .ToList();
+
+        if (horaAlmuerzoValue != null)
+            baseQuery = baseQuery.Where(r => r.HoraAlmuerzo == horaAlmuerzoValue);
 
         var respuestas = await baseQuery.ToListAsync();
         respuestas = respuestas
@@ -1340,11 +1386,13 @@ public class ReportesController : Controller
             EmpleadoId = empleadoId,
             LocalizacionId = localizacionId,
             HorarioId = horarioId,
+            HoraAlmuerzo = horaAlmuerzoValue?.ToString("HH:mm"),
             Empresas = empresas,
             Sucursales = sucursales,
             Empleados = empleados,
             Localizaciones = localizaciones,
             Horarios = horarios,
+            HorasAlmuerzo = horasAlmuerzo.Select(h => h.ToString("HH:mm")).ToList(),
             ResumenFiliales = resumen,
             DetalleEmpleados = detalle,
             PorLocalizacion = porLocalizacion,
@@ -1973,9 +2021,9 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,RRHH")]
     [HttpGet]
-    public async Task<IActionResult> DistribucionCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? vista = null)
+    public async Task<IActionResult> DistribucionCsv(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? horaAlmuerzo = null, string? vista = null)
     {
-        var result = await Distribucion(empresaId, sucursalId, empleadoId, localizacionId, horarioId, desde, hasta) as ViewResult;
+        var result = await Distribucion(empresaId, sucursalId, empleadoId, localizacionId, horarioId, desde, hasta, horaAlmuerzo) as ViewResult;
         var vm = (DistribucionVM)result!.Model!;
         var export = BuildDistribucionExport(vm, vista);
         var bytes = ExportHelper.BuildCsv(export.Headers, export.Rows);
@@ -1984,9 +2032,9 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,RRHH")]
     [HttpGet]
-    public async Task<IActionResult> DistribucionExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? vista = null)
+    public async Task<IActionResult> DistribucionExcel(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? horaAlmuerzo = null, string? vista = null)
     {
-        var result = await Distribucion(empresaId, sucursalId, empleadoId, localizacionId, horarioId, desde, hasta) as ViewResult;
+        var result = await Distribucion(empresaId, sucursalId, empleadoId, localizacionId, horarioId, desde, hasta, horaAlmuerzo) as ViewResult;
         var vm = (DistribucionVM)result!.Model!;
         var export = BuildDistribucionExport(vm, vista);
         var bytes = ExportHelper.BuildExcel("Distribucion", export.Headers, export.Rows);
@@ -1995,9 +2043,9 @@ public class ReportesController : Controller
 
     [Authorize(Roles = "Admin,RRHH")]
     [HttpGet]
-    public async Task<IActionResult> DistribucionPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? vista = null)
+    public async Task<IActionResult> DistribucionPdf(int? empresaId = null, int? sucursalId = null, int? empleadoId = null, int? localizacionId = null, int? horarioId = null, DateOnly? desde = null, DateOnly? hasta = null, string? horaAlmuerzo = null, string? vista = null)
     {
-        var result = await Distribucion(empresaId, sucursalId, empleadoId, localizacionId, horarioId, desde, hasta) as ViewResult;
+        var result = await Distribucion(empresaId, sucursalId, empleadoId, localizacionId, horarioId, desde, hasta, horaAlmuerzo) as ViewResult;
         var vm = (DistribucionVM)result!.Model!;
 
         var export = BuildDistribucionExport(vm, vista);
@@ -2285,72 +2333,83 @@ private IQueryable<RespuestaFormulario> AplicarFiltrosEmpresaSucursales(IQueryab
         return await query.OrderBy(e => e.Nombre ?? e.Codigo).ToListAsync();
     }
 
-    private async Task<List<Horario>> ObtenerHorariosFiltroAsync(int? empresaId, int? sucursalId)
+    private async Task<List<Horario>> ObtenerHorariosFiltroAsync(int? empresaId, int? sucursalId, DateOnly? inicio, DateOnly? fin)
     {
+        var ids = new HashSet<int>();
+
         if (sucursalId != null)
         {
-            var ids = await _db.SucursalesHorarios
+            var configurados = await _db.SucursalesHorarios
                 .Where(sh => sh.SucursalId == sucursalId)
                 .Select(sh => sh.HorarioId)
                 .Distinct()
                 .ToListAsync();
-            if (ids.Count == 0)
+            if (configurados.Count == 0)
             {
-                ids = await _db.SucursalesHorariosSlots
+                configurados = await _db.SucursalesHorariosSlots
                     .Where(sh => sh.SucursalId == sucursalId)
                     .Select(sh => sh.HorarioId)
                     .Distinct()
                     .ToListAsync();
             }
-            if (ids.Count == 0)
-            {
-                return await _db.Horarios
-                    .Where(h => h.Activo)
-                    .OrderBy(h => h.Orden)
-                    .ThenBy(h => h.Nombre)
-                    .ToListAsync();
-            }
-            return await _db.Horarios
-                .Where(h => ids.Contains(h.Id))
-                .OrderBy(h => h.Orden)
-                .ThenBy(h => h.Nombre)
-                .ToListAsync();
+            foreach (var id in configurados)
+                ids.Add(id);
         }
-
-        if (empresaId != null)
+        else if (empresaId != null)
         {
-            var ids = await _db.SucursalesHorarios
+            var configurados = await _db.SucursalesHorarios
                 .Include(sh => sh.Sucursal)
                 .Where(sh => sh.Sucursal != null && sh.Sucursal.EmpresaId == empresaId)
                 .Select(sh => sh.HorarioId)
                 .Distinct()
                 .ToListAsync();
-            if (ids.Count == 0)
+            if (configurados.Count == 0)
             {
-                ids = await _db.SucursalesHorariosSlots
+                configurados = await _db.SucursalesHorariosSlots
                     .Include(sh => sh.Sucursal)
                     .Where(sh => sh.Sucursal != null && sh.Sucursal.EmpresaId == empresaId)
                     .Select(sh => sh.HorarioId)
                     .Distinct()
                     .ToListAsync();
             }
-            if (ids.Count == 0)
-            {
-                return await _db.Horarios
-                    .Where(h => h.Activo)
-                    .OrderBy(h => h.Orden)
-                    .ThenBy(h => h.Nombre)
-                    .ToListAsync();
-            }
+            foreach (var id in configurados)
+                ids.Add(id);
+        }
+
+        if (inicio != null && fin != null && (empresaId != null || sucursalId != null))
+        {
+            var inicioValue = inicio.Value;
+            var finValue = fin.Value;
+            var historicoQuery = _db.RespuestasFormulario
+                .AsNoTracking()
+                .Where(r => r.OpcionMenu != null
+                    && r.OpcionMenu.HorarioId != null
+                    && r.OpcionMenu.Menu != null
+                    && r.OpcionMenu.Menu.FechaInicio <= finValue
+                    && r.OpcionMenu.Menu.FechaTermino >= inicioValue);
+
+            historicoQuery = AplicarFiltrosEmpresaSucursal(historicoQuery, empresaId, sucursalId);
+
+            var historicos = await historicoQuery
+                .Select(r => r.OpcionMenu!.HorarioId!.Value)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var id in historicos)
+                ids.Add(id);
+        }
+
+        if (ids.Count == 0)
+        {
             return await _db.Horarios
-                .Where(h => ids.Contains(h.Id))
+                .Where(h => h.Activo)
                 .OrderBy(h => h.Orden)
                 .ThenBy(h => h.Nombre)
                 .ToListAsync();
         }
 
         return await _db.Horarios
-            .Where(h => h.Activo)
+            .Where(h => ids.Contains(h.Id))
             .OrderBy(h => h.Orden)
             .ThenBy(h => h.Nombre)
             .ToListAsync();
@@ -3198,6 +3257,7 @@ private static (string Title, string Suffix, IReadOnlyList<string> Headers, List
         string empleado = vm.EmpleadoId != null ? (vm.Empleados.FirstOrDefault(e => e.Id == vm.EmpleadoId)?.Nombre ?? vm.Empleados.FirstOrDefault(e => e.Id == vm.EmpleadoId)?.Codigo ?? "Todos") : "Todos";
         string localizacion = vm.LocalizacionId != null ? vm.Localizaciones.FirstOrDefault(l => l.Id == vm.LocalizacionId)?.Nombre ?? "Todas" : "Todas";
         string tanda = vm.HorarioId != null ? vm.Horarios.FirstOrDefault(h => h.Id == vm.HorarioId)?.Nombre ?? "Todas" : "Todas";
+        string horaAlmuerzo = !string.IsNullOrWhiteSpace(vm.HoraAlmuerzo) ? vm.HoraAlmuerzo : "Todas";
 
         void AddRow(string label, string value)
         {
@@ -3214,6 +3274,7 @@ private static (string Title, string Suffix, IReadOnlyList<string> Headers, List
         AddRow("Filtro - Empleado", empleado);
         AddRow("Filtro - Localizacion", localizacion);
         AddRow("Filtro - Tanda", tanda);
+        AddRow("Filtro - Hora almuerzo", horaAlmuerzo);
         rows.Add(new string[headers.Count]);
         rows.AddRange(dataRows);
         return rows;
@@ -3457,7 +3518,6 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
         {
             "abierto" => baseQuery.Where(r => !r.CierreNomina),
             "cerrado" => baseQuery.Where(r => r.CierreNomina),
-            "facturado" => baseQuery.Where(r => r.Facturado),
             _ => baseQuery
         };
     }

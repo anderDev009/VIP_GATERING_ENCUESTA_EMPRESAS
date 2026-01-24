@@ -51,11 +51,11 @@ public class OpcionesController : Controller
         var headers = new[] { "Codigo", "Nombre", "Descripcion", "Costo", "Precio" };
         var rows = opciones.Select(o => (IReadOnlyList<string>)new[]
         {
-            o.Codigo ?? string.Empty,
-            o.Nombre ?? string.Empty,
-            o.Descripcion ?? string.Empty,
-            o.Costo.ToString("0.00"),
-            (o.Precio ?? 0m).ToString("0.00")
+            NormalizeCodigoPlato(o.Codigo) ?? string.Empty,
+            NormalizeExportText(o.Nombre),
+            NormalizeExportText(o.Descripcion),
+            o.Costo.ToString("0.00", CultureInfo.InvariantCulture),
+            (o.Precio ?? 0m).ToString("0.00", CultureInfo.InvariantCulture)
         }).ToList();
         var bytes = ExportHelper.BuildCsv(headers, rows);
         return File(bytes, "text/csv", "platos.csv");
@@ -69,11 +69,11 @@ public class OpcionesController : Controller
         var headers = new[] { "Codigo", "Nombre", "Descripcion", "Costo", "Precio" };
         var rows = opciones.Select(o => (IReadOnlyList<string>)new[]
         {
-            o.Codigo ?? string.Empty,
-            o.Nombre ?? string.Empty,
-            o.Descripcion ?? string.Empty,
-            o.Costo.ToString("0.00"),
-            (o.Precio ?? 0m).ToString("0.00")
+            NormalizeCodigoPlato(o.Codigo) ?? string.Empty,
+            NormalizeExportText(o.Nombre),
+            NormalizeExportText(o.Descripcion),
+            o.Costo.ToString("0.00", CultureInfo.InvariantCulture),
+            (o.Precio ?? 0m).ToString("0.00", CultureInfo.InvariantCulture)
         }).ToList();
         var bytes = ExportHelper.BuildExcel("Platos", headers, rows);
         return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "platos.xlsx");
@@ -87,11 +87,11 @@ public class OpcionesController : Controller
         var headers = new[] { "Codigo", "Nombre", "Descripcion", "Costo", "Precio" };
         var rows = opciones.Select(o => (IReadOnlyList<string>)new[]
         {
-            o.Codigo ?? string.Empty,
-            o.Nombre ?? string.Empty,
-            o.Descripcion ?? string.Empty,
-            o.Costo.ToString("0.00"),
-            (o.Precio ?? 0m).ToString("0.00")
+            NormalizeCodigoPlato(o.Codigo) ?? string.Empty,
+            NormalizeExportText(o.Nombre),
+            NormalizeExportText(o.Descripcion),
+            o.Costo.ToString("0.00", CultureInfo.InvariantCulture),
+            (o.Precio ?? 0m).ToString("0.00", CultureInfo.InvariantCulture)
         }).ToList();
         var pdf = ExportHelper.BuildPdf("Platos", headers, rows);
         return File(pdf, "application/pdf", "platos.pdf");
@@ -167,7 +167,7 @@ public class OpcionesController : Controller
             if (row.IsEmpty()) continue;
             totalFilas++;
 
-            var codigo = row.Cell(colCodigo).GetString().Trim();
+            var codigo = NormalizeCodigoPlato(row.Cell(colCodigo).GetString());
             var nombre = row.Cell(colNombre).GetString().Trim();
             var descripcion = row.Cell(colDescripcion).GetString().Trim();
             var costoRaw = row.Cell(colCosto).GetString().Trim();
@@ -206,7 +206,7 @@ public class OpcionesController : Controller
             {
                 opcion = new Opcion
                 {
-                    Codigo = string.IsNullOrWhiteSpace(codigo) ? null : codigo,
+                    Codigo = string.IsNullOrWhiteSpace(codigo) ? await GetNextPlatoCodigoAsync() : codigo,
                     Nombre = nombre,
                     Descripcion = descripcion,
                     Costo = costo,
@@ -468,6 +468,31 @@ public class OpcionesController : Controller
         }
         col = 0;
         return false;
+    }
+
+    private static string? NormalizeCodigoPlato(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var trimmed = raw.Trim().ToUpperInvariant();
+        var alnum = new string(trimmed.Where(char.IsLetterOrDigit).ToArray());
+        if (string.IsNullOrWhiteSpace(alnum)) return null;
+        if (!alnum.Any(char.IsLetter))
+            return $"P{alnum}";
+        return alnum;
+    }
+
+    private static string NormalizeExportText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var normalized = value.Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new StringBuilder();
+        foreach (var ch in normalized)
+        {
+            var cat = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (cat != System.Globalization.UnicodeCategory.NonSpacingMark)
+                sb.Append(ch);
+        }
+        return sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
     }
 
     private static string NormalizeKey(string value)
