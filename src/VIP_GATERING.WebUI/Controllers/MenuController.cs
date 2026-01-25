@@ -907,6 +907,11 @@ public class MenuController : Controller
         }
         TryGetColumn(headerMap, out var colCodigoUni, "codigouni");
         TryGetColumn(headerMap, out var colContrasena, "contrasena");
+        TryGetColumn(headerMap, out var colHoraAlmuerzo, "hora", "almuerzo");
+        if (colHoraAlmuerzo == 0)
+            TryGetColumn(headerMap, out colHoraAlmuerzo, "turno", "almuerzo");
+        if (colHoraAlmuerzo == 0)
+            TryGetColumn(headerMap, out colHoraAlmuerzo, "hora", "turno");
 
         var firstDataRow = headerRow.RowBelow();
         var lastRow = worksheet.LastRowUsed()?.RowNumber() ?? firstDataRow.RowNumber();
@@ -922,6 +927,22 @@ public class MenuController : Controller
             var localidad = row.Cell(colLocalidad).GetString().Trim();
             var codigoUni = colCodigoUni > 0 ? row.Cell(colCodigoUni).GetString().Trim() : string.Empty;
             var contrasena = colContrasena > 0 ? row.Cell(colContrasena).GetString().Trim() : string.Empty;
+            TimeOnly? horaAlmuerzo = null;
+            if (colHoraAlmuerzo > 0)
+            {
+                var horaCell = row.Cell(colHoraAlmuerzo);
+                var rawHora = horaCell.GetString().Trim();
+                if (TryParseHoraAlmuerzoCell(horaCell, out var horaParsed, out var hadRange, out var rawText))
+                {
+                    horaAlmuerzo = horaParsed;
+                    if (hadRange)
+                        AddLimitedWarning(advertencias, $"Fila {rowNumber}: turno de almuerzo '{rawText}' interpretado como {horaParsed:HH\\:mm} (hora inicial).");
+                }
+                else if (!string.IsNullOrWhiteSpace(rawHora))
+                {
+                    AddLimitedWarning(advertencias, $"Fila {rowNumber}: turno de almuerzo '{rawHora}' no es valido; se usara la hora por defecto.");
+                }
+            }
 
             if (string.IsNullOrWhiteSpace(nombre) && string.IsNullOrWhiteSpace(codigo))
             {
@@ -1105,7 +1126,7 @@ public class MenuController : Controller
                         sucursal.Id,
                         localizacion?.Id,
                         null,
-                        null);
+                        horaAlmuerzo);
                     seleccionesGuardadas++;
                 }
                 catch (Exception ex)
@@ -1543,6 +1564,58 @@ public class MenuController : Controller
             "e" => 'E',
             _ => null
         };
+    }
+
+    private static bool TryParseHoraAlmuerzoCell(IXLCell cell, out TimeOnly hora, out bool hadRange, out string rawText)
+    {
+        hadRange = false;
+        rawText = cell.GetString().Trim();
+        if (cell.TryGetValue<DateTime>(out var dt))
+        {
+            hora = TimeOnly.FromDateTime(dt);
+            return true;
+        }
+        if (cell.TryGetValue<TimeSpan>(out var ts))
+        {
+            hora = TimeOnly.FromTimeSpan(ts);
+            return true;
+        }
+        if (string.IsNullOrWhiteSpace(rawText))
+        {
+            hora = default;
+            return false;
+        }
+        return TryParseHoraAlmuerzo(rawText, out hora, out hadRange);
+    }
+
+    private static bool TryParseHoraAlmuerzo(string raw, out TimeOnly hora, out bool hadRange)
+    {
+        hora = default;
+        hadRange = false;
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+
+        var matches = Regex.Matches(raw, @"(?<!\d)(\d{1,2})(?:[:.](\d{2}))?\s*([ap]\.?m\.?|m\.?m\.?)?(?!\d)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeout);
+        if (matches.Count == 0) return false;
+
+        if (matches.Count > 1 && Regex.IsMatch(raw, @"\b(a|hasta|al|–|-|—)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, RegexTimeout))
+            hadRange = true;
+
+        var match = matches[0];
+        if (!int.TryParse(match.Groups[1].Value, out var hours)) return false;
+        var minutes = 0;
+        if (match.Groups[2].Success && !int.TryParse(match.Groups[2].Value, out minutes))
+            return false;
+
+        if (minutes < 0 || minutes > 59) return false;
+        var meridian = match.Groups[3].Success ? match.Groups[3].Value.Replace(".", string.Empty).ToLowerInvariant() : string.Empty;
+        if (meridian.StartsWith("p") && hours < 12) hours += 12;
+        if (meridian.StartsWith("a") && hours == 12) hours = 0;
+        if (meridian.StartsWith("m") && hours < 12) hours += 12;
+        if (hours < 0 || hours > 23) return false;
+
+        hora = new TimeOnly(hours, minutes);
+        return true;
     }
 
     private static readonly DayOfWeek[] WorkingDays = new[]
