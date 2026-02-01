@@ -285,32 +285,30 @@ public static class SeedData
         if (nombresLoc.Count == 0)
             return;
 
-        var sucursales = await db.Sucursales
+        var empresas = await db.Empresas
             .AsNoTracking()
-            .Select(s => new { s.Id, s.EmpresaId, s.Nombre })
+            .Select(e => e.Id)
             .ToListAsync();
         var existentes = await db.Localizaciones
             .AsNoTracking()
-            .Select(l => new { l.SucursalId, l.EmpresaId, l.Nombre })
+            .Select(l => new { l.EmpresaId, l.Nombre })
             .ToListAsync();
         var existentesSet = new HashSet<string>(
-            existentes.Select(e => $"{e.SucursalId:N}|{e.EmpresaId:N}|{e.Nombre}"),
+            existentes.Select(e => $"{e.EmpresaId:N}|{e.Nombre}"),
             StringComparer.OrdinalIgnoreCase);
 
-        foreach (var suc in sucursales)
+        foreach (var empresaId in empresas)
         {
-            if (suc.Id == 0) continue;
             foreach (var nombre in nombresLoc)
             {
-                var key = $"{suc.Id:N}|{suc.EmpresaId:N}|{nombre}";
+                var key = $"{empresaId:N}|{nombre}";
                 if (existentesSet.Contains(key)) continue;
-                var sucursalNombre = string.IsNullOrWhiteSpace(suc.Nombre) ? "filial" : suc.Nombre;
                 db.Localizaciones.Add(new Localizacion
                 {
                     Nombre = nombre,
-                    EmpresaId = suc.EmpresaId,
-                    SucursalId = suc.Id,
-                    Direccion = $"Direccion de {sucursalNombre}",
+                    EmpresaId = empresaId,
+                    SucursalId = null,
+                    Direccion = $"Direccion de empresa {empresaId}",
                     IndicacionesEntrega = $"Entrega en {nombre}"
                 });
                 existentesSet.Add(key);
@@ -320,6 +318,7 @@ public static class SeedData
         if (db.ChangeTracker.HasChanges())
             await db.SaveChangesAsync();
     }
+
 
     private static DateOnly GetWeekStart(DateOnly date)
     {

@@ -72,13 +72,13 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, 
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Localizacion>()
-            .HasIndex(l => new { l.SucursalId, l.Nombre })
+            .HasIndex(l => new { l.EmpresaId, l.Nombre })
             .IsUnique();
         modelBuilder.Entity<Localizacion>()
             .HasOne(l => l.Sucursal)
             .WithMany(s => s.Localizaciones)
             .HasForeignKey(l => l.SucursalId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<EmpleadoLocalizacion>()
             .HasIndex(el => new { el.EmpleadoId, el.LocalizacionId })

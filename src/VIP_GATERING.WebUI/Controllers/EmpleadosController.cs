@@ -68,13 +68,12 @@ public class EmpleadosController : Controller
             else
             {
                 var nombreFiltro = localizacionFiltro.Nombre.Trim();
-                var empresaFiltro = empresaId ?? localizacionFiltro.Sucursal?.EmpresaId;
+                var empresaFiltro = empresaId ?? localizacionFiltro.EmpresaId;
                 if (empresaFiltro != null)
                 {
                     query = query.Where(e => e.LocalizacionesAsignadas.Any(l =>
                         l.Localizacion != null
-                        && l.Localizacion.Sucursal != null
-                        && l.Localizacion.Sucursal.EmpresaId == empresaFiltro
+                        && l.Localizacion.EmpresaId == empresaFiltro
                         && l.Localizacion.Nombre.Equals(nombreFiltro, StringComparison.OrdinalIgnoreCase)));
                 }
                 else
@@ -89,9 +88,9 @@ public class EmpleadosController : Controller
         ViewBag.Sucursales = await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
         var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
         if (empresaId != null)
-            localizacionesQuery = localizacionesQuery.Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+            localizacionesQuery = localizacionesQuery.Where(l => l.EmpresaId == empresaId);
         if (sucursalId != null)
-            localizacionesQuery = localizacionesQuery.Where(l => l.SucursalId == sucursalId);
+            localizacionesQuery = localizacionesQuery.Where(l => l.SucursalId == sucursalId || l.SucursalId == null);
         var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
         ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
         ViewBag.EmpresaId = empresaId; ViewBag.SucursalId = sucursalId; ViewBag.LocalizacionId = localizacionId; ViewBag.Q = q;
@@ -198,9 +197,8 @@ public class EmpleadosController : Controller
                 .FirstOrDefaultAsync();
             var loc = await _db.Localizaciones
                 .AsNoTracking()
-                .Include(l => l.Sucursal)
                 .Where(l => l.Id == localizacionId.Value)
-                .Select(l => new { l.Id, EmpresaId = l.Sucursal != null ? l.Sucursal.EmpresaId : 0 })
+                .Select(l => new { l.Id, l.EmpresaId })
                 .FirstOrDefaultAsync();
             if (loc == null || loc.EmpresaId != empresaPrimaria)
             {
@@ -334,9 +332,8 @@ public class EmpleadosController : Controller
                 .FirstOrDefaultAsync();
             var loc = await _db.Localizaciones
                 .AsNoTracking()
-                .Include(l => l.Sucursal)
                 .Where(l => l.Id == localizacionId.Value)
-                .Select(l => new { l.Id, EmpresaId = l.Sucursal != null ? l.Sucursal.EmpresaId : 0 })
+                .Select(l => new { l.Id, l.EmpresaId })
                 .FirstOrDefaultAsync();
             if (loc == null || loc.EmpresaId != empresaPrimaria)
             {
@@ -407,7 +404,7 @@ public class EmpleadosController : Controller
         var grupos = localizaciones
             .GroupBy(l => new
             {
-                EmpresaId = l.Sucursal?.EmpresaId ?? 0,
+                EmpresaId = l.EmpresaId,
                 Nombre = l.Nombre.Trim().ToUpperInvariant()
             })
             .ToList();

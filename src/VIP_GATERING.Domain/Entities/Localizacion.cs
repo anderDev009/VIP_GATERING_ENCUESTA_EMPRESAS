@@ -7,7 +7,7 @@ public class Localizacion
     public int Id { get; set; }
     public string Nombre { get; set; } = string.Empty;
 
-    public int SucursalId { get; set; }
+    public int? SucursalId { get; set; }
     public Sucursal? Sucursal { get; set; }
 
     public int EmpresaId { get; set; }

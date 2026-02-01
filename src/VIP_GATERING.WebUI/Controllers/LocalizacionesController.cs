@@ -25,7 +25,7 @@ public class LocalizacionesController : Controller
         if (empresaId != null)
             baseQuery = baseQuery.Where(l => l.EmpresaId == empresaId);
         if (sucursalId != null)
-            baseQuery = baseQuery.Where(l => l.SucursalId == sucursalId);
+            baseQuery = baseQuery.Where(l => l.SucursalId == sucursalId || l.SucursalId == null);
 
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -33,6 +33,7 @@ public class LocalizacionesController : Controller
             baseQuery = baseQuery.Where(l =>
                 l.Nombre.ToLower().Contains(ql) ||
                 (l.Sucursal != null && l.Sucursal.Nombre.ToLower().Contains(ql)) ||
+                (l.Empresa != null && l.Empresa.Nombre.ToLower().Contains(ql)) ||
                 (l.Sucursal != null && l.Sucursal.Empresa != null && l.Sucursal.Empresa.Nombre.ToLower().Contains(ql)));
         }
 
@@ -116,7 +117,7 @@ public class LocalizacionesController : Controller
         if (empresaId != null)
             baseQuery = baseQuery.Where(l => l.EmpresaId == empresaId);
         if (sucursalId != null)
-            baseQuery = baseQuery.Where(l => l.SucursalId == sucursalId);
+            baseQuery = baseQuery.Where(l => l.SucursalId == sucursalId || l.SucursalId == null);
 
         if (!string.IsNullOrWhiteSpace(q))
         {
@@ -124,6 +125,7 @@ public class LocalizacionesController : Controller
             baseQuery = baseQuery.Where(l =>
                 l.Nombre.ToLower().Contains(ql) ||
                 (l.Sucursal != null && l.Sucursal.Nombre.ToLower().Contains(ql)) ||
+                (l.Empresa != null && l.Empresa.Nombre.ToLower().Contains(ql)) ||
                 (l.Sucursal != null && l.Sucursal.Empresa != null && l.Sucursal.Empresa.Nombre.ToLower().Contains(ql)));
         }
 
@@ -163,16 +165,6 @@ public class LocalizacionesController : Controller
             return await ReturnInvalidAsync(model);
         }
 
-        var sucursal = await _db.Sucursales
-            .Where(s => s.EmpresaId == model.EmpresaId)
-            .OrderBy(s => s.Nombre)
-            .FirstOrDefaultAsync();
-        if (sucursal == null)
-        {
-            ModelState.AddModelError("EmpresaId", "La empresa seleccionada no tiene filiales.");
-            return await ReturnInvalidAsync(model);
-        }
-
         var nombre = model.Nombre.Trim();
         var existe = await _db.Localizaciones.AnyAsync(l =>
             l.EmpresaId == model.EmpresaId
@@ -183,7 +175,7 @@ public class LocalizacionesController : Controller
             return await ReturnInvalidAsync(model);
         }
 
-        model.SucursalId = sucursal.Id;
+        model.SucursalId = null;
         model.Nombre = nombre;
         await _db.Localizaciones.AddAsync(model);
         await _db.SaveChangesAsync();
@@ -226,22 +218,6 @@ public class LocalizacionesController : Controller
             return View(model);
         }
 
-        var sucursalId = ent.SucursalId;
-        if (ent.EmpresaId != model.EmpresaId)
-        {
-            var sucursal = await _db.Sucursales
-                .Where(s => s.EmpresaId == model.EmpresaId)
-                .OrderBy(s => s.Nombre)
-                .FirstOrDefaultAsync();
-            if (sucursal == null)
-            {
-                ModelState.AddModelError("EmpresaId", "La empresa seleccionada no tiene filiales.");
-                ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
-                return View(model);
-            }
-            sucursalId = sucursal.Id;
-        }
-
         var nombre = model.Nombre.Trim();
         var nombreCambio = !string.Equals(ent.Nombre, nombre, StringComparison.OrdinalIgnoreCase) || ent.EmpresaId != model.EmpresaId;
         if (nombreCambio)
@@ -260,7 +236,7 @@ public class LocalizacionesController : Controller
 
         ent.Nombre = nombre;
         ent.EmpresaId = model.EmpresaId;
-        ent.SucursalId = sucursalId;
+        ent.SucursalId = null;
         ent.Rnc = model.Rnc;
         ent.Direccion = model.Direccion;
         ent.IndicacionesEntrega = model.IndicacionesEntrega;

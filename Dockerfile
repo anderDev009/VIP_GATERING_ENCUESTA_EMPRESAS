@@ -22,6 +22,15 @@ RUN dotnet publish src/VIP_GATERING.WebUI/VIP_GATERING.WebUI.csproj -c Release -
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 
+# Set timezone to Santo Domingo, Dominican Republic
+ENV TZ=America/Santo_Domingo
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Set a predictable URL binding inside the container
 ENV ASPNETCORE_URLS=http://+:8080
 

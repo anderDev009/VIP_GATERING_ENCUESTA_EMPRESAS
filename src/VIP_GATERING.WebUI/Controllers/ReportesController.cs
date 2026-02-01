@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using VIP_GATERING.Application.Services;
 using VIP_GATERING.Domain.Entities;
 using VIP_GATERING.Infrastructure.Data;
@@ -26,6 +27,23 @@ public class ReportesController : Controller
 
     public ReportesController(AppDbContext db, IFechaServicio fechas, ICurrentUserService current, ISubsidioService subsidios)
     { _db = db; _fechas = fechas; _current = current; _subsidios = subsidios; }
+
+    private static TimeZoneInfo GetRdTimeZone()
+    {
+        // Windows uses different timezone IDs than Linux containers.
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return TimeZoneInfo.FindSystemTimeZoneById("SA Western Standard Time");
+        return TimeZoneInfo.FindSystemTimeZoneById("America/Santo_Domingo");
+    }
+
+    private static string FormatHoraRd(DateTime? utcDateTime)
+    {
+        if (!utcDateTime.HasValue) return string.Empty;
+        var rdTz = GetRdTimeZone();
+        var utc = DateTime.SpecifyKind(utcDateTime.Value, DateTimeKind.Utc);
+        var local = TimeZoneInfo.ConvertTimeFromUtc(utc, rdTz);
+        return local.ToString("HH:mm");
+    }
 
     [Authorize(Roles = "Admin")]
     [HttpGet]
@@ -3544,7 +3562,7 @@ private async Task<List<Localizacion>> BuildLocalizacionesFiltroAsync(int? empre
     if (empresaId != null)
         query = query.Where(l => l.EmpresaId == empresaId);
     if (sucursalId != null)
-        query = query.Where(l => l.SucursalId == sucursalId);
+        query = query.Where(l => l.SucursalId == sucursalId || l.SucursalId == null);
     var items = await query.OrderBy(l => l.Nombre).ToListAsync();
     if (sucursalId == null)
     {
@@ -3657,7 +3675,7 @@ private async Task<List<ReporteMaestroVM.Row>> BuildReporteMaestroRowsAsync(Date
             {
                 Fecha = fecha,
                 DiaSemana = culture.DateTimeFormat.GetDayName(fecha.DayOfWeek),
-                Hora = r.FechaSeleccion.HasValue ? r.FechaSeleccion.Value.ToLocalTime().ToString("HH:mm") : string.Empty,
+                Hora = FormatHoraRd(r.FechaSeleccion),
                 HoraAlmuerzo = horaAlmuerzoTexto,
                 Horario = horarioNombre,
                 Empresa = empresaEmpleado.Nombre ?? string.Empty,

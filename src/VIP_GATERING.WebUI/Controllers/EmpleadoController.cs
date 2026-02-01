@@ -99,7 +99,7 @@ public class EmpleadoController : Controller
         var localizacionesQuery = _db.Localizaciones
             .AsNoTracking()
             .Include(l => l.Sucursal)
-            .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId);
+            .Where(l => l.EmpresaId == empresaId);
         if (localizacionesAsignadasIds.Count > 0
             && !string.Equals(sucursalDependencia.EmpresaNombre, "GRUPO UNIVERSAL", StringComparison.OrdinalIgnoreCase))
             localizacionesQuery = localizacionesQuery.Where(l => localizacionesAsignadasIds.Contains(l.Id));
@@ -531,7 +531,7 @@ public class EmpleadoController : Controller
                 localizacionEntregaId = await _db.Localizaciones
                     .AsNoTracking()
                     .Include(l => l.Sucursal)
-                    .Where(l => l.Sucursal != null && l.Sucursal.EmpresaId == empresaId)
+                    .Where(l => l.EmpresaId == empresaId)
                     .OrderBy(l => l.Nombre)
                     .Select(l => (int?)l.Id)
                     .FirstOrDefaultAsync();
@@ -576,7 +576,7 @@ public class EmpleadoController : Controller
             TempData["Error"] = "Selecciona una localizacion de entrega.";
             return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
         }
-        if (localizacionEntrega != null && localizacionEntrega.Sucursal != null && localizacionEntrega.Sucursal.EmpresaId != empresaId)
+        if (localizacionEntrega != null && localizacionEntrega.EmpresaId != empresaId)
         {
             TempData["Error"] = "Localizacion de entrega no pertenece a la empresa.";
             return RedirectToAction(nameof(MiSemana), new { semana = model.SemanaClave });
@@ -629,7 +629,7 @@ public class EmpleadoController : Controller
                 .AsNoTracking()
                 .FirstOrDefaultAsync(l => l.Id == localizacionEntregaId.Value);
             if (localizacionEntrega != null)
-                sucursalEntregaId = localizacionEntrega.SucursalId;
+                sucursalEntregaId = localizacionEntrega.SucursalId ?? empleado.SucursalId;
         }
 
         var opcionIds = model.Dias.Select(d => d.OpcionMenuId).Distinct().ToList();

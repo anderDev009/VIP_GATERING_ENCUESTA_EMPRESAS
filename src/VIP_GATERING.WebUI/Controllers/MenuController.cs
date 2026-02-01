@@ -849,7 +849,7 @@ public class MenuController : Controller
 
         var localizaciones = await _db.Localizaciones
             .Include(l => l.Sucursal).ThenInclude(s => s!.Empresa)
-            .Where(l => empresaFiltro == null || (l.Sucursal != null && l.Sucursal.EmpresaId == empresaFiltro))
+            .Where(l => empresaFiltro == null || l.EmpresaId == empresaFiltro)
             .ToListAsync();
         var localizacionesPorNombre = localizaciones
             .GroupBy(l => NormalizeKey(l.Nombre))
@@ -967,6 +967,14 @@ public class MenuController : Controller
                         NormalizeKey(s.Nombre) == NormalizeKey("SEGUROS UNIVERSAL"));
                 }
             }
+            if (localizacion != null && sucursal == null)
+            {
+                var empresaIdLoc = localizacion.EmpresaId;
+                sucursal = sucursales
+                    .Where(s => s.EmpresaId == empresaIdLoc)
+                    .OrderBy(s => s.Nombre)
+                    .FirstOrDefault();
+            }
             if (localizacion == null && sucursal != null)
             {
                 if (!empresasSet.Contains(sucursal.EmpresaId))
@@ -978,7 +986,7 @@ public class MenuController : Controller
                 localizacion = new Localizacion
                 {
                     Nombre = localidad,
-                    SucursalId = sucursal.Id,
+                    SucursalId = null,
                     EmpresaId = sucursal.EmpresaId
                 };
                 await _db.Localizaciones.AddAsync(localizacion);

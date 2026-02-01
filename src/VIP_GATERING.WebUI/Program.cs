@@ -237,11 +237,15 @@ using (var scope = app.Services.CreateScope())
     await db.Database.ExecuteSqlRawAsync(
         "ALTER TABLE IF EXISTS \"Opciones\" " +
         "ADD COLUMN IF NOT EXISTS \"EsAdicional\" boolean NOT NULL DEFAULT FALSE;");
-    await SeedData.EnsureSeedAsync(db, app.Environment.ContentRootPath);
-    // Ensure Identity roles and demo users
-    var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
-    var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-    await VIP_GATERING.WebUI.Setup.IdentitySeeder.SeedAsync(db, roleMgr, userMgr, app.Environment);
+    // Seeding solo en entornos no productivos.
+    if (!app.Environment.IsProduction())
+    {
+        await SeedData.EnsureSeedAsync(db, app.Environment.ContentRootPath);
+        // Ensure Identity roles and demo users
+        var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        await VIP_GATERING.WebUI.Setup.IdentitySeeder.SeedAsync(db, roleMgr, userMgr, app.Environment);
+    }
 }
 
 app.Run();

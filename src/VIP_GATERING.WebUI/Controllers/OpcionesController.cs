@@ -193,7 +193,7 @@ public class OpcionesController : Controller
             if (!TryParseDecimal(precioRaw, out var precio)) precio = 0m;
             if (costo <= 0m && precio <= 0m)
             {
-                AddLimitedError(errores, $"Fila {rowNumber}: costo y precio invalidos.");
+                AddLimitedWarning(advertencias, $"Fila {rowNumber}: costo y precio en cero; se omite el producto.");
                 productosSaltados++;
                 continue;
             }
