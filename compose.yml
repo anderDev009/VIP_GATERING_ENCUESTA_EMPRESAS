@@ -23,6 +23,7 @@ services:
     container_name: vipcatering-web
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      #Staging para correr el seeder
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__DefaultConnection: Host=vipcatering;Database=vipcatering;Username=vipcatering;Password=vipcatering
       IDENTITY_DEFAULT_PASSWORD: "ChangeMe123!ChangeMe123!"
