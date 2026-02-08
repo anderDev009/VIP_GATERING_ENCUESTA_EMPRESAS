@@ -33,12 +33,12 @@ public class EmpleadosController : Controller
     public EmpleadosController(AppDbContext db, ICurrentUserService currentUser, IEmpleadoUsuarioService empUserService, UserManager<ApplicationUser> userManager, IMenuService menuService, IEncuestaCierreService cierre, ISubsidioService subsidios)
     { _db = db; _currentUser = currentUser; _empUserService = empUserService; _userManager = userManager; _menuService = menuService; _cierre = cierre; _subsidios = subsidios; }
 
-    public async Task<IActionResult> Index(int? empresaId, int? sucursalId, int? localizacionId, string? q, int page = 1, int pageSize = 10)
+    public async Task<IActionResult> Index(int? empresaId, int? sucursalId, int? localizacionId, string? q, bool verDeshabilitados = false, int page = 1, int pageSize = 10)
     {
         var query = _db.Empleados
             .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
             .Include(e => e.LocalizacionesAsignadas).ThenInclude(l => l.Localizacion)
-            .Where(e => !e.Borrado)
+            .Where(e => e.Borrado == verDeshabilitados)
             .AsQueryable();
         if (empresaId != null) query = query.Where(e => e.Sucursal!.EmpresaId == empresaId);
         if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId);
@@ -55,45 +55,12 @@ public class EmpleadosController : Controller
                 .Include(l => l.Sucursal)
                 .FirstOrDefaultAsync(l => l.Id == localizacionId.Value)
             : null;
-        if (localizacionId != null)
-        {
-            if (localizacionFiltro == null)
-            {
-                query = query.Where(e => false);
-            }
-            else if (sucursalId != null)
-            {
-                query = query.Where(e => e.LocalizacionesAsignadas.Any(l => l.LocalizacionId == localizacionId));
-            }
-            else
-            {
-                var nombreFiltro = localizacionFiltro.Nombre.Trim();
-                var empresaFiltro = empresaId ?? localizacionFiltro.EmpresaId;
-                if (empresaFiltro != null)
-                {
-                    query = query.Where(e => e.LocalizacionesAsignadas.Any(l =>
-                        l.Localizacion != null
-                        && l.Localizacion.EmpresaId == empresaFiltro
-                        && l.Localizacion.Nombre.Equals(nombreFiltro, StringComparison.OrdinalIgnoreCase)));
-                }
-                else
-                {
-                    query = query.Where(e => e.LocalizacionesAsignadas.Any(l =>
-                        l.Localizacion != null
-                        && l.Localizacion.Nombre.Equals(nombreFiltro, StringComparison.OrdinalIgnoreCase)));
-                }
-            }
-        }
+        query = ApplyLocalizacionFilter(query, empresaId, sucursalId, localizacionId, localizacionFiltro);
         ViewBag.Empresas = await _db.Empresas.OrderBy(e => e.Nombre).ToListAsync();
         ViewBag.Sucursales = await _db.Sucursales.OrderBy(s => s.Nombre).ToListAsync();
-        var localizacionesQuery = _db.Localizaciones.Include(l => l.Sucursal).AsQueryable();
-        if (empresaId != null)
-            localizacionesQuery = localizacionesQuery.Where(l => l.EmpresaId == empresaId);
-        if (sucursalId != null)
-            localizacionesQuery = localizacionesQuery.Where(l => l.SucursalId == sucursalId || l.SucursalId == null);
-        var localizacionesList = await localizacionesQuery.OrderBy(l => l.Nombre).ToListAsync();
-        ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList);
-        ViewBag.EmpresaId = empresaId; ViewBag.SucursalId = sucursalId; ViewBag.LocalizacionId = localizacionId; ViewBag.Q = q;
+        var localizacionesList = await _db.Localizaciones.Include(l => l.Sucursal).OrderBy(l => l.Nombre).ToListAsync();
+        ViewBag.Localizaciones = DistinctLocalizaciones(localizacionesList, localizacionId != null ? new[] { localizacionId.Value } : null);
+        ViewBag.EmpresaId = empresaId; ViewBag.SucursalId = sucursalId; ViewBag.LocalizacionId = localizacionId; ViewBag.Q = q; ViewBag.VerDeshabilitados = verDeshabilitados;
         var paged = await query.OrderBy(e => e.Nombre).ToPagedResultAsync(page, pageSize);
         // Usuario por empleado en pagina
         var ids = paged.Items.Select(i => i.Id).ToList();
@@ -106,9 +73,10 @@ public class EmpleadosController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> ExportExcel(int? empresaId, int? sucursalId, int? localizacionId, string? q)
+    public async Task<IActionResult> ExportExcel(int? empresaId, int? sucursalId, int? localizacionId, string? q, bool verDeshabilitados = false)
     {
-        var empleados = await BuildExportQuery(empresaId, sucursalId, localizacionId, q)
+        var exportQuery = await BuildExportQueryAsync(empresaId, sucursalId, localizacionId, q, verDeshabilitados);
+        var empleados = await exportQuery
             .OrderBy(e => e.Nombre ?? e.Codigo)
             .ToListAsync();
         var headers = new[] { "Codigo", "Nombre", "Empresa", "Filial", "Estado", "Subsidio", "Localizacion" };
@@ -382,19 +350,33 @@ public class EmpleadosController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> Delete(int id, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, string? q = null, int page = 1)
     {
         var ent = await _db.Empleados.FindAsync(id);
         if (ent != null)
         {
-            var sucId = ent.SucursalId;
             ent.Estado = EmpleadoEstado.Desactivado;
             ent.Borrado = true;
             await _db.SaveChangesAsync();
             TempData["Success"] = "Empleado desactivado.";
-            return RedirectToAction(nameof(Index), new { sucursalId = sucId });
+            return RedirectToAction(nameof(Index), new { empresaId, sucursalId, localizacionId, q, page });
         }
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { empresaId, sucursalId, localizacionId, q, page });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Restore(int id, int? empresaId = null, int? sucursalId = null, int? localizacionId = null, string? q = null, int page = 1)
+    {
+        var ent = await _db.Empleados.FindAsync(id);
+        if (ent != null)
+        {
+            ent.Estado = EmpleadoEstado.Habilitado;
+            ent.Borrado = false;
+            await _db.SaveChangesAsync();
+            TempData["Success"] = "Empleado re-habilitado.";
+        }
+        return RedirectToAction(nameof(Index), new { empresaId, sucursalId, localizacionId, q, page, verDeshabilitados = true });
     }
 
     private static List<Localizacion> DistinctLocalizaciones(List<Localizacion> localizaciones, IEnumerable<int>? seleccionadas = null)
@@ -418,12 +400,12 @@ public class EmpleadosController : Controller
         return resultado;
     }
 
-    private IQueryable<Empleado> BuildExportQuery(int? empresaId, int? sucursalId, int? localizacionId, string? q)
+    private async Task<IQueryable<Empleado>> BuildExportQueryAsync(int? empresaId, int? sucursalId, int? localizacionId, string? q, bool verDeshabilitados)
     {
         var query = _db.Empleados
             .Include(e => e.Sucursal).ThenInclude(s => s!.Empresa)
             .Include(e => e.LocalizacionesAsignadas).ThenInclude(l => l.Localizacion)
-            .Where(e => !e.Borrado)
+            .Where(e => e.Borrado == verDeshabilitados)
             .AsQueryable();
         if (empresaId != null) query = query.Where(e => e.Sucursal!.EmpresaId == empresaId);
         if (sucursalId != null) query = query.Where(e => e.SucursalId == sucursalId);
@@ -435,12 +417,37 @@ public class EmpleadosController : Controller
                 || (e.Codigo != null && e.Codigo.ToLower().Contains(ql)));
         }
 
-        if (localizacionId != null)
-        {
-            query = query.Where(e => e.LocalizacionesAsignadas.Any(l => l.LocalizacionId == localizacionId));
-        }
+        var localizacionFiltro = localizacionId != null
+            ? await _db.Localizaciones.AsNoTracking().FirstOrDefaultAsync(l => l.Id == localizacionId.Value)
+            : null;
+        query = ApplyLocalizacionFilter(query, empresaId, sucursalId, localizacionId, localizacionFiltro);
 
         return query;
+    }
+
+    private IQueryable<Empleado> ApplyLocalizacionFilter(IQueryable<Empleado> query, int? empresaId, int? sucursalId, int? localizacionId, Localizacion? localizacionFiltro)
+    {
+        if (localizacionId == null)
+            return query;
+        if (localizacionFiltro == null)
+            return query.Where(_ => false);
+        if (sucursalId != null)
+            return query.Where(e => e.LocalizacionesAsignadas.Any(l => l.LocalizacionId == localizacionId));
+
+        var empresaFiltro = empresaId ?? localizacionFiltro.EmpresaId;
+        var nombreFiltro = NormalizeLocalizacionKey(localizacionFiltro.Nombre);
+        return query.Where(e => e.LocalizacionesAsignadas.Any(l =>
+            l.Localizacion != null
+            && l.Localizacion.EmpresaId == empresaFiltro
+            && l.Localizacion.Nombre != null
+            && l.Localizacion.Nombre.Trim().ToUpper() == nombreFiltro));
+    }
+
+    private static string NormalizeLocalizacionKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+        return value.Trim().ToUpper();
     }
 
     // Atajo: simular sesion del usuario del empleado y abrir "Mi semana"

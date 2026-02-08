@@ -274,6 +274,73 @@ public class MenuController : Controller
         return View("VistaPrevia", vm);
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> QuitarDiasVistaPrevia(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, [FromForm] List<int>? opcionMenuIds)
+    {
+        if (opcionMenuIds == null || opcionMenuIds.Count == 0)
+        {
+            TempData["Info"] = "Selecciona al menos un dia para quitar.";
+            return RedirectToAction(nameof(VistaPrevia), new { inicio, fin, empresaId, sucursalId });
+        }
+
+        var menu = await _menuService.GetOrCreateMenuAsync(inicio, fin, empresaId, sucursalId);
+        var ids = opcionMenuIds.Distinct().ToList();
+        var dias = await _db.OpcionesMenu
+            .Where(o => o.MenuId == menu.Id && ids.Contains(o.Id))
+            .ToListAsync();
+
+        if (dias.Count == 0)
+        {
+            TempData["Info"] = "No se encontraron dias validos para quitar.";
+            return RedirectToAction(nameof(VistaPrevia), new { inicio, fin, empresaId, sucursalId });
+        }
+
+        foreach (var dia in dias)
+        {
+            dia.DiaCerrado = true;
+            dia.OpcionIdA = null;
+            dia.OpcionIdB = null;
+            dia.OpcionIdC = null;
+            dia.OpcionIdD = null;
+            dia.OpcionIdE = null;
+        }
+
+        await _db.SaveChangesAsync();
+        TempData["Success"] = $"Se quitaron {dias.Count} dia(s) del menu.";
+        return RedirectToAction(nameof(VistaPrevia), new { inicio, fin, empresaId, sucursalId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RehabilitarDiasVistaPrevia(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId, [FromForm] List<int>? opcionMenuIds)
+    {
+        if (opcionMenuIds == null || opcionMenuIds.Count == 0)
+        {
+            TempData["Info"] = "Selecciona al menos un dia para re-habilitar.";
+            return RedirectToAction(nameof(VistaPrevia), new { inicio, fin, empresaId, sucursalId });
+        }
+
+        var menu = await _menuService.GetOrCreateMenuAsync(inicio, fin, empresaId, sucursalId);
+        var ids = opcionMenuIds.Distinct().ToList();
+        var dias = await _db.OpcionesMenu
+            .Where(o => o.MenuId == menu.Id && ids.Contains(o.Id))
+            .ToListAsync();
+
+        if (dias.Count == 0)
+        {
+            TempData["Info"] = "No se encontraron dias validos para re-habilitar.";
+            return RedirectToAction(nameof(VistaPrevia), new { inicio, fin, empresaId, sucursalId });
+        }
+
+        foreach (var dia in dias)
+            dia.DiaCerrado = false;
+
+        await _db.SaveChangesAsync();
+        TempData["Success"] = $"Se re-habilitaron {dias.Count} dia(s).";
+        return RedirectToAction(nameof(VistaPrevia), new { inicio, fin, empresaId, sucursalId });
+    }
+
     [HttpGet]
     public async Task<IActionResult> ExportMenuCsv(DateOnly inicio, DateOnly fin, int? empresaId, int? sucursalId)
     {
@@ -329,6 +396,21 @@ public class MenuController : Controller
             ? await _db.Sucursales.Where(s => s.Id == sucursalLookupId).Select(s => s.Nombre).FirstOrDefaultAsync()
             : null;
 
+        var dias = opciones.Select(o => new MenuPreviewDiaVM
+        {
+            OpcionMenuId = o.Id,
+            DiaSemana = o.DiaSemana,
+            HorarioNombre = o.Horario?.Nombre ?? "General",
+            HorarioOrden = o.Horario?.Orden ?? int.MaxValue,
+            DiaCerrado = o.DiaCerrado,
+            A = o.OpcionA?.Nombre,
+            B = o.OpcionB?.Nombre,
+            C = o.OpcionC?.Nombre,
+            D = o.OpcionD?.Nombre,
+            E = o.OpcionE?.Nombre,
+            OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas
+        }).ToList();
+
         return new MenuPreviewVM
         {
             FechaInicio = inicio,
@@ -338,18 +420,8 @@ public class MenuController : Controller
             EmpresaNombre = empresaNombre,
             FilialNombre = sucursalNombre,
             OrigenScope = sucursalLookupId != null ? "Filial" : "Empresa",
-            Dias = opciones.Select(o => new MenuPreviewDiaVM
-            {
-                DiaSemana = o.DiaSemana,
-                HorarioNombre = o.Horario?.Nombre ?? "General",
-                HorarioOrden = o.Horario?.Orden ?? int.MaxValue,
-                A = o.OpcionA?.Nombre,
-                B = o.OpcionB?.Nombre,
-                C = o.OpcionC?.Nombre,
-                D = o.OpcionD?.Nombre,
-                E = o.OpcionE?.Nombre,
-                OpcionesMaximas = o.OpcionesMaximas == 0 ? 3 : o.OpcionesMaximas
-            }).ToList()
+            Dias = dias.Where(d => !d.DiaCerrado).ToList(),
+            DiasCerrados = dias.Where(d => d.DiaCerrado).ToList()
         };
     }
 

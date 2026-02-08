@@ -55,6 +55,15 @@
     </div>
     @if (Model.EmpresaId != null && Model.SucursalId != null)
     {
+        <div class="mb-4 text-right space-y-1 border-t border-slate-200 pt-3">
+            <div class="text-sm text-slate-600">Selecciones: <span class="font-semibold">@Model.TotalSelecciones</span></div>
+            <div class="text-sm text-slate-600">Total base: <span class="font-semibold">@Model.TotalBase.ToString("C")</span></div>
+            <div class="text-sm text-slate-600">ITBIS: <span class="font-semibold">@Model.TotalItbis.ToString("C")</span></div>
+            <div class="text-sm text-slate-600">Total general: <span class="font-semibold">@Model.TotalGeneral.ToString("C")</span></div>
+            <div class="text-sm text-slate-600">Empresa paga: <span class="font-semibold">@Model.TotalEmpresa.ToString("C")</span></div>
+            <div class="text-sm text-slate-600">Empleado paga: <span class="font-semibold">@Model.TotalEmpleado.ToString("C")</span></div>
+        </div>
+
         <div class="flex gap-3 md:col-span-4">
             <a class="btn-outline" asp-action="@Model.ExportExcelAction" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")">Exportar Excel</a>
             <a class="btn-outline" asp-action="@Model.ExportCsvAction" asp-route-empresaId="@Model.EmpresaId" asp-route-sucursalId="@Model.SucursalId" asp-route-desde="@Model.Inicio.ToString("yyyy-MM-dd")" asp-route-hasta="@Model.Fin.ToString("yyyy-MM-dd")">Exportar CSV</a>
@@ -103,6 +112,16 @@
                 </tr>
             }
             </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="7" class="text-right p-2">Totales</th>
+                    <th class="text-right p-2">@Model.TotalBase.ToString("C")</th>
+                    <th class="text-right p-2">@Model.TotalItbis.ToString("C")</th>
+                    <th class="text-right p-2">@Model.TotalGeneral.ToString("C")</th>
+                    <th class="text-right p-2">@Model.TotalEmpresa.ToString("C")</th>
+                    <th class="text-right p-2">@Model.TotalEmpleado.ToString("C")</th>
+                </tr>
+            </tfoot>
         </table>
     </div>
 }

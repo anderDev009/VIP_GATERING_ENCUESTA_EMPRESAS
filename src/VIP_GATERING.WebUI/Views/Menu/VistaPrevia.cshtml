@@ -43,10 +43,60 @@
     <div class="panel-subtitle">Esta vista muestra como se vera el menu para los empleados.</div>
 </section>
 
+<form asp-action="QuitarDiasVistaPrevia" method="post" class="page-panel space-y-3 mb-4" id="quitar-dias-preview-form">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="inicio" value="@Model.FechaInicio.ToString("yyyy-MM-dd")" />
+    <input type="hidden" name="fin" value="@Model.FechaTermino.ToString("yyyy-MM-dd")" />
+    <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
+    <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
+    <div class="flex flex-wrap items-center gap-2">
+        <button type="submit" class="btn-outline text-rose-600 border-rose-200 hover:border-rose-300">Quitar dias seleccionados</button>
+        <span class="text-xs text-slate-500">Marca el dia y luego haz clic en quitar.</span>
+    </div>
+</form>
+
+@if (Model.DiasCerrados.Any())
+{
+    <form asp-action="RehabilitarDiasVistaPrevia" method="post" class="page-panel space-y-3 mb-4" id="rehabilitar-dias-preview-form">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="inicio" value="@Model.FechaInicio.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="fin" value="@Model.FechaTermino.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="empresaId" value="@Model.EmpresaId" />
+        <input type="hidden" name="sucursalId" value="@Model.SucursalId" />
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="submit" class="btn-outline text-emerald-700 border-emerald-200 hover:border-emerald-300">Re-habilitar dias seleccionados</button>
+            <span class="text-xs text-slate-500">Estos dias fueron quitados. Puedes activarlos de nuevo.</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="menu-table">
+                <thead>
+                    <tr>
+                        <th>Re-habilitar</th>
+                        <th>Dia</th>
+                        <th>Horario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var d in Model.DiasCerrados.OrderBy(x => x.HorarioOrden).ThenBy(x => x.DiaSemana))
+                    {
+                        <tr>
+                            <td class="menu-daycell">
+                                <input type="checkbox" name="opcionMenuIds" value="@d.OpcionMenuId" />
+                            </td>
+                            <td class="menu-daycell">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana)</td>
+                            <td class="menu-daycell">@d.HorarioNombre</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </form>
+}
+
 @if (Model.Dias == null || Model.Dias.Count == 0)
 {
     <div class="page-panel">
-        <div class="empty-state">No hay platos configurados para este rango.</div>
+        <div class="empty-state">No hay dias activos para este rango.</div>
     </div>
 }
 else
@@ -72,6 +122,7 @@ else
                 <table class="menu-table">
                     <thead>
                         <tr>
+                            <th>Quitar</th>
                             <th>Dia</th>
                             @for (var c = 0; c < maxOpciones; c++)
                             {
@@ -83,6 +134,9 @@ else
                         @foreach (var d in items)
                         {
                             <tr>
+                                <td class="menu-daycell">
+                                    <input type="checkbox" name="opcionMenuIds" value="@d.OpcionMenuId" form="quitar-dias-preview-form" />
+                                </td>
                                 <td class="menu-daycell">
                                     <div class="menu-day-title">
                                         <span>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetDayName(d.DiaSemana)</span>

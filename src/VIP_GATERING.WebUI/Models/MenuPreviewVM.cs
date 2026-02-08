@@ -10,13 +10,16 @@ public class MenuPreviewVM
     public string? FilialNombre { get; set; }
     public string OrigenScope { get; set; } = "Empresa";
     public List<MenuPreviewDiaVM> Dias { get; set; } = new();
+    public List<MenuPreviewDiaVM> DiasCerrados { get; set; } = new();
 }
 
 public class MenuPreviewDiaVM
 {
+    public int OpcionMenuId { get; set; }
     public DayOfWeek DiaSemana { get; set; }
     public string? HorarioNombre { get; set; }
     public int HorarioOrden { get; set; }
+    public bool DiaCerrado { get; set; }
     public string? A { get; set; }
     public string? B { get; set; }
     public string? C { get; set; }

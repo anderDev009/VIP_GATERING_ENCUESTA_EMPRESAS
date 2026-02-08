@@ -22,6 +22,12 @@ public class CierreFacturacionDetalleVM
     public IEnumerable<Sucursal> Sucursales { get; set; } = Enumerable.Empty<Sucursal>();
 
     public List<Row> Filas { get; set; } = new();
+    public int TotalSelecciones => Filas.Count;
+    public decimal TotalBase => Filas.Sum(r => r.Base);
+    public decimal TotalItbis => Filas.Sum(r => r.Itbis);
+    public decimal TotalGeneral => Filas.Sum(r => r.Total);
+    public decimal TotalEmpresa => Filas.Sum(r => r.EmpresaPaga);
+    public decimal TotalEmpleado => Filas.Sum(r => r.EmpleadoPaga);
 
     public class Row
     {

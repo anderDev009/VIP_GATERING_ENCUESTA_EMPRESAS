@@ -1,5 +1,7 @@
 @{
     Layout = null;
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString();
+    var isReportesController = string.Equals(controller, "Reportes", System.StringComparison.OrdinalIgnoreCase);
 }
 <!DOCTYPE html>
 <html lang="es">
@@ -8,6 +10,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - VIP CATERING</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @if (isReportesController)
+    {
+        <link rel="stylesheet" href="~/vendor/tom-select/tom-select.css" />
+    }
     @RenderSection("Styles", required: false)
 </head>
 <body class="app-body">
@@ -121,6 +127,11 @@
         </footer>
     </div>
 
+    @if (isReportesController)
+    {
+        <script src="~/vendor/tom-select/tom-select.complete.min.js" defer></script>
+        <script src="~/js/reportes-filtros.js" defer></script>
+    }
     @RenderSection("Scripts", required: false)
 </body>
 </html>
