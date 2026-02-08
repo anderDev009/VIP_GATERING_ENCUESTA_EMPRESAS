@@ -17,6 +17,11 @@
                 <th class="text-left p-2">Filial</th>
                 <th class="text-center p-2">Estado</th>
                 <th class="text-right p-2">Selecciones</th>
+                <th class="text-right p-2">Base</th>
+                <th class="text-right p-2">ITBIS</th>
+                <th class="text-right p-2">Total</th>
+                <th class="text-right p-2">Empresa paga</th>
+                <th class="text-right p-2">Empleado paga</th>
                 <th class="text-right p-2">Acciones</th>
             </tr>
         </thead>
@@ -32,6 +37,11 @@
                     <span class="chip">@r.Estado</span>
                 </td>
                 <td class="p-2 text-right">@r.TotalSelecciones</td>
+                <td class="p-2 text-right">@r.TotalBase.ToString("C")</td>
+                <td class="p-2 text-right">@r.TotalItbis.ToString("C")</td>
+                <td class="p-2 text-right">@r.TotalGeneral.ToString("C")</td>
+                <td class="p-2 text-right">@r.TotalEmpresa.ToString("C")</td>
+                <td class="p-2 text-right">@r.TotalEmpleado.ToString("C")</td>
                 <td class="p-2 text-right">
                     <div class="flex justify-end gap-2">
                         @if (!r.Cerrado && !string.IsNullOrWhiteSpace(Model.AccionEditar))

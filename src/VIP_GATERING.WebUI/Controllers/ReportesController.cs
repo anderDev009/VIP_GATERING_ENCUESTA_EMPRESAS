@@ -3272,7 +3272,12 @@ private async Task<CierreListadoVM> BuildCierreListadoAsync(bool esFacturacion, 
                 Sucursal = sucursal,
                 Inicio = r.OpcionMenu!.Menu!.FechaInicio,
                 Fin = r.OpcionMenu.Menu.FechaTermino,
-                Cerrado = esFacturacion ? r.Facturado : r.CierreNomina
+                Cerrado = esFacturacion ? r.Facturado : r.CierreNomina,
+                Base = (r.BaseSnapshot ?? 0m) + (r.AdicionalBaseSnapshot ?? 0m),
+                Itbis = (r.ItbisSnapshot ?? 0m) + (r.AdicionalItbisSnapshot ?? 0m),
+                Total = (r.TotalSnapshot ?? 0m) + (r.AdicionalTotalSnapshot ?? 0m),
+                EmpresaPaga = (r.EmpresaPagaSnapshot ?? 0m) + (r.AdicionalEmpresaPagaSnapshot ?? 0m),
+                EmpleadoPaga = (r.EmpleadoPagaSnapshot ?? 0m) + (r.AdicionalEmpleadoPagaSnapshot ?? 0m)
             };
         })
         .Where(x => x.Empresa != null && x.Sucursal != null)
@@ -3289,6 +3294,11 @@ private async Task<CierreListadoVM> BuildCierreListadoAsync(bool esFacturacion, 
                 Inicio = g.Key.Inicio,
                 Fin = g.Key.Fin,
                 TotalSelecciones = g.Count(),
+                TotalBase = g.Sum(x => x.Base),
+                TotalItbis = g.Sum(x => x.Itbis),
+                TotalGeneral = g.Sum(x => x.Total),
+                TotalEmpresa = g.Sum(x => x.EmpresaPaga),
+                TotalEmpleado = g.Sum(x => x.EmpleadoPaga),
                 Cerrado = g.All(x => x.Cerrado)
             };
         })

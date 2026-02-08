@@ -21,6 +21,11 @@ public class CierreListadoVM
         public DateOnly Inicio { get; set; }
         public DateOnly Fin { get; set; }
         public int TotalSelecciones { get; set; }
+        public decimal TotalBase { get; set; }
+        public decimal TotalItbis { get; set; }
+        public decimal TotalGeneral { get; set; }
+        public decimal TotalEmpresa { get; set; }
+        public decimal TotalEmpleado { get; set; }
         public bool Cerrado { get; set; }
         public string Estado => Cerrado ? "Cerrado" : "Abierto";
     }

@@ -22,8 +22,8 @@
 <div class="tab-switch tab-switch--panel mb-4">
     <div class="tab-switch__label">Estado</div>
     <div class="tab-switch__group">
-        <a class="tab-pill @(verDeshabilitados ? "" : "is-active")" asp-action="Index" asp-route-empresaId="@empresaSel" asp-route-sucursalId="@sucursalSel" asp-route-localizacionId="@localizacionSel" asp-route-q="@q" asp-route-verDeshabilitados="false">Activos</a>
-        <a class="tab-pill @(verDeshabilitados ? "is-active" : "")" asp-action="Index" asp-route-empresaId="@empresaSel" asp-route-sucursalId="@sucursalSel" asp-route-localizacionId="@localizacionSel" asp-route-q="@q" asp-route-verDeshabilitados="true">Deshabilitados</a>
+        <a class="tab-pill @(verDeshabilitados ? "" : "is-active text-white hover:text-white")" asp-action="Index" asp-route-empresaId="@empresaSel" asp-route-sucursalId="@sucursalSel" asp-route-localizacionId="@localizacionSel" asp-route-q="@q" asp-route-verDeshabilitados="false">Activos</a>
+        <a class="tab-pill @(verDeshabilitados ? "is-active text-white hover:text-white" : "")" asp-action="Index" asp-route-empresaId="@empresaSel" asp-route-sucursalId="@sucursalSel" asp-route-localizacionId="@localizacionSel" asp-route-q="@q" asp-route-verDeshabilitados="true">Deshabilitados</a>
     </div>
 </div>
 
