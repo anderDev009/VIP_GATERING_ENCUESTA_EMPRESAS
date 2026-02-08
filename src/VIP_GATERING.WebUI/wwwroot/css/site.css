@@ -48,6 +48,13 @@
 .report-scroll::-webkit-scrollbar-thumb:hover{background:#b7bfd6}
 .input-error{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.12)}
 
+/* Ensure tab pills rendered as links keep readable text colors */
+a.tab-pill{color:var(--ink-800)!important}
+a.tab-pill:hover{color:var(--ink-900)!important}
+a.tab-pill.is-active,
+a.tab-pill.is-active:hover,
+a.tab-pill.is-active:focus{color:#fff!important}
+
 
 .app-logo{gap:.65rem;text-transform:none;letter-spacing:.12em}
 .app-logo:before{content:none}
