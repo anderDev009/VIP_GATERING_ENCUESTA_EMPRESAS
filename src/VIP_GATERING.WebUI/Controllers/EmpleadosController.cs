@@ -730,8 +730,16 @@ public class EmpleadosController : Controller
 
         if (!await _userManager.IsInRoleAsync(usuario, "Empleado"))
             await _userManager.AddToRoleAsync(usuario, "Empleado");
+        await EnsureMustChangePasswordClaimAsync(usuario);
 
         return (null, false);
+    }
+
+    private async Task EnsureMustChangePasswordClaimAsync(ApplicationUser user)
+    {
+        var claims = await _userManager.GetClaimsAsync(user);
+        if (!claims.Any(c => c.Type == "must_change_password" && c.Value == "1"))
+            await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("must_change_password", "1"));
     }
 
     private async Task<string?> ValidatePasswordAsync(ApplicationUser user, string newPassword)

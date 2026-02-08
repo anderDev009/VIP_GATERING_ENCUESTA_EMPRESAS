@@ -1991,6 +1991,7 @@ public class MenuController : Controller
 
             if (!await _userManager.IsInRoleAsync(existing, "Empleado"))
                 await _userManager.AddToRoleAsync(existing, "Empleado");
+            await EnsureMustChangePasswordClaimAsync(existing);
 
             return (false, null);
         }
@@ -2021,8 +2022,16 @@ public class MenuController : Controller
 
         if (!await _userManager.IsInRoleAsync(usuario, "Empleado"))
             await _userManager.AddToRoleAsync(usuario, "Empleado");
+        await EnsureMustChangePasswordClaimAsync(usuario);
 
         return (true, null);
+    }
+
+    private async Task EnsureMustChangePasswordClaimAsync(ApplicationUser user)
+    {
+        var claims = await _userManager.GetClaimsAsync(user);
+        if (!claims.Any(c => c.Type == "must_change_password" && c.Value == "1"))
+            await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("must_change_password", "1"));
     }
 
     private static string BuildDefaultPassword(string codigo, int empleadoId)

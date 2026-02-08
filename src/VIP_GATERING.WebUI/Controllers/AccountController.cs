@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Text;
 using VIP_GATERING.Infrastructure.Identity;
 using System.Linq;
 using VIP_GATERING.WebUI.Models.Account;
@@ -54,6 +56,15 @@ public class AccountController : Controller
                 }
                 var claims = await _userManager.GetClaimsAsync(user);
                 var mustChange = claims.Any(c => c.Type == "must_change_password" && c.Value == "1");
+                if (!mustChange && user.EmpleadoId != null)
+                {
+                    var defaultPassword = BuildEmpleadoDefaultPassword(user.UserName, user.EmpleadoId.Value);
+                    if (await _userManager.CheckPasswordAsync(user, defaultPassword))
+                    {
+                        await _userManager.AddClaimAsync(user, new System.Security.Claims.Claim("must_change_password", "1"));
+                        mustChange = true;
+                    }
+                }
                 if (mustChange)
                     return RedirectToAction("ChangePassword", new { returnUrl = model.ReturnUrl });
                 if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
@@ -111,4 +122,35 @@ public class AccountController : Controller
         TempData["Success"] = "Contraseña actualizada.";
         return Redirect(model.ReturnUrl ?? Url.Action("Index", "Home")!);
     }
+    private static string BuildEmpleadoDefaultPassword(string? userName, int empleadoId)
+    {
+        var codigoToken = ToToken(userName);
+        if (string.IsNullOrWhiteSpace(codigoToken))
+            codigoToken = empleadoId.ToString().PadLeft(6, '0');
+        var password = $"UNI{codigoToken}@";
+        if (password.Length < 6)
+            password = password.PadRight(6, '0');
+        return password;
+    }
+
+    private static string ToToken(string? value)
+    {
+        var cleaned = RemoveDiacritics(value ?? string.Empty);
+        var chars = cleaned.Where(char.IsLetterOrDigit).ToArray();
+        return new string(chars).ToUpperInvariant();
+    }
+
+    private static string RemoveDiacritics(string value)
+    {
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder();
+        foreach (var ch in normalized)
+        {
+            var cat = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (cat != UnicodeCategory.NonSpacingMark)
+                sb.Append(ch);
+        }
+        return sb.ToString().Normalize(NormalizationForm.FormC);
+    }
 }
+
