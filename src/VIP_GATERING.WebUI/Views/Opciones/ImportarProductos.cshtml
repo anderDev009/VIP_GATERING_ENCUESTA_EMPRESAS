@@ -13,6 +13,10 @@
 
     <form asp-action="ImportarProductos" method="post" enctype="multipart/form-data" class="space-y-4">
         @Html.AntiForgeryToken()
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div asp-validation-summary="All" class="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"></div>
+        }
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="md:col-span-2">
                 <label class="form-label">Archivo Excel</label>
